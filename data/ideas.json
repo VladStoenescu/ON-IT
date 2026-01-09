@@ -1,0 +1,12 @@
+[
+  {
+    "id": "1767947418646",
+    "title": "Automated Code Review System",
+    "description": "Implement an AI-powered code review system that automatically checks code quality, security vulnerabilities, and best practices before merging pull requests.",
+    "category": "Technology",
+    "type": "Efficiency Improvement",
+    "submittedBy": "Test User",
+    "submittedAt": "2026-01-09T08:30:18.646Z",
+    "status": "Pending"
+  }
+]
