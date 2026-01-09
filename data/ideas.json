@@ -1,12 +1,12 @@
 [
   {
-    "id": "1767947418646",
-    "title": "Automated Code Review System",
-    "description": "Implement an AI-powered code review system that automatically checks code quality, security vulnerabilities, and best practices before merging pull requests.",
-    "category": "Technology",
+    "id": "1767947620114",
+    "title": "Mobile App for Team Communication",
+    "description": "Develop a mobile app to improve internal team communication and collaboration on-the-go.",
+    "category": "Internal",
     "type": "Efficiency Improvement",
-    "submittedBy": "Test User",
-    "submittedAt": "2026-01-09T08:30:18.646Z",
+    "submittedBy": "Anonymous",
+    "submittedAt": "2026-01-09T08:33:40.114Z",
     "status": "Pending"
   }
 ]

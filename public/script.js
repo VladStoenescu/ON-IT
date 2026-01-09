@@ -5,7 +5,7 @@ const API_URL = '/api';
 let allIdeas = [];
 
 // Tab switching
-function showTab(tabName) {
+function showTab(tabName, event) {
     // Hide all tabs
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
@@ -16,7 +16,9 @@ function showTab(tabName) {
 
     // Show selected tab
     document.getElementById(`${tabName}-tab`).classList.add('active');
-    event.target.classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
 
     // Load ideas when viewing the ideas tab
     if (tabName === 'view') {
