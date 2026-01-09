@@ -1,6 +1,9 @@
 // API Base URL
 const API_URL = '/api';
 
+// Constants
+const MESSAGE_DISPLAY_DURATION = 5000; // milliseconds
+
 // Store all ideas for filtering
 let allIdeas = [];
 
@@ -52,14 +55,14 @@ document.getElementById('idea-form').addEventListener('submit', async (e) => {
         if (response.ok) {
             showMessage('success', 'Your idea has been submitted successfully!');
             document.getElementById('idea-form').reset();
-            setTimeout(() => hideMessage('success'), 5000);
+            setTimeout(() => hideMessage('success'), MESSAGE_DISPLAY_DURATION);
         } else {
             showMessage('error', data.error || 'Error submitting idea');
-            setTimeout(() => hideMessage('error'), 5000);
+            setTimeout(() => hideMessage('error'), MESSAGE_DISPLAY_DURATION);
         }
     } catch (error) {
         showMessage('error', 'Error connecting to server');
-        setTimeout(() => hideMessage('error'), 5000);
+        setTimeout(() => hideMessage('error'), MESSAGE_DISPLAY_DURATION);
     }
 });
 

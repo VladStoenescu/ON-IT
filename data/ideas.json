@@ -8,5 +8,15 @@
     "submittedBy": "Anonymous",
     "submittedAt": "2026-01-09T08:33:40.114Z",
     "status": "Pending"
+  },
+  {
+    "id": "1767947756052-fk6j2s5dq",
+    "title": "Test Idea",
+    "description": "Testing the new ID generation",
+    "category": "Process",
+    "type": "Cost Reduction",
+    "submittedBy": "API Test",
+    "submittedAt": "2026-01-09T08:35:56.052Z",
+    "status": "Pending"
   }
 ]

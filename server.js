@@ -16,7 +16,7 @@ app.use(express.static('public'));
 
 // Ensure data directory and file exist
 if (!fsSync.existsSync(path.join(__dirname, 'data'))) {
-    fsSync.mkdirSync(path.join(__dirname, 'data'));
+    fsSync.mkdirSync(path.join(__dirname, 'data'), { mode: 0o755 });
 }
 if (!fsSync.existsSync(DATA_FILE)) {
     fsSync.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
@@ -47,7 +47,7 @@ app.post('/api/ideas', async (req, res) => {
         const ideas = JSON.parse(data);
         
         const newIdea = {
-            id: Date.now().toString(),
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             title,
             description,
             category,
