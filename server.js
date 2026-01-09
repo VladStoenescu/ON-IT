@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -9,10 +10,24 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'ideas.json');
 
+// Rate limiting configuration
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.'
+});
+
+const strictLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // Limit each IP to 20 POST requests per windowMs
+    message: 'Too many submissions from this IP, please try again later.'
+});
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
+app.use('/api/', limiter); // Apply rate limiting to all API routes
 
 // Ensure data directory and file exist
 if (!fsSync.existsSync(path.join(__dirname, 'data'))) {
@@ -34,7 +49,7 @@ app.get('/api/ideas', async (req, res) => {
 });
 
 // Submit a new idea
-app.post('/api/ideas', async (req, res) => {
+app.post('/api/ideas', strictLimiter, async (req, res) => {
     try {
         const { title, description, category, type, submittedBy } = req.body;
 
