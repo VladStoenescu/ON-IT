@@ -1,22 +1,12 @@
 [
   {
-    "id": "1767947620114",
-    "title": "Mobile App for Team Communication",
-    "description": "Develop a mobile app to improve internal team communication and collaboration on-the-go.",
-    "category": "Internal",
-    "type": "Efficiency Improvement",
-    "submittedBy": "Anonymous",
-    "submittedAt": "2026-01-09T08:33:40.114Z",
-    "status": "Pending"
-  },
-  {
-    "id": "1767947756052-fk6j2s5dq",
-    "title": "Test Idea",
-    "description": "Testing the new ID generation",
-    "category": "Process",
-    "type": "Cost Reduction",
-    "submittedBy": "API Test",
-    "submittedAt": "2026-01-09T08:35:56.052Z",
+    "id": "1767948053970-ttod7313b",
+    "title": "Customer Feedback Portal",
+    "description": "Build an external-facing portal where customers can submit feedback and feature requests directly.",
+    "category": "External",
+    "type": "Quality Enhancement",
+    "submittedBy": "Product Team",
+    "submittedAt": "2026-01-09T08:40:53.970Z",
     "status": "Pending"
   }
 ]

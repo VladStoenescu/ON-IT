@@ -17,7 +17,8 @@ A web application for internal teams to submit and manage innovation ideas. Team
 - **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
 - **Backend**: Node.js with Express
 - **Data Storage**: JSON file-based storage
-- **Dependencies**: express, body-parser, cors
+- **Dependencies**: express, body-parser, cors, express-rate-limit
+- **Security**: Rate limiting, input sanitization, XSS protection
 
 ## Prerequisites
 
@@ -117,9 +118,15 @@ All ideas are stored in `data/ideas.json`. Each idea includes:
 
 ## Security Notes
 
-- Input sanitization is implemented on the frontend to prevent XSS attacks
-- CORS is enabled for API access
-- All user inputs are escaped before display
+- **Rate Limiting**: API endpoints are protected with rate limiting:
+  - General API endpoints: 100 requests per 15 minutes per IP
+  - Submission endpoint: 20 requests per 15 minutes per IP
+- **Input Sanitization**: All user inputs are sanitized on the frontend to prevent XSS attacks
+- **CORS**: Cross-Origin Resource Sharing is enabled for API access
+- **HTML Escaping**: All user inputs are escaped before display in the browser
+- **Async I/O**: Non-blocking file operations for better performance and security
+- **Directory Permissions**: Data directory created with secure permissions (0o755)
+- **Collision-Resistant IDs**: Unique ID generation using timestamp + random string
 
 ## Future Enhancements
 
