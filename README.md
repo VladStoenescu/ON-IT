@@ -95,6 +95,18 @@ Retrieve a specific idea by ID.
 
 **Response**: Single idea object
 
+## Deployment
+
+The application is deployed to a DigitalOcean droplet via SSH using GitHub Actions on every push to the `main` branch.
+
+| Variable | Value |
+|---|---|
+| `SSH_HOST` | `134.122.80.196` |
+| `SSH_USERNAME` | `root` |
+| `SSH_PRIVATE_KEY` | Stored as a GitHub repository secret (`SSH_PRIVATE_KEY`) |
+
+The deployment script clones or updates the repository at `/opt/on-it`, installs production dependencies, and manages the process with PM2 (with automatic rollback on failure).
+
 ## Configuration
 
 You can change the server port by setting the `PORT` environment variable:
