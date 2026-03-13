@@ -1,0 +1,67 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Droplet
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            APP_DIR="/opt/on-it"
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+
+            # Clone repo on first deploy if directory doesn't exist
+            if [ ! -d "$APP_DIR/.git" ]; then
+              git clone "$REPO_URL" "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+
+            # Save current commit for potential rollback
+            PREV_COMMIT=$(git rev-parse HEAD)
+
+            # Pull latest changes from main
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Install/update dependencies from lockfile for reproducibility
+            npm ci --omit=dev
+
+            # Ensure data directory exists
+            mkdir -p data
+
+            # Restart / start the app with PM2
+            if pm2 describe on-it > /dev/null 2>&1; then
+              pm2 restart on-it
+            else
+              pm2 start server.js --name on-it
+              pm2 save
+            fi
+
+            # Wait briefly and verify the process is still running
+            sleep 3
+            if ! pm2 describe on-it | grep -q "online"; then
+              echo "Deployment failed — rolling back to $PREV_COMMIT"
+              git reset --hard "$PREV_COMMIT"
+              npm ci --omit=dev
+              pm2 restart on-it || pm2 start server.js --name on-it
+              pm2 save
+              exit 1
+            fi
+
+            echo "Deployment successful"
