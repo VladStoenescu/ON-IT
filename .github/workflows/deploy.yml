@@ -13,6 +13,25 @@ jobs:
       contents: read
 
     steps:
+      - name: Validate SSH key secret
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "::error::SSH_PRIVATE_KEY secret is not configured."
+            echo "::error::Generate a key pair and add the private key as a repository secret:"
+            echo "::error::  ssh-keygen -t ed25519 -C 'github-actions-deploy' -f deploy_key"
+            echo "::error::Then add the contents of deploy_key to the SSH_PRIVATE_KEY repository secret."
+            exit 1
+          fi
+          if ! printf '%s' "$SSH_PRIVATE_KEY" | grep -q 'PRIVATE KEY'; then
+            echo "::error::SSH_PRIVATE_KEY does not appear to contain a valid PEM-encoded private key."
+            echo "::error::The key should start with '-----BEGIN OPENSSH PRIVATE KEY-----' or '-----BEGIN RSA PRIVATE KEY-----'."
+            echo "::error::Make sure you stored the private key (not the public key) in the secret."
+            exit 1
+          fi
+          echo "SSH key validation passed."
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
