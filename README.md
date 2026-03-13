@@ -107,6 +107,33 @@ The application is deployed to a DigitalOcean droplet via SSH using GitHub Actio
 
 The deployment script clones or updates the repository at `/opt/on-it`, installs production dependencies, and manages the process with PM2 (with automatic rollback on failure).
 
+### Setting up the SSH_PRIVATE_KEY secret
+
+1. **Generate a dedicated deploy key** on your local machine (or the server):
+   ```bash
+   ssh-keygen -t ed25519 -C "github-actions-deploy" -f deploy_key
+   ```
+   This creates two files: `deploy_key` (private) and `deploy_key.pub` (public).
+
+2. **Authorize the public key on the droplet** (run on the server):
+   ```bash
+   cat deploy_key.pub >> ~/.ssh/authorized_keys
+   ```
+
+3. **Add the private key as a GitHub repository secret**:
+   - Go to **Settings → Secrets and variables → Actions** in the repository.
+   - Click **New repository secret**.
+   - Name: `SSH_PRIVATE_KEY`
+   - Value: paste the **entire contents** of the `deploy_key` file, including the
+     `-----BEGIN OPENSSH PRIVATE KEY-----` header and `-----END OPENSSH PRIVATE KEY-----` footer.
+
+4. **Delete the local key files** after adding the secret:
+   ```bash
+   rm deploy_key deploy_key.pub
+   ```
+
+> **Important:** Store the *private* key (`deploy_key`), not the public key (`deploy_key.pub`). The workflow validates the secret format on every run and will fail with a descriptive error if the key is missing or malformed.
+
 ## Configuration
 
 You can change the server port by setting the `PORT` environment variable:
