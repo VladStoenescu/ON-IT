@@ -23,6 +23,12 @@ function showTab(tabName, event) {
         loadProcesses();
         populateTemplateDropdown();
     }
+    if (tabName === 'trainings') {
+        loadTrainingDashboard();
+        loadEmployees();
+        loadTrainingTemplates();
+        loadAssignments();
+    }
 }
 
 // ─── Ideas: existing functionality ───────────────────────────────────────────
@@ -1446,15 +1452,4 @@ function trainingStatusLabel(status) {
     return labels[status] || status;
 }
 
-// ─── Update showTab to handle trainings ──────────────────────────────────────
 
-const _origShowTab = showTab;
-function showTab(tabName, event) {
-    _origShowTab(tabName, event);
-    if (tabName === 'trainings') {
-        loadTrainingDashboard();
-        loadEmployees();
-        loadTrainingTemplates();
-        loadAssignments();
-    }
-}

@@ -680,8 +680,9 @@ app.post('/api/trainings/assignments', strictLimiter, async (req, res) => {
         for (const empId of employeeIds) {
             const employee = employees.find(e => e.id === empId);
             if (!employee) continue;
-            // Skip if already assigned
-            if (assignments.some(a => a.trainingId === trainingId && a.employeeId === empId && a.status !== 'completed')) {
+            // Skip if already assigned and not yet completed (covers not_started, in_progress, and overdue)
+            if (assignments.some(a => a.trainingId === trainingId && a.employeeId === empId &&
+                    ['not_started', 'in_progress', 'overdue'].includes(a.status))) {
                 continue;
             }
             const dueDate = new Date(now);
