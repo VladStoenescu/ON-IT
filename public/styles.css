@@ -822,3 +822,164 @@ header h1 {
     .ob-section { padding: 18px 16px; }
     .sub-tab-btn { padding: 10px 14px; font-size: 0.85em; }
 }
+
+/* ─── Trainings ──────────────────────────────────────────────────────────── */
+
+/* Employee Table */
+.emp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+.emp-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: #f5f5f5;
+    color: #555;
+    font-weight: 700;
+    border-bottom: 2px solid #e0e0e0;
+}
+.emp-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #333;
+}
+.emp-table tr:hover td { background: #fafafa; }
+
+/* Assign employees grid */
+.assign-employees-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px;
+}
+.emp-assign-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    font-size: 0.9em;
+}
+.emp-assign-checkbox:hover { background: #f5f5f5; }
+.emp-assign-checkbox input[type="checkbox"] { flex-shrink: 0; }
+
+/* Training section type badges */
+.tr-sec-type-badge {
+    font-size: 1.2em;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #e8f4f8;
+    flex-shrink: 0;
+    margin-top: 8px;
+}
+.tr-sec-type-badge.text    { background: #e8f5e9; }
+.tr-sec-type-badge.image   { background: #fce4ec; }
+.tr-sec-type-badge.quiz    { background: #fff8e1; }
+
+/* Quiz option row in editor */
+.quiz-options { display: flex; flex-direction: column; gap: 8px; }
+.quiz-option-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.quiz-option-row input[type="text"] {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+.quiz-option-row input[type="radio"] { flex-shrink: 0; }
+
+/* Take Training view */
+.take-training-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.training-sections { display: flex; flex-direction: column; gap: 20px; }
+
+.training-section {
+    border-radius: 10px;
+    padding: 18px;
+}
+.text-section {
+    background: #f9f9f9;
+    border: 1px solid #e8e8e8;
+}
+.image-section {
+    background: #f0f9ff;
+    border: 1px solid #b3e5fc;
+    text-align: center;
+}
+.quiz-section {
+    background: #fffde7;
+    border: 1px solid #fff176;
+}
+
+.training-text-content {
+    color: #333;
+    line-height: 1.7;
+    font-size: 0.95em;
+}
+
+.training-image {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+.training-image-caption {
+    font-size: 0.85em;
+    color: #666;
+    font-style: italic;
+}
+
+.quiz-question {
+    font-weight: 700;
+    color: #333;
+    font-size: 1em;
+    margin-bottom: 14px;
+}
+.quiz-options-display { display: flex; flex-direction: column; gap: 8px; }
+.quiz-option-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    background: white;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s;
+}
+.quiz-option-display:hover:not(.correct):not(.wrong) { background: #f5f5f5; }
+.quiz-option-display.correct { background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32; font-weight: 600; }
+.quiz-option-display.wrong   { background: #fce4ec; border-color: #f48fb1; color: #c62828; text-decoration: line-through; }
+
+/* Not-started status badge */
+.proc-status-badge.not_started { background: #f3e5f5; color: #6a1b9a; }
+
+@media (max-width: 768px) {
+    .emp-table th, .emp-table td { padding: 8px; font-size: 0.82em; }
+    .emp-table th:nth-child(4), .emp-table td:nth-child(4),
+    .emp-table th:nth-child(5), .emp-table td:nth-child(5) { display: none; }
+}

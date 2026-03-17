@@ -725,4 +725,736 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('templates-list').addEventListener('click', handleTemplateListClick);
     document.getElementById('processes-list').addEventListener('click', handleProcessListClick);
     document.getElementById('proc-modal-body').addEventListener('click', handleModalBodyClick);
+    document.getElementById('employees-list').addEventListener('click', handleEmployeeListClick);
+    document.getElementById('tr-templates-list').addEventListener('click', handleTrainingTemplateListClick);
+    document.getElementById('assignments-list').addEventListener('click', handleAssignmentListClick);
+    document.getElementById('take-training-body').addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-action="submit-training"]');
+        if (btn) submitTrainingAnswers(btn.dataset.assignmentId, btn.dataset.trainingId);
+    });
 });
+
+// ─── Trainings: state ─────────────────────────────────────────────────────────
+
+let allEmployees = [];
+let allTrainingTemplates = [];
+let allAssignments = [];
+let trainingSectionCounter = 0;
+
+// ─── Trainings: tab/section navigation ───────────────────────────────────────
+
+function showTrainingsSection(section, btn) {
+    document.querySelectorAll('#trainings-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#trainings-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(section).classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+// ─── Training Dashboard ───────────────────────────────────────────────────────
+
+async function loadTrainingDashboard() {
+    try {
+        const res = await fetch(`${API_URL}/trainings/kpis`);
+        const kpis = await res.json();
+        renderTrainingKpis(kpis);
+        renderTrainingByTraining(kpis.byTraining);
+        renderRecentAssignments(kpis.recentAssignments);
+    } catch (e) {
+        document.getElementById('tr-kpi-cards').innerHTML = '<p class="no-ideas">Error loading dashboard.</p>';
+    }
+}
+
+function renderTrainingKpis(kpis) {
+    const cards = [
+        { label: 'Total Employees', value: kpis.totalEmployees, icon: '👥', color: '#667eea' },
+        { label: 'Total Trainings', value: kpis.totalTrainings, icon: '📚', color: '#8e24aa' },
+        { label: 'Assignments', value: kpis.total, icon: '📋', color: '#039be5' },
+        { label: 'Completed', value: kpis.completed, icon: '✅', color: '#43a047' },
+        { label: 'In Progress', value: kpis.inProgress, icon: '⚙️', color: '#fb8c00' },
+        { label: 'Not Started', value: kpis.notStarted, icon: '⏳', color: '#90a4ae' },
+        { label: 'Overdue', value: kpis.overdue, icon: '⚠️', color: kpis.overdue > 0 ? '#e53935' : '#43a047' },
+        { label: 'Avg. Quiz Score', value: kpis.avgScore !== null ? kpis.avgScore + '%' : '—', icon: '🎯', color: '#00acc1' }
+    ];
+    document.getElementById('tr-kpi-cards').innerHTML = cards.map(c => `
+        <div class="kpi-card" style="border-top:4px solid ${c.color}">
+            <div class="kpi-icon">${c.icon}</div>
+            <div class="kpi-value" style="color:${c.color}">${c.value}</div>
+            <div class="kpi-label">${c.label}</div>
+        </div>
+    `).join('');
+}
+
+function renderTrainingByTraining(byTraining) {
+    const container = document.getElementById('tr-by-training');
+    if (!byTraining || Object.keys(byTraining).length === 0) {
+        container.innerHTML = '<p class="no-data">No training data yet.</p>';
+        return;
+    }
+    container.innerHTML = Object.entries(byTraining).map(([title, data]) => {
+        const pct = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+        return `
+        <div class="entity-bar-row">
+            <div class="entity-bar-label">${escapeHtml(title)}</div>
+            <div class="entity-bar-track">
+                <div class="entity-bar-fill completed-fill" style="width:${pct}%" title="Completed: ${data.completed}"></div>
+            </div>
+            <div class="entity-bar-counts">
+                <span class="ebc-done">● ${data.completed}/${data.total} done</span>
+                ${data.overdue > 0 ? `<span style="color:#e53935;font-weight:600">⚠ ${data.overdue} overdue</span>` : ''}
+                ${data.avgScore !== null ? `<span style="color:#00acc1;font-weight:600">🎯 avg ${data.avgScore}%</span>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderRecentAssignments(list) {
+    const container = document.getElementById('tr-recent-assignments');
+    if (!list || list.length === 0) {
+        container.innerHTML = '<p class="no-data">No assignments yet.</p>';
+        return;
+    }
+    container.innerHTML = list.map(a => `
+        <div class="recent-proc-row">
+            <div class="rp-info">
+                <span class="rp-name">${escapeHtml(a.employeeName)}</span>
+                <span class="rp-meta">${escapeHtml(a.trainingTitle)}</span>
+            </div>
+            <div class="rp-right">
+                <span class="proc-status-badge ${a.status}">${trainingStatusLabel(a.status)}</span>
+                ${a.score !== null ? `<span style="font-size:0.78em;color:#00acc1;font-weight:600">${a.score}%</span>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+// ─── Employees ────────────────────────────────────────────────────────────────
+
+async function loadEmployees() {
+    try {
+        const res = await fetch(`${API_URL}/employees`);
+        allEmployees = await res.json();
+        renderEmployees();
+        populateAssignEmployeesList();
+    } catch (e) {
+        document.getElementById('employees-list').innerHTML = '<p class="no-ideas">Error loading employees.</p>';
+    }
+}
+
+function renderEmployees() {
+    const search = (document.getElementById('emp-search').value || '').toLowerCase();
+    const container = document.getElementById('employees-list');
+    let list = allEmployees;
+    if (search) list = list.filter(e =>
+        e.name.toLowerCase().includes(search) || e.email.toLowerCase().includes(search)
+    );
+    if (list.length === 0) {
+        container.innerHTML = '<p class="no-data">No employees found. Click "+ Add Employee" to add one.</p>';
+        return;
+    }
+    container.innerHTML = `
+        <table class="emp-table">
+            <thead><tr>
+                <th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Entity</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+                ${list.map(e => `
+                <tr>
+                    <td><strong>${escapeHtml(e.name)}</strong></td>
+                    <td>${escapeHtml(e.email)}</td>
+                    <td>${escapeHtml(e.role || '—')}</td>
+                    <td>${escapeHtml(e.department || '—')}</td>
+                    <td>${escapeHtml(e.entity || '—')}</td>
+                    <td>
+                        <button class="btn-icon" data-action="edit-emp" data-emp-id="${e.id}" title="Edit">✏️</button>
+                        <button class="btn-icon btn-danger" data-action="delete-emp" data-emp-id="${e.id}" title="Delete">🗑️</button>
+                    </td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+function handleEmployeeListClick(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const id = btn.dataset.empId;
+    if (btn.dataset.action === 'edit-emp') editEmployee(id);
+    else if (btn.dataset.action === 'delete-emp') deleteEmployee(id);
+}
+
+// ─── Employee Modal ───────────────────────────────────────────────────────────
+
+function openEmployeeModal(empData) {
+    document.getElementById('emp-edit-id').value = '';
+    document.getElementById('emp-name').value = '';
+    document.getElementById('emp-email').value = '';
+    document.getElementById('emp-role').value = '';
+    document.getElementById('emp-department').value = '';
+    document.getElementById('emp-entity').value = '';
+    document.getElementById('emp-manager').value = '';
+    if (empData) {
+        document.getElementById('emp-modal-title').textContent = 'Edit Employee';
+        document.getElementById('emp-edit-id').value = empData.id;
+        document.getElementById('emp-name').value = empData.name;
+        document.getElementById('emp-email').value = empData.email;
+        document.getElementById('emp-role').value = empData.role || '';
+        document.getElementById('emp-department').value = empData.department || '';
+        document.getElementById('emp-entity').value = empData.entity || '';
+        document.getElementById('emp-manager').value = empData.lineManagerEmail || '';
+    } else {
+        document.getElementById('emp-modal-title').textContent = 'Add Employee';
+    }
+    document.getElementById('employee-modal').classList.remove('hidden');
+}
+
+function closeEmployeeModal() {
+    document.getElementById('employee-modal').classList.add('hidden');
+}
+
+function closeEmpModalOnBg(e) {
+    if (e.target === document.getElementById('employee-modal')) closeEmployeeModal();
+}
+
+async function submitEmployee(e) {
+    e.preventDefault();
+    const editId = document.getElementById('emp-edit-id').value;
+    const payload = {
+        name: document.getElementById('emp-name').value.trim(),
+        email: document.getElementById('emp-email').value.trim(),
+        role: document.getElementById('emp-role').value.trim(),
+        department: document.getElementById('emp-department').value.trim(),
+        entity: document.getElementById('emp-entity').value,
+        lineManagerEmail: document.getElementById('emp-manager').value.trim()
+    };
+    const url = editId ? `${API_URL}/employees/${editId}` : `${API_URL}/employees`;
+    const method = editId ? 'PUT' : 'POST';
+    try {
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error saving employee'); return; }
+        closeEmployeeModal();
+        await loadEmployees();
+    } catch (err) {
+        alert('Error saving employee');
+    }
+}
+
+function editEmployee(id) {
+    const emp = allEmployees.find(e => e.id === id);
+    if (emp) openEmployeeModal(emp);
+}
+
+async function deleteEmployee(id) {
+    if (!confirm('Delete this employee? This cannot be undone.')) return;
+    try {
+        const res = await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
+        if (res.ok) await loadEmployees();
+        else { const d = await res.json(); alert(d.error || 'Error deleting employee'); }
+    } catch (e) {
+        alert('Error deleting employee');
+    }
+}
+
+// ─── Training Templates ───────────────────────────────────────────────────────
+
+async function loadTrainingTemplates() {
+    try {
+        const res = await fetch(`${API_URL}/trainings/templates`);
+        allTrainingTemplates = await res.json();
+        renderTrainingTemplates();
+        populateAssignTrainingDropdown();
+        populateAssignmentFilterDropdown();
+    } catch (e) {
+        document.getElementById('tr-templates-list').innerHTML = '<p class="no-ideas">Error loading trainings.</p>';
+    }
+}
+
+function renderTrainingTemplates() {
+    const container = document.getElementById('tr-templates-list');
+    if (allTrainingTemplates.length === 0) {
+        container.innerHTML = '<p class="no-data">No trainings yet. Click "+ New Training" to create one.</p>';
+        return;
+    }
+    container.innerHTML = allTrainingTemplates.map(t => {
+        const textCount = t.sections.filter(s => s.type === 'text').length;
+        const imageCount = t.sections.filter(s => s.type === 'image').length;
+        const quizCount = t.sections.filter(s => s.type === 'quiz').length;
+        return `
+        <div class="template-card">
+            <div class="tpl-card-header">
+                <div>
+                    <span class="tpl-name">${escapeHtml(t.title)}</span>
+                    <span class="entity-chip">${t.dueDays} days to complete</span>
+                </div>
+                <div class="tpl-actions">
+                    <button class="btn-icon" data-action="edit-training" data-training-id="${t.id}" title="Edit">✏️</button>
+                    <button class="btn-icon btn-danger" data-action="delete-training" data-training-id="${t.id}" title="Delete">🗑️</button>
+                </div>
+            </div>
+            ${t.description ? `<div class="tpl-desc">${escapeHtml(t.description)}</div>` : ''}
+            <div class="tpl-steps-summary">
+                ${textCount > 0 ? `📝 ${textCount} text ` : ''}${imageCount > 0 ? `🖼️ ${imageCount} image ` : ''}${quizCount > 0 ? `❓ ${quizCount} quiz` : ''} · 
+                Reminders: ${t.reminderDays.join(', ')} days before due · Created ${formatDate(t.createdAt)}
+            </div>
+            <div class="tpl-steps-list">
+                ${t.sections.map(s => `
+                    <div class="tpl-step-row">
+                        <span class="step-order">${s.order}</span>
+                        <span class="step-name">${s.type === 'text' ? '📝' : s.type === 'image' ? '🖼️' : '❓'} 
+                            ${s.type === 'quiz' ? escapeHtml(s.question || 'Quiz question') : 
+                              s.type === 'image' ? escapeHtml(s.caption || s.imageUrl || 'Image') : 
+                              escapeHtml((s.content || '').slice(0, 60) + ((s.content || '').length > 60 ? '…' : ''))}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function handleTrainingTemplateListClick(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const id = btn.dataset.trainingId;
+    if (btn.dataset.action === 'edit-training') editTrainingTemplate(id);
+    else if (btn.dataset.action === 'delete-training') deleteTrainingTemplate(id);
+}
+
+// ─── Training Template Modal ──────────────────────────────────────────────────
+
+function openTrainingModal(tplData) {
+    trainingSectionCounter = 0;
+    document.getElementById('tr-edit-id').value = '';
+    document.getElementById('tr-title').value = '';
+    document.getElementById('tr-desc').value = '';
+    document.getElementById('tr-due-days').value = '7';
+    document.getElementById('tr-reminder-days').value = '3, 1';
+    document.getElementById('training-sections-container').innerHTML = '';
+
+    if (tplData) {
+        document.getElementById('training-modal-title').textContent = 'Edit Training';
+        document.getElementById('tr-edit-id').value = tplData.id;
+        document.getElementById('tr-title').value = tplData.title;
+        document.getElementById('tr-desc').value = tplData.description || '';
+        document.getElementById('tr-due-days').value = tplData.dueDays;
+        document.getElementById('tr-reminder-days').value = tplData.reminderDays.join(', ');
+        tplData.sections.forEach(s => addTrainingSection(s.type, s));
+    } else {
+        document.getElementById('training-modal-title').textContent = 'New Training';
+    }
+    document.getElementById('training-modal').classList.remove('hidden');
+}
+
+function closeTrainingModal() {
+    document.getElementById('training-modal').classList.add('hidden');
+}
+
+function closeTrainingModalOnBg(e) {
+    if (e.target === document.getElementById('training-modal')) closeTrainingModal();
+}
+
+function addTrainingSection(type, data) {
+    trainingSectionCounter++;
+    const idx = trainingSectionCounter;
+    const div = document.createElement('div');
+    div.className = 'step-row tr-section-row';
+    div.id = `tr-sec-${idx}`;
+    div.dataset.sectionType = type;
+    if (data && data.id) div.dataset.sectionId = data.id;
+
+    let fieldsHtml = '';
+    if (type === 'text') {
+        fieldsHtml = `
+            <div class="form-group">
+                <label>📝 Text Content *</label>
+                <textarea class="tr-sec-content" rows="4" placeholder="Enter your training text here…" required>${data ? escapeHtml(data.content || '') : ''}</textarea>
+            </div>`;
+    } else if (type === 'image') {
+        fieldsHtml = `
+            <div class="form-group">
+                <label>🖼️ Image URL *</label>
+                <input type="url" class="tr-sec-imageurl" placeholder="https://example.com/image.png" value="${data ? escapeHtml(data.imageUrl || '') : ''}" required>
+            </div>
+            <div class="form-group">
+                <label>Caption</label>
+                <input type="text" class="tr-sec-caption" placeholder="Optional caption" value="${data ? escapeHtml(data.caption || '') : ''}">
+            </div>`;
+    } else if (type === 'quiz') {
+        const opts = data && data.options ? data.options : ['', '', '', ''];
+        const correct = data ? (data.correctAnswer || 0) : 0;
+        fieldsHtml = `
+            <div class="form-group">
+                <label>❓ Question *</label>
+                <input type="text" class="tr-sec-question" placeholder="Enter quiz question" value="${data ? escapeHtml(data.question || '') : ''}" required>
+            </div>
+            <div class="form-group">
+                <label>Answer Options (mark correct with the radio button)</label>
+                <div class="quiz-options">
+                    ${opts.map((opt, i) => `
+                    <div class="quiz-option-row">
+                        <input type="radio" name="correct-${idx}" class="tr-sec-correct" value="${i}" ${i === correct ? 'checked' : ''}>
+                        <input type="text" class="tr-sec-option" placeholder="Option ${String.fromCharCode(65+i)}" value="${escapeHtml(opt)}" required>
+                    </div>`).join('')}
+                </div>
+            </div>`;
+    }
+
+    div.innerHTML = `
+        <div class="step-row-num tr-sec-type-badge ${type}">${type === 'text' ? '📝' : type === 'image' ? '🖼️' : '❓'}</div>
+        <div class="step-row-fields">${fieldsHtml}</div>
+        <button type="button" class="btn-remove-step" onclick="removeTrainingSection(${idx})" title="Remove">✕</button>
+    `;
+    document.getElementById('training-sections-container').appendChild(div);
+}
+
+function removeTrainingSection(idx) {
+    const el = document.getElementById(`tr-sec-${idx}`);
+    if (el) el.remove();
+}
+
+async function submitTraining(e) {
+    e.preventDefault();
+    const editId = document.getElementById('tr-edit-id').value;
+    const title = document.getElementById('tr-title').value.trim();
+    const description = document.getElementById('tr-desc').value.trim();
+    const dueDays = parseInt(document.getElementById('tr-due-days').value, 10) || 7;
+    const reminderDaysStr = document.getElementById('tr-reminder-days').value;
+    const reminderDays = reminderDaysStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+
+    const sectionRows = document.querySelectorAll('.tr-section-row');
+    if (sectionRows.length === 0) { alert('Please add at least one content section.'); return; }
+
+    const sections = [...sectionRows].map(row => {
+        const type = row.dataset.sectionType;
+        const sec = { id: row.dataset.sectionId || undefined, type };
+        if (type === 'text') {
+            sec.content = row.querySelector('.tr-sec-content').value.trim();
+        } else if (type === 'image') {
+            sec.imageUrl = row.querySelector('.tr-sec-imageurl').value.trim();
+            sec.caption = row.querySelector('.tr-sec-caption').value.trim();
+        } else if (type === 'quiz') {
+            sec.question = row.querySelector('.tr-sec-question').value.trim();
+            sec.options = [...row.querySelectorAll('.tr-sec-option')].map(i => i.value.trim());
+            const correctRadio = row.querySelector('.tr-sec-correct:checked');
+            sec.correctAnswer = correctRadio ? parseInt(correctRadio.value, 10) : 0;
+        }
+        return sec;
+    });
+
+    const payload = { title, description, dueDays, reminderDays, sections };
+    const url = editId ? `${API_URL}/trainings/templates/${editId}` : `${API_URL}/trainings/templates`;
+    const method = editId ? 'PUT' : 'POST';
+    try {
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error saving training'); return; }
+        closeTrainingModal();
+        await loadTrainingTemplates();
+        await loadTrainingDashboard();
+    } catch (err) {
+        alert('Error saving training');
+    }
+}
+
+function editTrainingTemplate(id) {
+    const tpl = allTrainingTemplates.find(t => t.id === id);
+    if (tpl) openTrainingModal(tpl);
+}
+
+async function deleteTrainingTemplate(id) {
+    if (!confirm('Delete this training? This cannot be undone.')) return;
+    try {
+        const res = await fetch(`${API_URL}/trainings/templates/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            await loadTrainingTemplates();
+            await loadTrainingDashboard();
+        } else { const d = await res.json(); alert(d.error || 'Error deleting training'); }
+    } catch (e) {
+        alert('Error deleting training');
+    }
+}
+
+// ─── Assignments ──────────────────────────────────────────────────────────────
+
+async function loadAssignments() {
+    try {
+        const res = await fetch(`${API_URL}/trainings/assignments`);
+        allAssignments = await res.json();
+        renderAssignments();
+    } catch (e) {
+        document.getElementById('assignments-list').innerHTML = '<p class="no-ideas">Error loading assignments.</p>';
+    }
+}
+
+function renderAssignments() {
+    const statusFilter = document.getElementById('asgn-filter-status').value;
+    const trainingFilter = document.getElementById('asgn-filter-training').value;
+    let list = allAssignments;
+    if (statusFilter) list = list.filter(a => a.status === statusFilter);
+    if (trainingFilter) list = list.filter(a => a.trainingId === trainingFilter);
+
+    const container = document.getElementById('assignments-list');
+    if (list.length === 0) {
+        container.innerHTML = '<p class="no-data">No assignments found.</p>';
+        return;
+    }
+    list.sort((a, b) => new Date(b.assignedAt) - new Date(a.assignedAt));
+    container.innerHTML = list.map(a => `
+        <div class="process-card" data-assignment-id="${a.id}">
+            <div class="proc-card-header">
+                <div class="proc-emp">
+                    <span class="proc-emp-name">${escapeHtml(a.employeeName)}</span>
+                </div>
+                <span class="proc-status-badge ${a.status}">${trainingStatusLabel(a.status)}</span>
+            </div>
+            <div class="proc-meta-row">
+                <span class="entity-chip">📚 ${escapeHtml(a.trainingTitle)}</span>
+                <span class="proc-date">Due: ${escapeHtml(a.dueDate)}</span>
+                ${a.score !== null ? `<span class="entity-chip" style="background:#e0f7fa;color:#00838f">🎯 Score: ${a.score}%</span>` : ''}
+            </div>
+        </div>`).join('');
+}
+
+function handleAssignmentListClick(e) {
+    const card = e.target.closest('[data-assignment-id]');
+    if (card) openTakeTrainingModal(card.dataset.assignmentId);
+}
+
+// ─── Assign Training Modal ────────────────────────────────────────────────────
+
+function openAssignModal() {
+    populateAssignTrainingDropdown();
+    populateAssignEmployeesList();
+    document.getElementById('assign-success').classList.add('hidden');
+    document.getElementById('assign-error').classList.add('hidden');
+    document.getElementById('assign-modal').classList.remove('hidden');
+}
+
+function closeAssignModal() {
+    document.getElementById('assign-modal').classList.add('hidden');
+}
+
+function closeAssignModalOnBg(e) {
+    if (e.target === document.getElementById('assign-modal')) closeAssignModal();
+}
+
+function populateAssignTrainingDropdown() {
+    const sel = document.getElementById('assign-training');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Select training</option>';
+    allTrainingTemplates.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.title;
+        sel.appendChild(opt);
+    });
+}
+
+function populateAssignEmployeesList() {
+    const container = document.getElementById('assign-employees-list');
+    if (!container) return;
+    if (allEmployees.length === 0) {
+        container.innerHTML = '<p class="no-data">No employees. Add employees first.</p>';
+        return;
+    }
+    container.innerHTML = allEmployees.map(e => `
+        <label class="emp-assign-checkbox">
+            <input type="checkbox" name="assign-emp" value="${e.id}">
+            <span><strong>${escapeHtml(e.name)}</strong> <small>${escapeHtml(e.email)}</small></span>
+        </label>
+    `).join('');
+}
+
+async function submitAssignment(e) {
+    e.preventDefault();
+    const trainingId = document.getElementById('assign-training').value;
+    const employeeIds = [...document.querySelectorAll('[name="assign-emp"]:checked')].map(cb => cb.value);
+    if (!trainingId) { alert('Please select a training.'); return; }
+    if (employeeIds.length === 0) { alert('Please select at least one employee.'); return; }
+    try {
+        const res = await fetch(`${API_URL}/trainings/assignments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trainingId, employeeIds })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById('assign-success').textContent = `✓ Training assigned to ${data.length} employee(s).`;
+            document.getElementById('assign-success').classList.remove('hidden');
+            document.getElementById('assign-error').classList.add('hidden');
+            document.querySelectorAll('[name="assign-emp"]').forEach(cb => cb.checked = false);
+            setTimeout(() => {
+                document.getElementById('assign-success').classList.add('hidden');
+                closeAssignModal();
+            }, 2000);
+            await loadAssignments();
+            await loadTrainingDashboard();
+        } else {
+            document.getElementById('assign-error').textContent = '✗ ' + (data.error || 'Error assigning training');
+            document.getElementById('assign-error').classList.remove('hidden');
+        }
+    } catch (err) {
+        document.getElementById('assign-error').textContent = '✗ Error connecting to server';
+        document.getElementById('assign-error').classList.remove('hidden');
+    }
+}
+
+function populateAssignmentFilterDropdown() {
+    const sel = document.getElementById('asgn-filter-training');
+    if (!sel) return;
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">All Trainings</option>';
+    allTrainingTemplates.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.title;
+        sel.appendChild(opt);
+    });
+    sel.value = currentVal;
+}
+
+// ─── Take Training Modal ──────────────────────────────────────────────────────
+
+async function openTakeTrainingModal(assignmentId) {
+    const assignment = allAssignments.find(a => a.id === assignmentId);
+    if (!assignment) return;
+
+    const training = allTrainingTemplates.find(t => t.id === assignment.trainingId);
+    if (!training) return;
+
+    document.getElementById('take-training-title').textContent = `📚 ${escapeHtml(training.title)}`;
+    document.getElementById('take-training-body').innerHTML = renderTakeTraining(assignment, training);
+    document.getElementById('take-training-modal').classList.remove('hidden');
+
+    // Mark as in_progress if not_started
+    if (assignment.status === 'not_started') {
+        try {
+            const res = await fetch(`${API_URL}/trainings/assignments/${assignmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'in_progress' })
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                const idx = allAssignments.findIndex(a => a.id === assignmentId);
+                if (idx !== -1) allAssignments[idx] = updated;
+            }
+        } catch (e) { /* silent */ }
+    }
+}
+
+function renderTakeTraining(assignment, training) {
+    const isCompleted = assignment.status === 'completed';
+    return `
+        <div class="take-training-meta">
+            <span class="proc-status-badge ${assignment.status}">${trainingStatusLabel(assignment.status)}</span>
+            <span class="proc-date">Due: ${escapeHtml(assignment.dueDate)}</span>
+            ${assignment.score !== null ? `<span class="entity-chip" style="background:#e0f7fa;color:#00838f">🎯 Score: ${assignment.score}%</span>` : ''}
+        </div>
+        <div class="training-sections">
+            ${training.sections.map(s => renderTrainingSection(s, assignment)).join('')}
+        </div>
+        ${!isCompleted ? `
+        <div class="proc-detail-footer" style="margin-top:20px">
+            <button class="submit-button" data-action="submit-training" data-assignment-id="${assignment.id}" data-training-id="${training.id}">Submit &amp; Complete Training</button>
+        </div>` : `
+        <div class="proc-detail-footer" style="margin-top:20px;text-align:center">
+            <span style="color:#43a047;font-weight:700;font-size:1.1em">✅ Training Completed${assignment.score !== null ? ` — Score: ${assignment.score}%` : ''}</span>
+        </div>`}
+    `;
+}
+
+function renderTrainingSection(section, assignment) {
+    const existingAnswer = assignment.quizAnswers ? assignment.quizAnswers[section.id] : undefined;
+    const isCompleted = assignment.status === 'completed';
+    if (section.type === 'text') {
+        return `
+        <div class="training-section text-section">
+            <div class="training-text-content">${escapeHtml(section.content).replace(/\n/g, '<br>')}</div>
+        </div>`;
+    } else if (section.type === 'image') {
+        return `
+        <div class="training-section image-section">
+            <img src="${escapeHtml(section.imageUrl)}" alt="${escapeHtml(section.caption || 'Training image')}" class="training-image">
+            ${section.caption ? `<div class="training-image-caption">${escapeHtml(section.caption)}</div>` : ''}
+        </div>`;
+    } else if (section.type === 'quiz') {
+        return `
+        <div class="training-section quiz-section">
+            <div class="quiz-question">${escapeHtml(section.question)}</div>
+            <div class="quiz-options-display">
+                ${section.options.map((opt, i) => `
+                <label class="quiz-option-display ${isCompleted ? (i === section.correctAnswer ? 'correct' : (existingAnswer === i ? 'wrong' : '')) : ''}">
+                    <input type="radio" name="quiz-${section.id}" value="${i}" data-section-id="${section.id}"
+                        ${existingAnswer === i ? 'checked' : ''} ${isCompleted ? 'disabled' : ''}>
+                    ${escapeHtml(opt)}
+                    ${isCompleted && i === section.correctAnswer ? ' ✅' : ''}
+                </label>`).join('')}
+            </div>
+        </div>`;
+    }
+    return '';
+}
+
+async function submitTrainingAnswers(assignmentId, trainingId) {
+    const assignment = allAssignments.find(a => a.id === assignmentId);
+    if (!assignment) return;
+    const training = allTrainingTemplates.find(t => t.id === trainingId);
+    if (!training) return;
+
+    const quizSections = training.sections.filter(s => s.type === 'quiz');
+    const quizAnswers = {};
+    let allAnswered = true;
+
+    for (const sec of quizSections) {
+        const selected = document.querySelector(`[name="quiz-${sec.id}"]:checked`);
+        if (!selected) { allAnswered = false; break; }
+        quizAnswers[sec.id] = parseInt(selected.value, 10);
+    }
+
+    if (!allAnswered && quizSections.length > 0) {
+        alert('Please answer all quiz questions before submitting.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/trainings/assignments/${assignmentId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'completed', quizAnswers })
+        });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error submitting training'); return; }
+        const updated = await res.json();
+        const idx = allAssignments.findIndex(a => a.id === assignmentId);
+        if (idx !== -1) allAssignments[idx] = updated;
+        document.getElementById('take-training-body').innerHTML = renderTakeTraining(updated, training);
+        renderAssignments();
+        loadTrainingDashboard();
+    } catch (err) {
+        alert('Error submitting training');
+    }
+}
+
+function closeTakeTrainingModal() {
+    document.getElementById('take-training-modal').classList.add('hidden');
+}
+
+function closeTakeTrainingOnBg(e) {
+    if (e.target === document.getElementById('take-training-modal')) closeTakeTrainingModal();
+}
+
+// ─── Helpers for Trainings ────────────────────────────────────────────────────
+
+function trainingStatusLabel(status) {
+    const labels = { not_started: 'Not Started', in_progress: 'In Progress', completed: 'Completed', overdue: 'Overdue' };
+    return labels[status] || status;
+}
+
+// ─── Update showTab to handle trainings ──────────────────────────────────────
+
+const _origShowTab = showTab;
+function showTab(tabName, event) {
+    _origShowTab(tabName, event);
+    if (tabName === 'trainings') {
+        loadTrainingDashboard();
+        loadEmployees();
+        loadTrainingTemplates();
+        loadAssignments();
+    }
+}

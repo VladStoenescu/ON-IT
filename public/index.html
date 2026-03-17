@@ -17,6 +17,7 @@
             <button class="tab-button active" onclick="showTab('submit', event)">Submit Idea</button>
             <button class="tab-button" onclick="showTab('view', event)">View Ideas</button>
             <button class="tab-button" onclick="showTab('onboarding', event)">🎯 Onboarding</button>
+            <button class="tab-button" onclick="showTab('trainings', event)">🎓 Trainings</button>
         </div>
 
         <!-- Submit Idea Tab -->
@@ -232,6 +233,83 @@
         </div>
     </div>
 
+        <!-- Trainings Tab -->
+        <div id="trainings-tab" class="tab-content ob-tab-content">
+            <!-- Sub-navigation -->
+            <div class="sub-tabs">
+                <button class="sub-tab-btn active" onclick="showTrainingsSection('tr-dashboard', this)">📊 Dashboard</button>
+                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-employees', this)">👥 Employees</button>
+                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-templates', this)">📚 Trainings</button>
+                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-assignments', this)">📋 Assignments</button>
+            </div>
+
+            <!-- Dashboard Section -->
+            <div id="tr-dashboard" class="ob-section active">
+                <h2 class="section-title">Training Dashboard</h2>
+                <div id="tr-kpi-cards" class="kpi-grid">
+                    <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                </div>
+                <div class="dashboard-bottom">
+                    <div class="entity-chart-box">
+                        <h3>By Training</h3>
+                        <div id="tr-by-training"></div>
+                    </div>
+                    <div class="recent-activity-box">
+                        <h3>Recent Assignments</h3>
+                        <div id="tr-recent-assignments"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employees Section -->
+            <div id="tr-employees" class="ob-section">
+                <div class="section-header">
+                    <h2 class="section-title">Employees</h2>
+                    <button class="btn-primary" onclick="openEmployeeModal()">+ Add Employee</button>
+                </div>
+                <div class="filter-bar" style="margin-bottom:16px">
+                    <input type="text" id="emp-search" placeholder="Search by name or email…" oninput="renderEmployees()" style="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;font-size:1em">
+                </div>
+                <div id="employees-list" class="employees-list">
+                    <p class="loading">Loading employees…</p>
+                </div>
+            </div>
+
+            <!-- Training Templates Section -->
+            <div id="tr-templates" class="ob-section">
+                <div class="section-header">
+                    <h2 class="section-title">Training Catalogue</h2>
+                    <button class="btn-primary" onclick="openTrainingModal()">+ New Training</button>
+                </div>
+                <div id="tr-templates-list" class="templates-list">
+                    <p class="loading">Loading trainings…</p>
+                </div>
+            </div>
+
+            <!-- Assignments Section -->
+            <div id="tr-assignments" class="ob-section">
+                <div class="section-header">
+                    <h2 class="section-title">Training Assignments</h2>
+                    <button class="btn-primary" onclick="openAssignModal()">+ Assign Training</button>
+                </div>
+                <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                    <select id="asgn-filter-status" onchange="renderAssignments()" style="flex:1;min-width:140px;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:0.9em">
+                        <option value="">All Statuses</option>
+                        <option value="not_started">Not Started</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="overdue">Overdue</option>
+                    </select>
+                    <select id="asgn-filter-training" onchange="renderAssignments()" style="flex:1;min-width:160px;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:0.9em">
+                        <option value="">All Trainings</option>
+                    </select>
+                </div>
+                <div id="assignments-list" class="processes-list">
+                    <p class="loading">Loading assignments…</p>
+                </div>
+            </div>
+        </div>
+
     <!-- Template Modal -->
     <div id="template-modal" class="modal-overlay hidden" onclick="closeTemplateModalOnBg(event)">
         <div class="modal">
@@ -289,6 +367,140 @@
                 <button class="modal-close" onclick="closeProcessModal()">✕</button>
             </div>
             <div class="modal-body" id="proc-modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Employee Modal -->
+    <div id="employee-modal" class="modal-overlay hidden" onclick="closeEmpModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="emp-modal-title">Add Employee</h3>
+                <button class="modal-close" onclick="closeEmployeeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="employee-form" onsubmit="submitEmployee(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Full Name *</label>
+                            <input type="text" id="emp-name" required placeholder="e.g. Jane Smith">
+                        </div>
+                        <div class="form-group">
+                            <label>Email *</label>
+                            <input type="email" id="emp-email" required placeholder="jane@company.com">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Role / Job Title</label>
+                            <input type="text" id="emp-role" placeholder="e.g. Software Engineer">
+                        </div>
+                        <div class="form-group">
+                            <label>Department</label>
+                            <input type="text" id="emp-department" placeholder="e.g. Engineering">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Entity</label>
+                            <select id="emp-entity">
+                                <option value="">Select entity</option>
+                                <option value="ON-POINT Switzerland">ON-POINT Switzerland</option>
+                                <option value="ON-POINT Germany">ON-POINT Germany</option>
+                                <option value="ON-POINT UK">ON-POINT UK</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Line Manager Email</label>
+                            <input type="email" id="emp-manager" placeholder="manager@company.com">
+                        </div>
+                    </div>
+                    <input type="hidden" id="emp-edit-id">
+                    <button type="submit" class="submit-button" style="margin-top:10px">Save Employee</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Training Template Modal -->
+    <div id="training-modal" class="modal-overlay hidden" onclick="closeTrainingModalOnBg(event)">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3 id="training-modal-title">New Training</h3>
+                <button class="modal-close" onclick="closeTrainingModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="training-form" onsubmit="submitTraining(event)">
+                    <div class="form-group">
+                        <label>Training Title *</label>
+                        <input type="text" id="tr-title" required placeholder="e.g. Workplace Safety Training">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="tr-desc" rows="2" placeholder="Brief overview of this training"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Due Days (days to complete after assignment)</label>
+                            <input type="number" id="tr-due-days" min="1" value="7">
+                        </div>
+                        <div class="form-group">
+                            <label>Reminder Days (comma-separated, days before due)</label>
+                            <input type="text" id="tr-reminder-days" placeholder="e.g. 3, 1" value="3, 1">
+                        </div>
+                    </div>
+
+                    <div class="steps-header">
+                        <label>Content Sections *</label>
+                        <div style="display:flex;gap:8px">
+                            <button type="button" class="btn-add-step" onclick="addTrainingSection('text')">+ Text</button>
+                            <button type="button" class="btn-add-step" style="background:linear-gradient(135deg,#43a047,#2e7d32)" onclick="addTrainingSection('image')">+ Image</button>
+                            <button type="button" class="btn-add-step" style="background:linear-gradient(135deg,#fb8c00,#e65100)" onclick="addTrainingSection('quiz')">+ Quiz</button>
+                        </div>
+                    </div>
+                    <div id="training-sections-container" class="steps-container"></div>
+
+                    <input type="hidden" id="tr-edit-id">
+                    <button type="submit" class="submit-button" style="margin-top:20px">Save Training</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assign Training Modal -->
+    <div id="assign-modal" class="modal-overlay hidden" onclick="closeAssignModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Assign Training</h3>
+                <button class="modal-close" onclick="closeAssignModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="assign-form" onsubmit="submitAssignment(event)">
+                    <div class="form-group">
+                        <label>Training *</label>
+                        <select id="assign-training" required>
+                            <option value="">Select training</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Employees * (select one or more)</label>
+                        <div id="assign-employees-list" class="assign-employees-grid"></div>
+                    </div>
+                    <button type="submit" class="submit-button" style="margin-top:10px">Assign Training</button>
+                </form>
+                <div id="assign-success" class="message success hidden"></div>
+                <div id="assign-error" class="message error hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Take Training Modal -->
+    <div id="take-training-modal" class="modal-overlay hidden" onclick="closeTakeTrainingOnBg(event)">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3 id="take-training-title">Take Training</h3>
+                <button class="modal-close" onclick="closeTakeTrainingModal()">✕</button>
+            </div>
+            <div class="modal-body" id="take-training-body"></div>
         </div>
     </div>
 
