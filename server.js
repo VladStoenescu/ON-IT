@@ -847,6 +847,11 @@ app.get('/api/trainings/kpis', async (req, res) => {
     }
 });
 
+// Health check endpoint used by the CI/CD pipeline to verify the deployment
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime() });
+});
+
 app.listen(PORT, () => {
     console.log(`Innovation Ideas Server running on http://localhost:${PORT}`);
 });

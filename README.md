@@ -105,7 +105,9 @@ The application is deployed to a DigitalOcean droplet via SSH using GitHub Actio
 | `SSH_USERNAME` | `root` |
 | `SSH_PRIVATE_KEY` | Stored as a GitHub repository secret (`SSH_PRIVATE_KEY`) |
 
-The deployment script clones or updates the repository at `/opt/on-it`, installs production dependencies, and manages the process with PM2 (with automatic rollback on failure).
+The deployment script clones or updates the repository at `/opt/on-it`, installs production dependencies, and manages the process with PM2 using `ecosystem.config.js` (with automatic rollback on failure).
+
+After starting the app, the pipeline performs an HTTP health check against `GET /health` to confirm the server is accepting requests before marking the deployment as successful.
 
 ### Setting up the SSH_PRIVATE_KEY secret
 
@@ -133,6 +135,25 @@ The deployment script clones or updates the repository at `/opt/on-it`, installs
    ```
 
 > **Important:** Store the *private* key (`deploy_key`), not the public key (`deploy_key.pub`). The workflow validates the secret format on every run and will fail with a descriptive error if the key is missing or malformed.
+
+### PM2 process management
+
+The app is managed by [PM2](https://pm2.keymetrics.io/) on the droplet. Configuration lives in `ecosystem.config.js`:
+
+- Process name: `on-it`
+- Logs are written to `logs/out.log` and `logs/err.log`
+- The app auto-restarts if it crashes or exceeds 256 MB of memory
+- `NODE_ENV=production` is set automatically
+- PM2 startup is configured on first deploy so the app survives server reboots
+
+Useful PM2 commands when SSH-ed into the droplet:
+
+```bash
+pm2 list                  # show all processes
+pm2 logs on-it            # stream application logs
+pm2 restart on-it         # manual restart
+pm2 monit                 # real-time monitoring dashboard
+```
 
 ## Configuration
 

@@ -61,24 +61,38 @@ jobs:
             # Install/update dependencies from lockfile for reproducibility
             npm ci --omit=dev
 
-            # Ensure data directory exists
-            mkdir -p data
+            # Ensure data and logs directories exist
+            mkdir -p data logs
 
-            # Restart / start the app with PM2
+            # Enable PM2 to start on server reboot (idempotent)
+            env PATH="$PATH:/usr/bin" pm2 startup systemd -u root --hp /root 2>/dev/null || true
+
+            # Restart / start the app via the PM2 ecosystem file
             if pm2 describe on-it > /dev/null 2>&1; then
-              pm2 restart on-it
+              pm2 reload ecosystem.config.js --env production
             else
-              pm2 start server.js --name on-it
-              pm2 save
+              pm2 start ecosystem.config.js --env production
             fi
+            pm2 save
 
-            # Wait briefly and verify the process is still running
-            sleep 3
-            if ! pm2 describe on-it | grep -q "online"; then
-              echo "Deployment failed — rolling back to $PREV_COMMIT"
+            # Wait for the server to become ready and verify via HTTP health check
+            echo "Waiting for application to become healthy..."
+            PORT=3000
+            HEALTHY=0
+            for i in $(seq 1 10); do
+              if curl -sf http://localhost:${PORT}/health > /dev/null; then
+                echo "Health check passed on attempt $i."
+                HEALTHY=1
+                break
+              fi
+              sleep 3
+            done
+
+            if [ "$HEALTHY" -ne 1 ]; then
+              echo "Health check failed after 10 attempts — rolling back to $PREV_COMMIT"
               git reset --hard "$PREV_COMMIT"
               npm ci --omit=dev
-              pm2 restart on-it || pm2 start server.js --name on-it
+              pm2 reload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
               pm2 save
               exit 1
             fi
