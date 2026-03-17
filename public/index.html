@@ -3,25 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ON-IT Innovation Ideas</title>
+    <title>ON-POINT — Innovation Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>💡 ON-IT Innovation Ideas</h1>
-            <p class="subtitle">Submit your innovative ideas to help us improve and grow</p>
+            <div class="header-inner">
+                <div class="header-brand">
+                    <!-- ON-POINT logo mark: 4 stacked circles -->
+                    <svg class="header-logo-mark" viewBox="0 0 56 152" width="28" height="76" xmlns="http://www.w3.org/2000/svg" fill="none" role="img" aria-label="ON-POINT logo mark">
+                        <circle cx="28" cy="14"  r="11" stroke="currentColor" stroke-width="3.5"/>
+                        <circle cx="28" cy="52"  r="11" stroke="currentColor" stroke-width="3.5"/>
+                        <circle cx="28" cy="90"  r="11" stroke="currentColor" stroke-width="3.5"/>
+                        <circle cx="28" cy="128" r="11" stroke="currentColor" stroke-width="3.5"/>
+                    </svg>
+                    <div class="header-text-group">
+                        <span class="header-company"><span>ON</span>-POINT</span>
+                        <span class="subtitle">Innovation Hub</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-divider"></div>
         </header>
 
         <div class="tabs">
             <button class="tab-button active" onclick="showTab('submit', event)">Submit Idea</button>
             <button class="tab-button" onclick="showTab('view', event)">View Ideas</button>
-            <button class="tab-button" onclick="showTab('onboarding', event)">🎯 Onboarding</button>
-            <button class="tab-button" onclick="showTab('trainings', event)">🎓 Trainings</button>
+            <button class="tab-button" onclick="showTab('onboarding', event)">Onboarding</button>
+            <button class="tab-button" onclick="showTab('trainings', event)">Trainings</button>
         </div>
 
         <!-- Submit Idea Tab -->
         <div id="submit-tab" class="tab-content active">
+            <h2 class="section-title">Submit an Innovation Idea</h2>
             <form id="idea-form">
                 <div class="form-group">
                     <label for="title">Idea Title *</label>
@@ -78,6 +96,7 @@
 
         <!-- View Ideas Tab -->
         <div id="view-tab" class="tab-content">
+            <h2 class="section-title">Innovation Ideas</h2>
             <div class="filter-bar">
                 <select id="filter-category" onchange="filterIdeas()">
                     <option value="">All Categories</option>
@@ -109,10 +128,10 @@
 
             <!-- Sub-navigation -->
             <div class="sub-tabs">
-                <button class="sub-tab-btn active" onclick="showObSection('dashboard', this)">📊 Dashboard</button>
-                <button class="sub-tab-btn" onclick="showObSection('templates', this)">📋 Templates</button>
-                <button class="sub-tab-btn" onclick="showObSection('processes', this)">⚙️ Active Processes</button>
-                <button class="sub-tab-btn" onclick="showObSection('new-process', this)">➕ New Process</button>
+                <button class="sub-tab-btn active" onclick="showObSection('dashboard', this)">Dashboard</button>
+                <button class="sub-tab-btn" onclick="showObSection('templates', this)">Templates</button>
+                <button class="sub-tab-btn" onclick="showObSection('processes', this)">Active Processes</button>
+                <button class="sub-tab-btn" onclick="showObSection('new-process', this)">New Process</button>
             </div>
 
             <!-- Dashboard Section -->
@@ -224,7 +243,7 @@
                             </div>
                         </div>
                         <div id="np-template-preview" class="template-preview hidden"></div>
-                        <button type="submit" class="submit-button">🚀 Start Process</button>
+                        <button type="submit" class="submit-button">Start Process</button>
                     </form>
                     <div id="np-success" class="message success hidden"></div>
                     <div id="np-error" class="message error hidden"></div>
@@ -237,10 +256,10 @@
         <div id="trainings-tab" class="tab-content ob-tab-content">
             <!-- Sub-navigation -->
             <div class="sub-tabs">
-                <button class="sub-tab-btn active" onclick="showTrainingsSection('tr-dashboard', this)">📊 Dashboard</button>
-                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-employees', this)">👥 Employees</button>
-                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-templates', this)">📚 Trainings</button>
-                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-assignments', this)">📋 Assignments</button>
+                <button class="sub-tab-btn active" onclick="showTrainingsSection('tr-dashboard', this)">Dashboard</button>
+                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-employees', this)">Employees</button>
+                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-templates', this)">Trainings</button>
+                <button class="sub-tab-btn" onclick="showTrainingsSection('tr-assignments', this)">Assignments</button>
             </div>
 
             <!-- Dashboard Section -->

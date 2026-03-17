@@ -161,18 +161,21 @@ async function loadOnboardingDashboard() {
 }
 
 function renderKpiCards(kpis) {
+    const red = '#C8312B';
+    const green = '#2e7d32';
+    const amber = '#c45800';
     const cards = [
-        { label: 'Total Processes', value: kpis.totalProcesses, icon: '📁', color: '#667eea' },
-        { label: 'Active', value: kpis.activeProcesses, icon: '⚙️', color: '#43a047' },
-        { label: 'Completed', value: kpis.completedProcesses, icon: '✅', color: '#00acc1' },
-        { label: 'Completion Rate', value: kpis.completionRate + '%', icon: '📈', color: '#8e24aa' },
-        { label: 'Avg. Days to Complete', value: kpis.avgCompletionDays || '—', icon: '⏱️', color: '#fb8c00' },
-        { label: 'Overdue Steps', value: kpis.overdueSteps, icon: '⚠️', color: kpis.overdueSteps > 0 ? '#e53935' : '#43a047' },
-        { label: 'Steps Completed Late', value: kpis.completedLateSteps, icon: '🕐', color: '#f4511e' },
-        { label: 'Onboarding / Offboarding', value: `${kpis.onboardingCount} / ${kpis.offboardingCount}`, icon: '👥', color: '#039be5' }
+        { label: 'Total Processes', value: kpis.totalProcesses, icon: '📁', color: red },
+        { label: 'Active', value: kpis.activeProcesses, icon: '⚙️', color: red },
+        { label: 'Completed', value: kpis.completedProcesses, icon: '✅', color: green },
+        { label: 'Completion Rate', value: kpis.completionRate + '%', icon: '📈', color: red },
+        { label: 'Avg. Days to Complete', value: kpis.avgCompletionDays || '—', icon: '⏱️', color: amber },
+        { label: 'Overdue Steps', value: kpis.overdueSteps, icon: '⚠️', color: kpis.overdueSteps > 0 ? red : green },
+        { label: 'Steps Completed Late', value: kpis.completedLateSteps, icon: '🕐', color: amber },
+        { label: 'Onboarding / Offboarding', value: `${kpis.onboardingCount} / ${kpis.offboardingCount}`, icon: '👥', color: red }
     ];
     document.getElementById('kpi-cards').innerHTML = cards.map(c => `
-        <div class="kpi-card" style="border-top:4px solid ${c.color}">
+        <div class="kpi-card" style="border-top:3px solid ${c.color}">
             <div class="kpi-icon">${c.icon}</div>
             <div class="kpi-value" style="color:${c.color}">${c.value}</div>
             <div class="kpi-label">${c.label}</div>
@@ -771,18 +774,22 @@ async function loadTrainingDashboard() {
 }
 
 function renderTrainingKpis(kpis) {
+    const red = '#C8312B';
+    const green = '#2e7d32';
+    const amber = '#c45800';
+    const muted = '#6B6B6B';
     const cards = [
-        { label: 'Total Employees', value: kpis.totalEmployees, icon: '👥', color: '#667eea' },
-        { label: 'Total Trainings', value: kpis.totalTrainings, icon: '📚', color: '#8e24aa' },
-        { label: 'Assignments', value: kpis.total, icon: '📋', color: '#039be5' },
-        { label: 'Completed', value: kpis.completed, icon: '✅', color: '#43a047' },
-        { label: 'In Progress', value: kpis.inProgress, icon: '⚙️', color: '#fb8c00' },
-        { label: 'Not Started', value: kpis.notStarted, icon: '⏳', color: '#90a4ae' },
-        { label: 'Overdue', value: kpis.overdue, icon: '⚠️', color: kpis.overdue > 0 ? '#e53935' : '#43a047' },
-        { label: 'Avg. Quiz Score', value: kpis.avgScore !== null ? kpis.avgScore + '%' : '—', icon: '🎯', color: '#00acc1' }
+        { label: 'Total Employees', value: kpis.totalEmployees, icon: '👥', color: red },
+        { label: 'Total Trainings', value: kpis.totalTrainings, icon: '📚', color: red },
+        { label: 'Assignments', value: kpis.total, icon: '📋', color: red },
+        { label: 'Completed', value: kpis.completed, icon: '✅', color: green },
+        { label: 'In Progress', value: kpis.inProgress, icon: '⚙️', color: amber },
+        { label: 'Not Started', value: kpis.notStarted, icon: '⏳', color: muted },
+        { label: 'Overdue', value: kpis.overdue, icon: '⚠️', color: kpis.overdue > 0 ? red : green },
+        { label: 'Avg. Quiz Score', value: kpis.avgScore !== null ? kpis.avgScore + '%' : '—', icon: '🎯', color: red }
     ];
     document.getElementById('tr-kpi-cards').innerHTML = cards.map(c => `
-        <div class="kpi-card" style="border-top:4px solid ${c.color}">
+        <div class="kpi-card" style="border-top:3px solid ${c.color}">
             <div class="kpi-icon">${c.icon}</div>
             <div class="kpi-value" style="color:${c.color}">${c.value}</div>
             <div class="kpi-label">${c.label}</div>
