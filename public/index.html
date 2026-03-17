@@ -16,6 +16,7 @@
         <div class="tabs">
             <button class="tab-button active" onclick="showTab('submit', event)">Submit Idea</button>
             <button class="tab-button" onclick="showTab('view', event)">View Ideas</button>
+            <button class="tab-button" onclick="showTab('onboarding', event)">🎯 Onboarding</button>
         </div>
 
         <!-- Submit Idea Tab -->
@@ -100,6 +101,194 @@
             <div id="ideas-list" class="ideas-list">
                 <p class="loading">Loading ideas...</p>
             </div>
+        </div>
+
+        <!-- Onboarding Tab -->
+        <div id="onboarding-tab" class="tab-content ob-tab-content">
+
+            <!-- Sub-navigation -->
+            <div class="sub-tabs">
+                <button class="sub-tab-btn active" onclick="showObSection('dashboard', this)">📊 Dashboard</button>
+                <button class="sub-tab-btn" onclick="showObSection('templates', this)">📋 Templates</button>
+                <button class="sub-tab-btn" onclick="showObSection('processes', this)">⚙️ Active Processes</button>
+                <button class="sub-tab-btn" onclick="showObSection('new-process', this)">➕ New Process</button>
+            </div>
+
+            <!-- Dashboard Section -->
+            <div id="ob-dashboard" class="ob-section active">
+                <h2 class="section-title">Onboarding &amp; Offboarding Dashboard</h2>
+                <div id="kpi-cards" class="kpi-grid">
+                    <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                </div>
+                <div class="dashboard-bottom">
+                    <div class="entity-chart-box">
+                        <h3>By Entity</h3>
+                        <div id="entity-chart"></div>
+                    </div>
+                    <div class="recent-activity-box">
+                        <h3>Recent Processes</h3>
+                        <div id="recent-processes"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Templates Section -->
+            <div id="ob-templates" class="ob-section">
+                <div class="section-header">
+                    <h2 class="section-title">Process Templates</h2>
+                    <button class="btn-primary" onclick="openTemplateModal()">+ New Template</button>
+                </div>
+                <div id="templates-list" class="templates-list">
+                    <p class="loading">Loading templates…</p>
+                </div>
+            </div>
+
+            <!-- Active Processes Section -->
+            <div id="ob-processes" class="ob-section">
+                <div class="section-header">
+                    <h2 class="section-title">Active Processes</h2>
+                    <div class="filter-group">
+                        <select id="proc-filter-type" onchange="renderProcesses()">
+                            <option value="">All Types</option>
+                            <option value="onboarding">Onboarding</option>
+                            <option value="offboarding">Offboarding</option>
+                        </select>
+                        <select id="proc-filter-entity" onchange="renderProcesses()">
+                            <option value="">All Entities</option>
+                            <option value="ON-POINT Switzerland">ON-POINT Switzerland</option>
+                            <option value="ON-POINT Germany">ON-POINT Germany</option>
+                            <option value="ON-POINT UK">ON-POINT UK</option>
+                        </select>
+                        <select id="proc-filter-status" onchange="renderProcesses()">
+                            <option value="">All Statuses</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="processes-list" class="processes-list">
+                    <p class="loading">Loading processes…</p>
+                </div>
+            </div>
+
+            <!-- New Process Section -->
+            <div id="ob-new-process" class="ob-section">
+                <h2 class="section-title">Start New Process</h2>
+                <div class="new-process-form-wrap">
+                    <form id="new-process-form" onsubmit="submitNewProcess(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Process Type *</label>
+                                <select id="np-type" required onchange="filterTemplatesByType()">
+                                    <option value="">Select type</option>
+                                    <option value="onboarding">Onboarding</option>
+                                    <option value="offboarding">Offboarding</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Entity *</label>
+                                <select id="np-entity" required onchange="filterTemplatesByType()">
+                                    <option value="">Select entity</option>
+                                    <option value="ON-POINT Switzerland">ON-POINT Switzerland</option>
+                                    <option value="ON-POINT Germany">ON-POINT Germany</option>
+                                    <option value="ON-POINT UK">ON-POINT UK</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Template *</label>
+                            <select id="np-template" required>
+                                <option value="">Select type and entity first</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Employee Name *</label>
+                                <input type="text" id="np-emp-name" required placeholder="Full name">
+                            </div>
+                            <div class="form-group">
+                                <label>Employee Email</label>
+                                <input type="email" id="np-emp-email" placeholder="email@company.com">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Job Title / Role</label>
+                                <input type="text" id="np-emp-role" placeholder="e.g. Software Engineer">
+                            </div>
+                            <div class="form-group">
+                                <label>Start Date *</label>
+                                <input type="date" id="np-start-date" required>
+                            </div>
+                        </div>
+                        <div id="np-template-preview" class="template-preview hidden"></div>
+                        <button type="submit" class="submit-button">🚀 Start Process</button>
+                    </form>
+                    <div id="np-success" class="message success hidden"></div>
+                    <div id="np-error" class="message error hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Modal -->
+    <div id="template-modal" class="modal-overlay hidden" onclick="closeTemplateModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">New Template</h3>
+                <button class="modal-close" onclick="closeTemplateModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="template-form" onsubmit="submitTemplate(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Template Name *</label>
+                            <input type="text" id="tpl-name" required placeholder="e.g. Standard Onboarding">
+                        </div>
+                        <div class="form-group">
+                            <label>Type *</label>
+                            <select id="tpl-type" required>
+                                <option value="">Select</option>
+                                <option value="onboarding">Onboarding</option>
+                                <option value="offboarding">Offboarding</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Applicable Entities *</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label"><input type="checkbox" name="tpl-entity" value="ON-POINT Switzerland"> ON-POINT Switzerland</label>
+                            <label class="checkbox-label"><input type="checkbox" name="tpl-entity" value="ON-POINT Germany"> ON-POINT Germany</label>
+                            <label class="checkbox-label"><input type="checkbox" name="tpl-entity" value="ON-POINT UK"> ON-POINT UK</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="tpl-desc" rows="2" placeholder="Brief description of this template"></textarea>
+                    </div>
+
+                    <div class="steps-header">
+                        <label>Steps *</label>
+                        <button type="button" class="btn-add-step" onclick="addStepRow()">+ Add Step</button>
+                    </div>
+                    <div id="steps-container" class="steps-container"></div>
+
+                    <input type="hidden" id="tpl-edit-id">
+                    <button type="submit" class="submit-button" style="margin-top:20px">Save Template</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Detail Modal -->
+    <div id="process-modal" class="modal-overlay hidden" onclick="closeProcessModalOnBg(event)">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3 id="proc-modal-title">Process Details</h3>
+                <button class="modal-close" onclick="closeProcessModal()">✕</button>
+            </div>
+            <div class="modal-body" id="proc-modal-body"></div>
         </div>
     </div>
 
