@@ -3,42 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ON-POINT — Innovation Hub</title>
+    <title>ON-POINT — Backoffice</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="header-inner">
-                <div class="header-brand">
-                    <!-- ON-POINT logo mark: 4 stacked circles -->
-                    <svg class="header-logo-mark" viewBox="0 0 56 152" width="28" height="76" xmlns="http://www.w3.org/2000/svg" fill="none" role="img" aria-label="ON-POINT logo mark">
+    <!-- Mobile sidebar overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <div class="app-shell">
+
+        <!-- ─── Sidebar ─────────────────────────────────────────────────────── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <svg class="sidebar-logo-mark" viewBox="0 0 56 152" width="24" height="66" xmlns="http://www.w3.org/2000/svg" fill="none">
                         <circle cx="28" cy="14"  r="11" stroke="currentColor" stroke-width="3.5"/>
                         <circle cx="28" cy="52"  r="11" stroke="currentColor" stroke-width="3.5"/>
                         <circle cx="28" cy="90"  r="11" stroke="currentColor" stroke-width="3.5"/>
                         <circle cx="28" cy="128" r="11" stroke="currentColor" stroke-width="3.5"/>
                     </svg>
-                    <div class="header-text-group">
-                        <span class="header-company"><span>ON</span>-POINT</span>
-                        <span class="subtitle">Innovation Hub</span>
+                    <div class="sidebar-brand-text">
+                        <span class="sidebar-brand-name"><span>ON</span>-POINT</span>
+                        <span class="sidebar-brand-sub">Backoffice</span>
                     </div>
                 </div>
             </div>
-            <div class="header-divider"></div>
-        </header>
 
-        <div class="tabs">
-            <button class="tab-button active" onclick="showTab('submit', event)">Submit Idea</button>
-            <button class="tab-button" onclick="showTab('view', event)">View Ideas</button>
-            <button class="tab-button" onclick="showTab('onboarding', event)">Onboarding</button>
-            <button class="tab-button" onclick="showTab('trainings', event)">Trainings</button>
-        </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-section="home" onclick="showTab('home', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L10 3l7 6.5V17h-5v-4H8v4H3V9.5z"/></svg>
+                    <span>Home</span>
+                </button>
 
-        <!-- Submit Idea Tab -->
-        <div id="submit-tab" class="tab-content active">
+                <p class="nav-group-label">Innovation</p>
+
+                <button class="nav-item" data-section="submit" onclick="showTab('submit', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M4 18a6 6 0 0112 0"/><line x1="15.5" y1="3" x2="15.5" y2="7"/><line x1="13.5" y1="5" x2="17.5" y2="5"/></svg>
+                    <span>Submit Idea</span>
+                </button>
+
+                <button class="nav-item" data-section="view" onclick="showTab('view', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="2"/><line x1="7" y1="8" x2="13" y2="8"/><line x1="7" y1="11" x2="13" y2="11"/><line x1="7" y1="14" x2="10" y2="14"/></svg>
+                    <span>View Ideas</span>
+                </button>
+
+                <p class="nav-group-label">People</p>
+
+                <button class="nav-item" data-section="onboarding" onclick="showTab('onboarding', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="6" r="3"/><path d="M2 18a5 5 0 0110 0"/><circle cx="14.5" cy="6.5" r="2.5"/><path d="M13 18a3.5 3.5 0 012-3"/></svg>
+                    <span>Onboarding</span>
+                </button>
+
+                <p class="nav-group-label">Learning</p>
+
+                <button class="nav-item" data-section="trainings" onclick="showTab('trainings', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8l8-5 8 5-8 5-8-5z"/><path d="M6 10.5V15c0 1.7 1.8 3 4 3s4-1.3 4-3v-4.5"/><line x1="18" y1="8" x2="18" y2="12"/></svg>
+                    <span>Trainings</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <span class="sidebar-footer-text">ON-POINT v1.0</span>
+            </div>
+        </aside>
+
+        <!-- ─── Main Area ─────────────────────────────────────────────────────── -->
+        <div class="main-area">
+
+            <!-- Top Bar -->
+            <div class="topbar">
+                <button class="sidebar-toggle" onclick="accessibleToggleSidebar()" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <span class="topbar-title" id="page-title">Home</span>
+            </div>
+
+            <script>
+                function accessibleToggleSidebar() {
+                    var toggleButton = document.querySelector('.sidebar-toggle');
+                    if (!toggleButton) {
+                        if (typeof toggleSidebar === 'function') {
+                            toggleSidebar();
+                        }
+                        return;
+                    }
+
+                    var isExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
+                    toggleButton.setAttribute('aria-expanded', String(!isExpanded));
+
+                    if (typeof toggleSidebar === 'function') {
+                        toggleSidebar();
+                    }
+
+                    if (!isExpanded) {
+                        var sidebar = document.getElementById('sidebar');
+                        if (sidebar) {
+                            if (!sidebar.hasAttribute('tabindex')) {
+                                sidebar.setAttribute('tabindex', '-1');
+                            }
+                            sidebar.focus();
+                        }
+                    }
+                }
+            </script>
+
+            <!-- Page Content -->
+            <main class="main-content">
+
+                <!-- ─── Home ──────────────────────────────────────────────────── -->
+                <div id="home-tab" class="tab-content active">
+                    <div class="home-welcome">
+                        <h1 class="home-title">Welcome to <span>ON</span>-POINT</h1>
+                        <p class="home-subtitle">Your all-in-one backoffice platform. Manage innovation, people, and learning from one place.</p>
+                    </div>
+                    <div class="home-modules-grid">
+                        <button type="button" class="home-module-card" onclick="showTab('submit', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><circle cx="10" cy="9" r="4.5"/><path d="M4 21a6 6 0 0112 0"/><line x1="19" y1="4" x2="19" y2="9"/><line x1="16.5" y1="6.5" x2="21.5" y2="6.5"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">Submit Idea</div>
+                                <div class="hmc-desc">Share innovation ideas with your team</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </button>
+                        <button type="button" class="home-module-card" onclick="showTab('view', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">View Ideas</div>
+                                <div class="hmc-desc">Browse and filter all submitted ideas</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </button>
+                        <div class="home-module-card" onclick="showTab('onboarding', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><circle cx="9" cy="7" r="4"/><path d="M3 21a6 6 0 0112 0"/><circle cx="18" cy="8" r="3" stroke-opacity="0.5"/><path d="M16 21a3 3 0 012-2.8" stroke-opacity="0.5"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">Onboarding</div>
+                                <div class="hmc-desc">Manage onboarding &amp; offboarding processes</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </div>
+                        <div class="home-module-card" onclick="showTab('trainings', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M22 10l-10-6L2 10l10 6 10-6z"/><path d="M7 12.5V17c0 2.2 2.2 4 5 4s5-1.8 5-4v-4.5"/><line x1="22" y1="10" x2="22" y2="15"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">Trainings</div>
+                                <div class="hmc-desc">Create and assign training programmes</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Submit Idea Tab ───────────────────────────────────── -->
+                <div id="submit-tab" class="tab-content">
             <h2 class="section-title">Submit an Innovation Idea</h2>
             <form id="idea-form">
                 <div class="form-group">
@@ -94,8 +222,8 @@
             <div id="error-message" class="message error hidden"></div>
         </div>
 
-        <!-- View Ideas Tab -->
-        <div id="view-tab" class="tab-content">
+                <!-- ─── View Ideas Tab ────────────────────────────────────── -->
+                <div id="view-tab" class="tab-content">
             <h2 class="section-title">Innovation Ideas</h2>
             <div class="filter-bar">
                 <select id="filter-category" onchange="filterIdeas()">
@@ -123,8 +251,8 @@
             </div>
         </div>
 
-        <!-- Onboarding Tab -->
-        <div id="onboarding-tab" class="tab-content ob-tab-content">
+                <!-- ─── Onboarding Tab ───────────────────────────────────── -->
+                <div id="onboarding-tab" class="tab-content ob-tab-content">
 
             <!-- Sub-navigation -->
             <div class="sub-tabs">
@@ -250,10 +378,9 @@
                 </div>
             </div>
         </div>
-    </div>
 
-        <!-- Trainings Tab -->
-        <div id="trainings-tab" class="tab-content ob-tab-content">
+                <!-- ─── Trainings Tab ────────────────────────────────────── -->
+                <div id="trainings-tab" class="tab-content ob-tab-content">
             <!-- Sub-navigation -->
             <div class="sub-tabs">
                 <button class="sub-tab-btn active" onclick="showTrainingsSection('tr-dashboard', this)">Dashboard</button>
@@ -328,6 +455,10 @@
                 </div>
             </div>
         </div>
+
+            </main>
+        </div>
+    </div>
 
     <!-- Template Modal -->
     <div id="template-modal" class="modal-overlay hidden" onclick="closeTemplateModalOnBg(event)">

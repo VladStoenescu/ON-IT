@@ -3,19 +3,38 @@ const API_URL = '/api';
 
 // Constants
 const MESSAGE_DISPLAY_DURATION = 5000; // milliseconds
+const MOBILE_BREAKPOINT = 1024; // matches CSS media query in styles.css
+const PAGE_TITLES = {
+    home: 'Home',
+    submit: 'Submit Idea',
+    view: 'View Ideas',
+    onboarding: 'Onboarding',
+    trainings: 'Trainings'
+};
 
 // Store all ideas for filtering
 let allIdeas = [];
 
-// ─── Tab switching ────────────────────────────────────────────────────────────
+// ─── Navigation ──────────────────────────────────────────────────────────────
 
-function showTab(tabName, event) {
+function showTab(tabName) {
+    // Hide all sections
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
 
-    document.getElementById(`${tabName}-tab`).classList.add('active');
-    if (event && event.target) event.target.classList.add('active');
+    // Update sidebar nav active state
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    const navItem = document.querySelector(`.nav-item[data-section="${tabName}"]`);
+    if (navItem) navItem.classList.add('active');
 
+    // Update topbar page title
+    const titleEl = document.getElementById('page-title');
+    if (titleEl) titleEl.textContent = PAGE_TITLES[tabName] || tabName;
+
+    // Show selected section
+    const tabEl = document.getElementById(`${tabName}-tab`);
+    if (tabEl) tabEl.classList.add('active');
+
+    // Load data for the selected section
     if (tabName === 'view') loadIdeas();
     if (tabName === 'onboarding') {
         loadOnboardingDashboard();
@@ -28,6 +47,44 @@ function showTab(tabName, event) {
         loadEmployees();
         loadTrainingTemplates();
         loadAssignments();
+    }
+
+    // Close sidebar on mobile after navigating
+    if (window.innerWidth < MOBILE_BREAKPOINT) closeSidebar();
+}
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const toggleButton = document.querySelector('[data-toggle="sidebar"], [aria-controls="sidebar"]');
+
+    const isOpen = sidebar.classList.contains('open');
+
+    if (isOpen) {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+        if (toggleButton) {
+            toggleButton.setAttribute('aria-expanded', 'false');
+        }
+    } else {
+        sidebar.classList.add('open');
+        overlay.classList.add('active');
+        if (toggleButton) {
+            toggleButton.setAttribute('aria-expanded', 'true');
+        }
+    }
+}
+
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const toggleButton = document.querySelector('[data-toggle="sidebar"], [aria-controls="sidebar"]');
+
+    sidebar.classList.remove('open');
+    overlay.classList.remove('active');
+
+    if (toggleButton) {
+        toggleButton.setAttribute('aria-expanded', 'false');
     }
 }
 
