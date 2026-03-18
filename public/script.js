@@ -4,6 +4,13 @@ const API_URL = '/api';
 // Constants
 const MESSAGE_DISPLAY_DURATION = 5000; // milliseconds
 const MOBILE_BREAKPOINT = 1024; // matches CSS media query in styles.css
+const PAGE_TITLES = {
+    home: 'Home',
+    submit: 'Submit Idea',
+    view: 'View Ideas',
+    onboarding: 'Onboarding',
+    trainings: 'Trainings'
+};
 
 // Store all ideas for filtering
 let allIdeas = [];
@@ -20,15 +27,8 @@ function showTab(tabName) {
     if (navItem) navItem.classList.add('active');
 
     // Update topbar page title
-    const titles = {
-        home: 'Home',
-        submit: 'Submit Idea',
-        view: 'View Ideas',
-        onboarding: 'Onboarding',
-        trainings: 'Trainings'
-    };
     const titleEl = document.getElementById('page-title');
-    if (titleEl) titleEl.textContent = titles[tabName] || tabName;
+    if (titleEl) titleEl.textContent = PAGE_TITLES[tabName] || tabName;
 
     // Show selected section
     const tabEl = document.getElementById(`${tabName}-tab`);
