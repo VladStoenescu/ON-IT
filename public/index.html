@@ -75,13 +75,42 @@
 
             <!-- Top Bar -->
             <div class="topbar">
-                <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">
+                <button class="sidebar-toggle" onclick="accessibleToggleSidebar()" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">
                     <span></span>
                     <span></span>
                     <span></span>
                 </button>
                 <span class="topbar-title" id="page-title">Home</span>
             </div>
+
+            <script>
+                function accessibleToggleSidebar() {
+                    var toggleButton = document.querySelector('.sidebar-toggle');
+                    if (!toggleButton) {
+                        if (typeof toggleSidebar === 'function') {
+                            toggleSidebar();
+                        }
+                        return;
+                    }
+
+                    var isExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
+                    toggleButton.setAttribute('aria-expanded', String(!isExpanded));
+
+                    if (typeof toggleSidebar === 'function') {
+                        toggleSidebar();
+                    }
+
+                    if (!isExpanded) {
+                        var sidebar = document.getElementById('sidebar');
+                        if (sidebar) {
+                            if (!sidebar.hasAttribute('tabindex')) {
+                                sidebar.setAttribute('tabindex', '-1');
+                            }
+                            sidebar.focus();
+                        }
+                    }
+                }
+            </script>
 
             <!-- Page Content -->
             <main class="main-content">
