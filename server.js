@@ -14,6 +14,7 @@ const PROCESSES_FILE = path.join(__dirname, 'data', 'onboarding-processes.json')
 const EMPLOYEES_FILE = path.join(__dirname, 'data', 'employees.json');
 const TRAINING_TEMPLATES_FILE = path.join(__dirname, 'data', 'training-templates.json');
 const TRAINING_ASSIGNMENTS_FILE = path.join(__dirname, 'data', 'training-assignments.json');
+const IT_LANDSCAPE_FILE = path.join(__dirname, 'data', 'it-landscape.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -55,6 +56,9 @@ if (!fsSync.existsSync(TRAINING_TEMPLATES_FILE)) {
 }
 if (!fsSync.existsSync(TRAINING_ASSIGNMENTS_FILE)) {
     fsSync.writeFileSync(TRAINING_ASSIGNMENTS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(IT_LANDSCAPE_FILE)) {
+    fsSync.writeFileSync(IT_LANDSCAPE_FILE, JSON.stringify([], null, 2));
 }
 
 // Helper utilities
@@ -844,6 +848,135 @@ app.get('/api/trainings/kpis', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: 'Error computing training KPIs' });
+    }
+});
+
+// ─── IT Landscape API ─────────────────────────────────────────────────────────
+
+const IT_DEPARTMENTS = ['HR', 'Finance', 'Backoffice', 'Cybersecurity', 'Marketing', 'Sales', 'IT', 'Legal', 'Operations', 'Product', 'Other'];
+const IT_CATEGORIES = ['SaaS', 'License', 'Hardware', 'Service', 'Subscription', 'Other'];
+const IT_BILLING_CYCLES = ['monthly', 'annual', 'one-time'];
+const IT_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF'];
+const IT_STATUSES = ['active', 'inactive', 'under-review'];
+
+app.get('/api/it-landscape', async (req, res) => {
+    try {
+        const tools = await readJson(IT_LANDSCAPE_FILE);
+        res.json(tools);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading IT landscape' });
+    }
+});
+
+app.post('/api/it-landscape', strictLimiter, async (req, res) => {
+    try {
+        const { name, vendor, description, department, category, cost, currency, billingCycle, contractStart, contractEnd, status, notes } = req.body;
+        if (!name || !department) {
+            return res.status(400).json({ error: 'Name and department are required' });
+        }
+        if (!IT_DEPARTMENTS.includes(department)) {
+            return res.status(400).json({ error: 'Invalid department' });
+        }
+        if (category && !IT_CATEGORIES.includes(category)) {
+            return res.status(400).json({ error: 'Invalid category' });
+        }
+        if (billingCycle && !IT_BILLING_CYCLES.includes(billingCycle)) {
+            return res.status(400).json({ error: 'Invalid billing cycle' });
+        }
+        if (currency && !IT_CURRENCIES.includes(currency)) {
+            return res.status(400).json({ error: 'Invalid currency' });
+        }
+        if (status && !IT_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        const costValue = cost !== undefined && cost !== '' ? parseFloat(cost) : null;
+        if (costValue !== null && (isNaN(costValue) || costValue < 0)) {
+            return res.status(400).json({ error: 'Cost must be a non-negative number' });
+        }
+        const tools = await readJson(IT_LANDSCAPE_FILE);
+        const newTool = {
+            id: generateId(),
+            name: name.trim(),
+            vendor: vendor ? vendor.trim() : '',
+            description: description ? description.trim() : '',
+            department,
+            category: category || 'Other',
+            cost: costValue,
+            currency: currency || 'EUR',
+            billingCycle: billingCycle || 'monthly',
+            contractStart: contractStart || null,
+            contractEnd: contractEnd || null,
+            status: status || 'active',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        tools.push(newTool);
+        await writeJson(IT_LANDSCAPE_FILE, tools);
+        res.status(201).json(newTool);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating IT tool' });
+    }
+});
+
+app.put('/api/it-landscape/:id', strictLimiter, async (req, res) => {
+    try {
+        const tools = await readJson(IT_LANDSCAPE_FILE);
+        const idx = tools.findIndex(t => t.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'IT tool not found' });
+        const { name, vendor, description, department, category, cost, currency, billingCycle, contractStart, contractEnd, status, notes } = req.body;
+        if (department && !IT_DEPARTMENTS.includes(department)) {
+            return res.status(400).json({ error: 'Invalid department' });
+        }
+        if (category && !IT_CATEGORIES.includes(category)) {
+            return res.status(400).json({ error: 'Invalid category' });
+        }
+        if (billingCycle && !IT_BILLING_CYCLES.includes(billingCycle)) {
+            return res.status(400).json({ error: 'Invalid billing cycle' });
+        }
+        if (currency && !IT_CURRENCIES.includes(currency)) {
+            return res.status(400).json({ error: 'Invalid currency' });
+        }
+        if (status && !IT_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        const costValue = cost !== undefined && cost !== '' ? parseFloat(cost) : tools[idx].cost;
+        if (costValue !== null && costValue !== undefined && (isNaN(costValue) || costValue < 0)) {
+            return res.status(400).json({ error: 'Cost must be a non-negative number' });
+        }
+        tools[idx] = {
+            ...tools[idx],
+            name: name ? name.trim() : tools[idx].name,
+            vendor: vendor !== undefined ? vendor.trim() : tools[idx].vendor,
+            description: description !== undefined ? description.trim() : tools[idx].description,
+            department: department || tools[idx].department,
+            category: category || tools[idx].category,
+            cost: cost !== undefined && cost !== '' ? costValue : tools[idx].cost,
+            currency: currency || tools[idx].currency,
+            billingCycle: billingCycle || tools[idx].billingCycle,
+            contractStart: contractStart !== undefined ? (contractStart || null) : tools[idx].contractStart,
+            contractEnd: contractEnd !== undefined ? (contractEnd || null) : tools[idx].contractEnd,
+            status: status || tools[idx].status,
+            notes: notes !== undefined ? notes.trim() : tools[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(IT_LANDSCAPE_FILE, tools);
+        res.json(tools[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating IT tool' });
+    }
+});
+
+app.delete('/api/it-landscape/:id', strictLimiter, async (req, res) => {
+    try {
+        const tools = await readJson(IT_LANDSCAPE_FILE);
+        const idx = tools.findIndex(t => t.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'IT tool not found' });
+        tools.splice(idx, 1);
+        await writeJson(IT_LANDSCAPE_FILE, tools);
+        res.json({ message: 'IT tool deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting IT tool' });
     }
 });
 

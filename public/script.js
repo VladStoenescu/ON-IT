@@ -9,11 +9,15 @@ const PAGE_TITLES = {
     submit: 'Submit Idea',
     view: 'View Ideas',
     onboarding: 'Onboarding',
-    trainings: 'Trainings'
+    trainings: 'Trainings',
+    landscape: 'IT Landscape'
 };
 
 // Store all ideas for filtering
 let allIdeas = [];
+
+// Store all IT tools for filtering
+let allITTools = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -47,6 +51,9 @@ function showTab(tabName) {
         loadEmployees();
         loadTrainingTemplates();
         loadAssignments();
+    }
+    if (tabName === 'landscape') {
+        loadITLandscape();
     }
 
     // Close sidebar on mobile after navigating
@@ -1514,6 +1521,285 @@ function closeTakeTrainingOnBg(e) {
 function trainingStatusLabel(status) {
     const labels = { not_started: 'Not Started', in_progress: 'In Progress', completed: 'Completed', overdue: 'Overdue' };
     return labels[status] || status;
+}
+
+// ─── IT Landscape ─────────────────────────────────────────────────────────────
+
+const IT_DEPT_COLORS = {
+    HR:           { bg: '#e3f2fd', color: '#1565c0', border: '#90caf9' },
+    Finance:      { bg: '#e8f5e9', color: '#2e7d32', border: '#a5d6a7' },
+    Backoffice:   { bg: '#fce4ec', color: '#880e4f', border: '#f48fb1' },
+    Cybersecurity:{ bg: '#fff3e0', color: '#e65100', border: '#ffcc80' },
+    Marketing:    { bg: '#f3e5f5', color: '#6a1b9a', border: '#ce93d8' },
+    Sales:        { bg: '#e0f2f1', color: '#00695c', border: '#80cbc4' },
+    IT:           { bg: '#e8eaf6', color: '#283593', border: '#9fa8da' },
+    Legal:        { bg: '#fff8e1', color: '#f57f17', border: '#ffe082' },
+    Operations:   { bg: '#fbe9e7', color: '#bf360c', border: '#ffab91' },
+    Product:      { bg: '#e1f5fe', color: '#01579b', border: '#81d4fa' },
+    Other:        { bg: '#f5f5f5', color: '#424242', border: '#bdbdbd' }
+};
+
+function showLandscapeSection(sectionId, btn) {
+    document.querySelectorAll('#landscape-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#landscape-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+async function loadITLandscape() {
+    try {
+        const res = await fetch(`${API_URL}/it-landscape`);
+        if (!res.ok) throw new Error('Failed to load IT tools');
+        allITTools = await res.json();
+        renderITTools();
+        renderITDashboard();
+    } catch (err) {
+        document.getElementById('it-tools-list').innerHTML = '<p class="error-state">Failed to load IT tools.</p>';
+    }
+}
+
+function renderITTools() {
+    const search = (document.getElementById('ls-search')?.value || '').toLowerCase();
+    const dept = document.getElementById('ls-filter-dept')?.value || '';
+    const status = document.getElementById('ls-filter-status')?.value || '';
+
+    let tools = allITTools.filter(t => {
+        if (dept && t.department !== dept) return false;
+        if (status && t.status !== status) return false;
+        if (search && !t.name.toLowerCase().includes(search) && !(t.vendor || '').toLowerCase().includes(search)) return false;
+        return true;
+    });
+
+    const container = document.getElementById('it-tools-list');
+    if (!container) return;
+
+    if (tools.length === 0) {
+        container.innerHTML = '<p class="empty-state">No IT tools found. Click "+ Add Tool" to get started.</p>';
+        return;
+    }
+
+    container.innerHTML = tools.map(tool => {
+        const dc = IT_DEPT_COLORS[tool.department] || IT_DEPT_COLORS.Other;
+        const costStr = tool.cost !== null && tool.cost !== undefined
+            ? `${Number(tool.cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tool.currency}`
+            : '—';
+        const billingLabel = { monthly: '/mo', annual: '/yr', 'one-time': ' one-time' }[tool.billingCycle] || '';
+        const statusColors = {
+            active: { bg: '#e8f5e9', color: '#2e7d32' },
+            inactive: { bg: '#f5f5f5', color: '#616161' },
+            'under-review': { bg: '#fff8e1', color: '#f57f17' }
+        };
+        const sc = statusColors[tool.status] || statusColors.active;
+        const statusLabel = { active: 'Active', inactive: 'Inactive', 'under-review': 'Under Review' }[tool.status] || tool.status;
+        return `<div class="it-tool-card">
+            <div class="it-tool-card-header">
+                <div class="it-tool-name">${escapeHtml(tool.name)}</div>
+                <div class="it-tool-badges">
+                    <span class="it-dept-badge" style="background:${dc.bg};color:${dc.color};border-color:${dc.border}">${escapeHtml(tool.department)}</span>
+                    <span class="it-status-badge" style="background:${sc.bg};color:${sc.color}">${statusLabel}</span>
+                </div>
+            </div>
+            ${tool.vendor ? `<div class="it-tool-vendor">${escapeHtml(tool.vendor)}</div>` : ''}
+            ${tool.description ? `<div class="it-tool-desc">${escapeHtml(tool.description)}</div>` : ''}
+            <div class="it-tool-footer">
+                <div class="it-tool-cost">
+                    <span class="it-cost-value">${costStr}</span>${tool.cost !== null && tool.cost !== undefined ? `<span class="it-cost-cycle">${billingLabel}</span>` : ''}
+                </div>
+                <div class="it-tool-meta">${escapeHtml(tool.category || 'Other')}</div>
+            </div>
+            <div class="it-tool-actions">
+                <button class="btn-link" data-tool-id="${tool.id}" onclick="openEditToolModal(this.dataset.toolId)">Edit</button>
+                <button class="btn-link btn-link-danger" data-tool-id="${tool.id}" onclick="deleteTool(this.dataset.toolId)">Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderITDashboard() {
+    const active = allITTools.filter(t => t.status === 'active');
+    const inactive = allITTools.filter(t => t.status === 'inactive');
+    const underReview = allITTools.filter(t => t.status === 'under-review');
+
+    // Compute monthly cost (normalise annual → /12, one-time → 0 for monthly calc)
+    function monthlyEquiv(tool) {
+        if (tool.cost === null || tool.cost === undefined) return 0;
+        if (tool.billingCycle === 'monthly') return tool.cost;
+        if (tool.billingCycle === 'annual') return tool.cost / 12;
+        return 0;
+    }
+    function annualEquiv(tool) {
+        if (tool.cost === null || tool.cost === undefined) return 0;
+        if (tool.billingCycle === 'monthly') return tool.cost * 12;
+        if (tool.billingCycle === 'annual') return tool.cost;
+        return 0; // one-time excluded from recurring annual
+    }
+
+    const totalMonthly = active.reduce((s, t) => s + monthlyEquiv(t), 0);
+    const totalAnnual = active.reduce((s, t) => s + annualEquiv(t), 0);
+
+    const kpiEl = document.getElementById('ls-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${allITTools.length}</div><div class="kpi-label">Total Tools</div></div>
+            <div class="kpi-card"><div class="kpi-value">${active.length}</div><div class="kpi-label">Active Tools</div></div>
+            <div class="kpi-card"><div class="kpi-value">€${totalMonthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Est. Monthly Cost</div></div>
+            <div class="kpi-card"><div class="kpi-value">€${totalAnnual.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Est. Annual Cost</div></div>
+        `;
+    }
+
+    // By department
+    const deptEl = document.getElementById('ls-by-department');
+    if (deptEl) {
+        const byDept = {};
+        active.forEach(t => {
+            if (!byDept[t.department]) byDept[t.department] = { count: 0, monthly: 0 };
+            byDept[t.department].count++;
+            byDept[t.department].monthly += monthlyEquiv(t);
+        });
+        const entries = Object.entries(byDept).sort((a, b) => b[1].monthly - a[1].monthly);
+        if (entries.length === 0) {
+            deptEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No active tools yet.</p>';
+        } else {
+            deptEl.innerHTML = entries.map(([dept, data]) => {
+                const dc = IT_DEPT_COLORS[dept] || IT_DEPT_COLORS.Other;
+                return `<div class="ls-dept-row">
+                    <span class="it-dept-badge" style="background:${dc.bg};color:${dc.color};border-color:${dc.border}">${escapeHtml(dept)}</span>
+                    <span class="ls-dept-count">${data.count} tool${data.count !== 1 ? 's' : ''}</span>
+                    <span class="ls-dept-cost">€${data.monthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}/mo</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Tools overview
+    const overviewEl = document.getElementById('ls-tools-overview');
+    if (overviewEl) {
+        const recent = [...allITTools].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
+        if (recent.length === 0) {
+            overviewEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No tools added yet.</p>';
+        } else {
+            overviewEl.innerHTML = recent.map(t => {
+                const dc = IT_DEPT_COLORS[t.department] || IT_DEPT_COLORS.Other;
+                const costStr = t.cost !== null && t.cost !== undefined ? `${Number(t.cost).toLocaleString()} ${t.currency}` : '—';
+                return `<div class="ls-overview-row">
+                    <span class="it-dept-badge" style="background:${dc.bg};color:${dc.color};border-color:${dc.border};flex-shrink:0">${escapeHtml(t.department)}</span>
+                    <span class="ls-overview-name">${escapeHtml(t.name)}</span>
+                    <span class="ls-overview-cost">${costStr}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function openToolModal() {
+    const modal = document.getElementById('tool-modal');
+    const form = document.getElementById('tool-form');
+    form.reset();
+    document.getElementById('tool-id').value = '';
+    document.getElementById('tool-modal-title').textContent = 'Add IT Tool';
+    document.getElementById('tool-submit-btn').textContent = 'Add Tool';
+    document.getElementById('tool-success').classList.add('hidden');
+    document.getElementById('tool-error').classList.add('hidden');
+    modal.classList.remove('hidden');
+}
+
+function openEditToolModal(id) {
+    const tool = allITTools.find(t => t.id === id);
+    if (!tool) return;
+    document.getElementById('tool-modal-title').textContent = 'Edit IT Tool';
+    document.getElementById('tool-submit-btn').textContent = 'Save Changes';
+    document.getElementById('tool-id').value = tool.id;
+    document.getElementById('tool-name').value = tool.name || '';
+    document.getElementById('tool-vendor').value = tool.vendor || '';
+    document.getElementById('tool-description').value = tool.description || '';
+    document.getElementById('tool-department').value = tool.department || '';
+    document.getElementById('tool-category').value = tool.category || 'Other';
+    document.getElementById('tool-cost').value = tool.cost !== null && tool.cost !== undefined ? tool.cost : '';
+    document.getElementById('tool-currency').value = tool.currency || 'EUR';
+    document.getElementById('tool-billing').value = tool.billingCycle || 'monthly';
+    document.getElementById('tool-contract-start').value = tool.contractStart || '';
+    document.getElementById('tool-contract-end').value = tool.contractEnd || '';
+    document.getElementById('tool-status').value = tool.status || 'active';
+    document.getElementById('tool-notes').value = tool.notes || '';
+    document.getElementById('tool-success').classList.add('hidden');
+    document.getElementById('tool-error').classList.add('hidden');
+    document.getElementById('tool-modal').classList.remove('hidden');
+}
+
+function closeToolModal() {
+    document.getElementById('tool-modal').classList.add('hidden');
+}
+
+function closeToolModalOnBg(e) {
+    if (e.target === document.getElementById('tool-modal')) closeToolModal();
+}
+
+async function submitTool(event) {
+    event.preventDefault();
+    const id = document.getElementById('tool-id').value;
+    const successEl = document.getElementById('tool-success');
+    const errorEl = document.getElementById('tool-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        name: document.getElementById('tool-name').value.trim(),
+        vendor: document.getElementById('tool-vendor').value.trim(),
+        description: document.getElementById('tool-description').value.trim(),
+        department: document.getElementById('tool-department').value,
+        category: document.getElementById('tool-category').value,
+        cost: document.getElementById('tool-cost').value !== '' ? parseFloat(document.getElementById('tool-cost').value) : null,
+        currency: document.getElementById('tool-currency').value,
+        billingCycle: document.getElementById('tool-billing').value,
+        contractStart: document.getElementById('tool-contract-start').value || null,
+        contractEnd: document.getElementById('tool-contract-end').value || null,
+        status: document.getElementById('tool-status').value,
+        notes: document.getElementById('tool-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/it-landscape/${id}` : `${API_URL}/it-landscape`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving tool';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Tool updated successfully!' : 'Tool added successfully!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allITTools.findIndex(t => t.id === id);
+            if (idx !== -1) allITTools[idx] = data;
+        } else {
+            allITTools.push(data);
+        }
+        renderITTools();
+        renderITDashboard();
+        setTimeout(() => closeToolModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteTool(id) {
+    if (!confirm('Are you sure you want to delete this tool?')) return;
+    try {
+        const res = await fetch(`${API_URL}/it-landscape/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting tool'); return; }
+        allITTools = allITTools.filter(t => t.id !== id);
+        renderITTools();
+        renderITDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
 }
 
 

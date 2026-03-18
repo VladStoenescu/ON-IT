@@ -63,6 +63,13 @@
                     <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8l8-5 8 5-8 5-8-5z"/><path d="M6 10.5V15c0 1.7 1.8 3 4 3s4-1.3 4-3v-4.5"/><line x1="18" y1="8" x2="18" y2="12"/></svg>
                     <span>Trainings</span>
                 </button>
+
+                <p class="nav-group-label">Tools &amp; Costs</p>
+
+                <button class="nav-item" data-section="landscape" onclick="showTab('landscape', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="7" height="7" rx="1"/><rect x="11" y="3" width="7" height="7" rx="1"/><rect x="2" y="11" width="7" height="7" rx="1"/><rect x="11" y="11" width="7" height="7" rx="1"/></svg>
+                    <span>IT Landscape</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -159,6 +166,16 @@
                             <div class="hmc-body">
                                 <div class="hmc-title">Trainings</div>
                                 <div class="hmc-desc">Create and assign training programmes</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </div>
+                        <div class="home-module-card" onclick="showTab('landscape', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">IT Landscape</div>
+                                <div class="hmc-desc">Track IT tools, costs and department usage</div>
                             </div>
                             <span class="hmc-arrow">→</span>
                         </div>
@@ -456,6 +473,67 @@
             </div>
         </div>
 
+                <!-- ─── IT Landscape Tab ─────────────────────────────── -->
+                <div id="landscape-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showLandscapeSection('ls-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showLandscapeSection('ls-tools', this)">All Tools</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="ls-dashboard" class="ob-section active">
+                        <h2 class="section-title">IT Landscape Dashboard</h2>
+                        <div id="ls-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>Cost by Department</h3>
+                                <div id="ls-by-department"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Tools Overview</h3>
+                                <div id="ls-tools-overview"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Tools Section -->
+                    <div id="ls-tools" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">IT Tools</h2>
+                            <button class="btn-primary" onclick="openToolModal()">+ Add Tool</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="ls-search" placeholder="Search by name or vendor…" oninput="renderITTools()" class="ls-filter-input">
+                            <select id="ls-filter-dept" onchange="renderITTools()" class="ls-filter-select">
+                                <option value="">All Departments</option>
+                                <option value="HR">HR</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Backoffice">Backoffice</option>
+                                <option value="Cybersecurity">Cybersecurity</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Sales">Sales</option>
+                                <option value="IT">IT</option>
+                                <option value="Legal">Legal</option>
+                                <option value="Operations">Operations</option>
+                                <option value="Product">Product</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <select id="ls-filter-status" onchange="renderITTools()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="under-review">Under Review</option>
+                            </select>
+                        </div>
+                        <div id="it-tools-list" class="it-tools-grid">
+                            <p class="loading">Loading IT tools…</p>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     </div>
@@ -651,6 +729,116 @@
                 <button class="modal-close" onclick="closeTakeTrainingModal()">✕</button>
             </div>
             <div class="modal-body" id="take-training-body"></div>
+        </div>
+    </div>
+
+    <!-- IT Tool Modal -->
+    <div id="tool-modal" class="modal-overlay hidden" onclick="closeToolModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="tool-modal-title">Add IT Tool</h3>
+                <button class="modal-close" onclick="closeToolModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="tool-form" onsubmit="submitTool(event)">
+                    <input type="hidden" id="tool-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tool Name *</label>
+                            <input type="text" id="tool-name" required placeholder="e.g. Slack">
+                        </div>
+                        <div class="form-group">
+                            <label>Vendor</label>
+                            <input type="text" id="tool-vendor" placeholder="e.g. Salesforce Inc.">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="tool-description" rows="2" placeholder="Brief description of what this tool does"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Department *</label>
+                            <select id="tool-department" required>
+                                <option value="">Select department</option>
+                                <option value="HR">HR</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Backoffice">Backoffice</option>
+                                <option value="Cybersecurity">Cybersecurity</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Sales">Sales</option>
+                                <option value="IT">IT</option>
+                                <option value="Legal">Legal</option>
+                                <option value="Operations">Operations</option>
+                                <option value="Product">Product</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="tool-category">
+                                <option value="SaaS">SaaS</option>
+                                <option value="License">License</option>
+                                <option value="Hardware">Hardware</option>
+                                <option value="Service">Service</option>
+                                <option value="Subscription">Subscription</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cost</label>
+                            <input type="number" id="tool-cost" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select id="tool-currency">
+                                <option value="EUR">EUR</option>
+                                <option value="USD">USD</option>
+                                <option value="GBP">GBP</option>
+                                <option value="CHF">CHF</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Billing Cycle</label>
+                            <select id="tool-billing">
+                                <option value="monthly">Monthly</option>
+                                <option value="annual">Annual</option>
+                                <option value="one-time">One-time</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Contract Start</label>
+                            <input type="date" id="tool-contract-start">
+                        </div>
+                        <div class="form-group">
+                            <label>Contract End</label>
+                            <input type="date" id="tool-contract-end">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="tool-status">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="under-review">Under Review</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="tool-notes" rows="2" placeholder="Any additional notes"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeToolModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="tool-submit-btn">Add Tool</button>
+                    </div>
+                    <div id="tool-success" class="message success hidden"></div>
+                    <div id="tool-error" class="message error hidden"></div>
+                </form>
+            </div>
         </div>
     </div>
 
