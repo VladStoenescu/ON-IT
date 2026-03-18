@@ -56,18 +56,36 @@ function showTab(tabName, event) {
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
-    if (sidebar.classList.contains('open')) {
+    const toggleButton = document.querySelector('[data-toggle="sidebar"], [aria-controls="sidebar"]');
+
+    const isOpen = sidebar.classList.contains('open');
+
+    if (isOpen) {
         sidebar.classList.remove('open');
         overlay.classList.remove('active');
+        if (toggleButton) {
+            toggleButton.setAttribute('aria-expanded', 'false');
+        }
     } else {
         sidebar.classList.add('open');
         overlay.classList.add('active');
+        if (toggleButton) {
+            toggleButton.setAttribute('aria-expanded', 'true');
+        }
     }
 }
 
 function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('sidebar-overlay').classList.remove('active');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const toggleButton = document.querySelector('[data-toggle="sidebar"], [aria-controls="sidebar"]');
+
+    sidebar.classList.remove('open');
+    overlay.classList.remove('active');
+
+    if (toggleButton) {
+        toggleButton.setAttribute('aria-expanded', 'false');
+    }
 }
 
 // ─── Ideas: existing functionality ───────────────────────────────────────────
