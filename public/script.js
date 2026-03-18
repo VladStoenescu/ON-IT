@@ -7,15 +7,33 @@ const MESSAGE_DISPLAY_DURATION = 5000; // milliseconds
 // Store all ideas for filtering
 let allIdeas = [];
 
-// ─── Tab switching ────────────────────────────────────────────────────────────
+// ─── Navigation ──────────────────────────────────────────────────────────────
 
 function showTab(tabName, event) {
+    // Hide all sections
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
 
-    document.getElementById(`${tabName}-tab`).classList.add('active');
-    if (event && event.target) event.target.classList.add('active');
+    // Update sidebar nav active state
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    const navItem = document.querySelector(`.nav-item[data-section="${tabName}"]`);
+    if (navItem) navItem.classList.add('active');
 
+    // Update topbar page title
+    const titles = {
+        home: 'Home',
+        submit: 'Submit Idea',
+        view: 'View Ideas',
+        onboarding: 'Onboarding',
+        trainings: 'Trainings'
+    };
+    const titleEl = document.getElementById('page-title');
+    if (titleEl) titleEl.textContent = titles[tabName] || tabName;
+
+    // Show selected section
+    const tabEl = document.getElementById(`${tabName}-tab`);
+    if (tabEl) tabEl.classList.add('active');
+
+    // Load data for the selected section
     if (tabName === 'view') loadIdeas();
     if (tabName === 'onboarding') {
         loadOnboardingDashboard();
@@ -29,6 +47,26 @@ function showTab(tabName, event) {
         loadTrainingTemplates();
         loadAssignments();
     }
+
+    // Close sidebar on mobile after navigating
+    if (window.innerWidth < 1024) closeSidebar();
+}
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+    } else {
+        sidebar.classList.add('open');
+        overlay.classList.add('active');
+    }
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('active');
 }
 
 // ─── Ideas: existing functionality ───────────────────────────────────────────
