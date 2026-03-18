@@ -3,6 +3,7 @@ const API_URL = '/api';
 
 // Constants
 const MESSAGE_DISPLAY_DURATION = 5000; // milliseconds
+const MOBILE_BREAKPOINT = 1024; // matches CSS media query in styles.css
 
 // Store all ideas for filtering
 let allIdeas = [];
@@ -49,7 +50,7 @@ function showTab(tabName, event) {
     }
 
     // Close sidebar on mobile after navigating
-    if (window.innerWidth < 1024) closeSidebar();
+    if (window.innerWidth < MOBILE_BREAKPOINT) closeSidebar();
 }
 
 function toggleSidebar() {
