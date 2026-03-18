@@ -10,7 +10,7 @@ let allIdeas = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
-function showTab(tabName, event) {
+function showTab(tabName) {
     // Hide all sections
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
 
