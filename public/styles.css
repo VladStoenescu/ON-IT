@@ -353,7 +353,7 @@ body {
 
     .sidebar-toggle { display: flex; }
 
-    .tab-content { padding: 20px 16px !important; }
+    .tab-content:not(.ob-tab-content) { padding: 20px 16px; }
 
     .home-modules-grid { grid-template-columns: 1fr; }
 }
