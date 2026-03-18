@@ -97,63 +97,38 @@ Retrieve a specific idea by ID.
 
 ## Deployment
 
-The application is deployed to a DigitalOcean droplet via SSH using GitHub Actions on every push to the `main` branch.
+### DigitalOcean App Platform (recommended)
 
-| Variable | Value |
+The application is deployed on [DigitalOcean App Platform](https://www.digitalocean.com/products/app-platform) with the GitHub repository linked for automatic deployments.
+
+The `.do/app.yaml` file in this repository contains the App Platform spec. DigitalOcean reads this file automatically when the app is connected to the repository.
+
+**How it works:**
+
+1. Every push to the `main` branch triggers an automatic build and deploy on App Platform (`deploy_on_push: true`).
+2. App Platform runs `npm ci --omit=dev` to install production dependencies and `npm start` to launch the server.
+3. The platform injects the `PORT` environment variable. The server already reads `process.env.PORT` so no manual configuration is required.
+4. A health check is performed against `GET /health` to confirm the deployment is healthy before traffic is routed to it.
+
+**Connecting the repository to a new App Platform app:**
+
+1. In the [DigitalOcean control panel](https://cloud.digitalocean.com/apps), click **Create App**.
+2. Choose **GitHub** as the source and select this repository and the `main` branch.
+3. DigitalOcean will detect `.do/app.yaml` and pre-fill the configuration — review and confirm.
+4. Click **Create Resources** to create the app.
+
+**Optional: monitor deployments from GitHub Actions**
+
+The CI/CD workflow (`.github/workflows/deploy.yml`) validates that the app builds and the server starts on every push and pull request. If you also want it to wait for the App Platform deployment to finish and surface the result in the workflow run, add two repository secrets:
+
+| Secret | Description |
 |---|---|
-| `SSH_HOST` | `134.122.80.196` |
-| `SSH_USERNAME` | `root` |
-| `SSH_PRIVATE_KEY` | Stored as a GitHub repository secret (`SSH_PRIVATE_KEY`) |
+| `DIGITALOCEAN_ACCESS_TOKEN` | A DigitalOcean personal access token with read scope |
+| `DIGITALOCEAN_APP_ID` | The App Platform app ID (visible in the app URL: `https://cloud.digitalocean.com/apps/<APP_ID>`) |
 
-The deployment script clones or updates the repository at `/opt/on-it`, installs production dependencies, and manages the process with PM2 using `ecosystem.config.js` (with automatic rollback on failure).
+When both secrets are present the `deploy` job polls the deployment status and fails the workflow if the deployment ends in an error state. Without the secrets the job simply prints a notice and exits successfully — App Platform will still deploy automatically via `deploy_on_push`.
 
-After starting the app, the pipeline performs an HTTP health check against `GET /health` to confirm the server is accepting requests before marking the deployment as successful.
-
-### Setting up the SSH_PRIVATE_KEY secret
-
-1. **Generate a dedicated deploy key** on your local machine (or the server):
-   ```bash
-   ssh-keygen -t ed25519 -C "github-actions-deploy" -f deploy_key
-   ```
-   This creates two files: `deploy_key` (private) and `deploy_key.pub` (public).
-
-2. **Authorize the public key on the droplet** (run on the server):
-   ```bash
-   cat deploy_key.pub >> ~/.ssh/authorized_keys
-   ```
-
-3. **Add the private key as a GitHub repository secret**:
-   - Go to **Settings → Secrets and variables → Actions** in the repository.
-   - Click **New repository secret**.
-   - Name: `SSH_PRIVATE_KEY`
-   - Value: paste the **entire contents** of the `deploy_key` file, including the
-     `-----BEGIN OPENSSH PRIVATE KEY-----` header and `-----END OPENSSH PRIVATE KEY-----` footer.
-
-4. **Delete the local key files** after adding the secret:
-   ```bash
-   rm deploy_key deploy_key.pub
-   ```
-
-> **Important:** Store the *private* key (`deploy_key`), not the public key (`deploy_key.pub`). The workflow validates the secret format on every run and will fail with a descriptive error if the key is missing or malformed.
-
-### PM2 process management
-
-The app is managed by [PM2](https://pm2.keymetrics.io/) on the droplet. Configuration lives in `ecosystem.config.js`:
-
-- Process name: `on-it`
-- Logs are written to `logs/out.log` and `logs/err.log`
-- The app auto-restarts if it crashes or exceeds 256 MB of memory
-- `NODE_ENV=production` is set automatically
-- PM2 startup is configured on first deploy so the app survives server reboots
-
-Useful PM2 commands when SSH-ed into the droplet:
-
-```bash
-pm2 list                  # show all processes
-pm2 logs on-it            # stream application logs
-pm2 restart on-it         # manual restart
-pm2 monit                 # real-time monitoring dashboard
-```
+> **Note on persistent data:** App Platform does not mount a persistent filesystem across deployments. The JSON files in `data/` are recreated from the in-repository defaults on each deploy. For durable storage, migrate to a managed database such as [DigitalOcean Managed PostgreSQL](https://www.digitalocean.com/products/managed-databases-postgresql) and update the server to use it.
 
 ## Configuration
 
