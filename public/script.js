@@ -1839,6 +1839,12 @@ function showAssetsSection(sectionId, btn) {
     if (btn) btn.classList.add('active');
 }
 
+function formatAssetAge(months) {
+    if (months === null) return '—';
+    if (months >= 12) return `${Math.floor(months / 12)}y ${months % 12}m`;
+    return `${months}m`;
+}
+
 async function loadITAssets() {
     try {
         const res = await fetch(`${API_URL}/it-assets`);
@@ -1960,9 +1966,7 @@ async function renderAssetDashboard() {
 
         const kpiEl = document.getElementById('assets-kpi-cards');
         if (kpiEl) {
-            const avgAge = kpis.avgAgeMonths !== null
-                ? (kpis.avgAgeMonths >= 12 ? `${Math.floor(kpis.avgAgeMonths / 12)}y ${kpis.avgAgeMonths % 12}m` : `${kpis.avgAgeMonths}m`)
-                : '—';
+            const avgAge = formatAssetAge(kpis.avgAgeMonths);
             const totalVal = kpis.totalValue > 0
                 ? `€${kpis.totalValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                 : '—';
@@ -2098,6 +2102,7 @@ async function submitAsset(event) {
     successEl.classList.add('hidden');
     errorEl.classList.add('hidden');
 
+    const priceRaw = document.getElementById('asset-price').value;
     const payload = {
         assetTag: document.getElementById('asset-tag').value.trim(),
         name: document.getElementById('asset-name').value.trim(),
@@ -2112,7 +2117,7 @@ async function submitAsset(event) {
         department: document.getElementById('asset-department').value.trim(),
         location: document.getElementById('asset-location').value.trim(),
         purchaseDate: document.getElementById('asset-purchase-date').value || null,
-        purchasePrice: document.getElementById('asset-price').value !== '' ? parseFloat(document.getElementById('asset-price').value) : null,
+        purchasePrice: priceRaw !== '' ? parseFloat(priceRaw) : null,
         currency: document.getElementById('asset-currency').value,
         warrantyExpiry: document.getElementById('asset-warranty').value || null,
         notes: document.getElementById('asset-notes').value.trim()

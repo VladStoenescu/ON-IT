@@ -992,6 +992,73 @@ const ASSET_STATUSES = ['in-use', 'available', 'maintenance', 'retired', 'lost']
 const ASSET_CONDITIONS = ['excellent', 'good', 'fair', 'poor'];
 const ASSET_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF'];
 
+// More-specific route defined first to avoid /:id matching 'kpis'
+app.get('/api/it-assets/kpis', async (req, res) => {
+    try {
+        const assets = await readJson(IT_ASSETS_FILE);
+        const now = new Date();
+        const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        const totalAssets = assets.length;
+        const inUse = assets.filter(a => a.status === 'in-use').length;
+        const available = assets.filter(a => a.status === 'available').length;
+        const maintenance = assets.filter(a => a.status === 'maintenance').length;
+        const retired = assets.filter(a => a.status === 'retired').length;
+
+        const totalValue = assets.reduce((sum, a) => sum + (a.purchasePrice || 0), 0);
+
+        const warrantyExpiringSoon = assets.filter(a => {
+            if (!a.warrantyExpiry) return false;
+            const exp = new Date(a.warrantyExpiry);
+            return exp >= now && exp <= in30Days;
+        }).length;
+
+        const warrantyExpired = assets.filter(a => {
+            if (!a.warrantyExpiry) return false;
+            return new Date(a.warrantyExpiry) < now;
+        }).length;
+
+        // Average asset age in months
+        const assetsWithPurchaseDate = assets.filter(a => a.purchaseDate);
+        const avgAgeMonths = assetsWithPurchaseDate.length > 0
+            ? Math.round(assetsWithPurchaseDate.reduce((sum, a) => {
+                const months = (now - new Date(a.purchaseDate)) / (1000 * 60 * 60 * 24 * 30.44);
+                return sum + months;
+            }, 0) / assetsWithPurchaseDate.length)
+            : null;
+
+        // By type breakdown
+        const byType = {};
+        assets.forEach(a => {
+            byType[a.type] = (byType[a.type] || 0) + 1;
+        });
+
+        // By department breakdown
+        const byDepartment = {};
+        assets.forEach(a => {
+            const dept = a.department || 'Unassigned';
+            byDepartment[dept] = (byDepartment[dept] || 0) + 1;
+        });
+
+        // By status breakdown
+        const byStatus = { 'in-use': inUse, available, maintenance, retired, lost: assets.filter(a => a.status === 'lost').length };
+
+        // Recently updated assets (top 8)
+        const recentAssets = [...assets]
+            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+            .slice(0, 8)
+            .map(a => ({ id: a.id, assetTag: a.assetTag, name: a.name, type: a.type, assignedTo: a.assignedTo, department: a.department, status: a.status, condition: a.condition }));
+
+        res.json({
+            totalAssets, inUse, available, maintenance, retired, totalValue,
+            warrantyExpiringSoon, warrantyExpired, avgAgeMonths,
+            byType, byDepartment, byStatus, recentAssets
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Error computing IT asset KPIs' });
+    }
+});
+
 app.get('/api/it-assets', async (req, res) => {
     try {
         const assets = await readJson(IT_ASSETS_FILE);
@@ -1124,72 +1191,6 @@ app.delete('/api/it-assets/:id', strictLimiter, async (req, res) => {
         res.json({ message: 'IT asset deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting IT asset' });
-    }
-});
-
-app.get('/api/it-assets/kpis', async (req, res) => {
-    try {
-        const assets = await readJson(IT_ASSETS_FILE);
-        const now = new Date();
-        const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-        const totalAssets = assets.length;
-        const inUse = assets.filter(a => a.status === 'in-use').length;
-        const available = assets.filter(a => a.status === 'available').length;
-        const maintenance = assets.filter(a => a.status === 'maintenance').length;
-        const retired = assets.filter(a => a.status === 'retired').length;
-
-        const totalValue = assets.reduce((sum, a) => sum + (a.purchasePrice || 0), 0);
-
-        const warrantyExpiringSoon = assets.filter(a => {
-            if (!a.warrantyExpiry) return false;
-            const exp = new Date(a.warrantyExpiry);
-            return exp >= now && exp <= in30Days;
-        }).length;
-
-        const warrantyExpired = assets.filter(a => {
-            if (!a.warrantyExpiry) return false;
-            return new Date(a.warrantyExpiry) < now;
-        }).length;
-
-        // Average asset age in months
-        const assetsWithPurchaseDate = assets.filter(a => a.purchaseDate);
-        const avgAgeMonths = assetsWithPurchaseDate.length > 0
-            ? Math.round(assetsWithPurchaseDate.reduce((sum, a) => {
-                const months = (now - new Date(a.purchaseDate)) / (1000 * 60 * 60 * 24 * 30.44);
-                return sum + months;
-            }, 0) / assetsWithPurchaseDate.length)
-            : null;
-
-        // By type breakdown
-        const byType = {};
-        assets.forEach(a => {
-            byType[a.type] = (byType[a.type] || 0) + 1;
-        });
-
-        // By department breakdown
-        const byDepartment = {};
-        assets.forEach(a => {
-            const dept = a.department || 'Unassigned';
-            byDepartment[dept] = (byDepartment[dept] || 0) + 1;
-        });
-
-        // By status breakdown
-        const byStatus = { 'in-use': inUse, available, maintenance, retired, lost: assets.filter(a => a.status === 'lost').length };
-
-        // Recently updated assets (top 8)
-        const recentAssets = [...assets]
-            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-            .slice(0, 8)
-            .map(a => ({ id: a.id, assetTag: a.assetTag, name: a.name, type: a.type, assignedTo: a.assignedTo, department: a.department, status: a.status, condition: a.condition }));
-
-        res.json({
-            totalAssets, inUse, available, maintenance, retired, totalValue,
-            warrantyExpiringSoon, warrantyExpired, avgAgeMonths,
-            byType, byDepartment, byStatus, recentAssets
-        });
-    } catch (error) {
-        res.status(500).json({ error: 'Error computing IT asset KPIs' });
     }
 });
 
