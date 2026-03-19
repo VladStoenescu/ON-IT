@@ -10,7 +10,8 @@ const PAGE_TITLES = {
     view: 'View Ideas',
     onboarding: 'Onboarding',
     trainings: 'Trainings',
-    landscape: 'IT Landscape'
+    landscape: 'IT Landscape',
+    assets: 'IT Asset Inventory'
 };
 
 // Store all ideas for filtering
@@ -18,6 +19,9 @@ let allIdeas = [];
 
 // Store all IT tools for filtering
 let allITTools = [];
+
+// Store all IT assets for filtering
+let allITAssets = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -54,6 +58,9 @@ function showTab(tabName) {
     }
     if (tabName === 'landscape') {
         loadITLandscape();
+    }
+    if (tabName === 'assets') {
+        loadITAssets();
     }
 
     // Close sidebar on mobile after navigating
@@ -1802,4 +1809,358 @@ async function deleteTool(id) {
     }
 }
 
+// ─── IT Asset Inventory ───────────────────────────────────────────────────────
+
+const ASSET_TYPE_ICONS = {
+    Laptop: '💻', Desktop: '🖥️', Monitor: '🖵', Phone: '📱', Tablet: '📲',
+    Printer: '🖨️', Server: '🗄️', 'Network Equipment': '🔌', Peripheral: '🖱️', Other: '📦'
+};
+
+const ASSET_STATUS_COLORS = {
+    'in-use':     { bg: '#e8f5e9', color: '#2e7d32', label: 'In Use' },
+    available:    { bg: '#e3f2fd', color: '#1565c0', label: 'Available' },
+    maintenance:  { bg: '#fff8e1', color: '#f57f17', label: 'Maintenance' },
+    retired:      { bg: '#f5f5f5', color: '#616161', label: 'Retired' },
+    lost:         { bg: '#fce4ec', color: '#880e4f', label: 'Lost' }
+};
+
+const ASSET_CONDITION_COLORS = {
+    excellent: { bg: '#e8f5e9', color: '#2e7d32' },
+    good:      { bg: '#e3f2fd', color: '#1565c0' },
+    fair:      { bg: '#fff8e1', color: '#f57f17' },
+    poor:      { bg: '#fce4ec', color: '#880e4f' }
+};
+
+function showAssetsSection(sectionId, btn) {
+    document.querySelectorAll('#assets-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#assets-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+async function loadITAssets() {
+    try {
+        const res = await fetch(`${API_URL}/it-assets`);
+        if (!res.ok) throw new Error('Failed to load IT assets');
+        allITAssets = await res.json();
+        populateAssetDeptFilter();
+        renderITAssets();
+        renderAssetDashboard();
+    } catch (err) {
+        document.getElementById('assets-table-container').innerHTML = '<p class="error-state">Failed to load IT assets.</p>';
+    }
+}
+
+function populateAssetDeptFilter() {
+    const sel = document.getElementById('assets-filter-dept');
+    if (!sel) return;
+    const current = sel.value;
+    const depts = [...new Set(allITAssets.map(a => a.department).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">All Departments</option>' +
+        depts.map(d => `<option value="${escapeHtml(d)}"${d === current ? ' selected' : ''}>${escapeHtml(d)}</option>`).join('');
+}
+
+function renderITAssets() {
+    const search = (document.getElementById('assets-search')?.value || '').toLowerCase();
+    const type = document.getElementById('assets-filter-type')?.value || '';
+    const status = document.getElementById('assets-filter-status')?.value || '';
+    const dept = document.getElementById('assets-filter-dept')?.value || '';
+
+    let assets = allITAssets.filter(a => {
+        if (type && a.type !== type) return false;
+        if (status && a.status !== status) return false;
+        if (dept && a.department !== dept) return false;
+        if (search) {
+            const haystack = [a.name, a.assetTag, a.serialNumber, a.assignedTo, a.brand, a.model].join(' ').toLowerCase();
+            if (!haystack.includes(search)) return false;
+        }
+        return true;
+    });
+
+    const container = document.getElementById('assets-table-container');
+    if (!container) return;
+
+    if (assets.length === 0) {
+        container.innerHTML = '<p class="empty-state">No IT assets found. Click "+ Add Asset" to get started.</p>';
+        return;
+    }
+
+    const now = new Date();
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead>
+            <tr>
+                <th>Asset</th>
+                <th>Type</th>
+                <th>Brand / Model</th>
+                <th>Assigned To</th>
+                <th>Department</th>
+                <th>Status</th>
+                <th>Condition</th>
+                <th>Warranty</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${assets.map(asset => {
+                const sc = ASSET_STATUS_COLORS[asset.status] || ASSET_STATUS_COLORS.available;
+                const cc = ASSET_CONDITION_COLORS[asset.condition] || ASSET_CONDITION_COLORS.good;
+                const icon = ASSET_TYPE_ICONS[asset.type] || '📦';
+                const brandModel = [asset.brand, asset.model].filter(Boolean).join(' / ') || '—';
+                let warrantyHtml = '—';
+                if (asset.warrantyExpiry) {
+                    const exp = new Date(asset.warrantyExpiry);
+                    if (exp < now) {
+                        warrantyHtml = `<span class="asset-warranty-expired">${asset.warrantyExpiry}</span>`;
+                    } else if (exp <= in30Days) {
+                        warrantyHtml = `<span class="asset-warranty-soon">${asset.warrantyExpiry}</span>`;
+                    } else {
+                        warrantyHtml = `<span>${asset.warrantyExpiry}</span>`;
+                    }
+                }
+                return `<tr>
+                    <td>
+                        <div class="asset-name-cell">
+                            <span class="asset-type-icon">${icon}</span>
+                            <div>
+                                <div class="asset-name">${escapeHtml(asset.name)}</div>
+                                ${asset.assetTag ? `<div class="asset-tag">${escapeHtml(asset.assetTag)}</div>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                    <td>${escapeHtml(asset.type)}</td>
+                    <td>${escapeHtml(brandModel)}</td>
+                    <td>
+                        ${asset.assignedTo ? `<div class="asset-assigned-name">${escapeHtml(asset.assignedTo)}</div>` : '<span class="asset-unassigned">—</span>'}
+                        ${asset.assignedEmail ? `<div class="asset-assigned-email">${escapeHtml(asset.assignedEmail)}</div>` : ''}
+                    </td>
+                    <td>${asset.department ? escapeHtml(asset.department) : '—'}</td>
+                    <td><span class="asset-status-badge" style="background:${sc.bg};color:${sc.color}">${sc.label}</span></td>
+                    <td><span class="asset-condition-badge" style="background:${cc.bg};color:${cc.color}">${asset.condition ? (asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1)) : '—'}</span></td>
+                    <td class="asset-warranty-cell">${warrantyHtml}</td>
+                    <td>
+                        <div class="it-tool-actions">
+                            <button class="btn-link" data-asset-id="${asset.id}" onclick="openEditAssetModal(this.dataset.assetId)">Edit</button>
+                            <button class="btn-link btn-link-danger" data-asset-id="${asset.id}" onclick="deleteAsset(this.dataset.assetId)">Delete</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+async function renderAssetDashboard() {
+    try {
+        const res = await fetch(`${API_URL}/it-assets/kpis`);
+        if (!res.ok) throw new Error('KPIs failed');
+        const kpis = await res.json();
+
+        const kpiEl = document.getElementById('assets-kpi-cards');
+        if (kpiEl) {
+            const avgAge = kpis.avgAgeMonths !== null
+                ? (kpis.avgAgeMonths >= 12 ? `${Math.floor(kpis.avgAgeMonths / 12)}y ${kpis.avgAgeMonths % 12}m` : `${kpis.avgAgeMonths}m`)
+                : '—';
+            const totalVal = kpis.totalValue > 0
+                ? `€${kpis.totalValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                : '—';
+            kpiEl.innerHTML = `
+                <div class="kpi-card"><div class="kpi-value">${kpis.totalAssets}</div><div class="kpi-label">Total Assets</div></div>
+                <div class="kpi-card"><div class="kpi-value">${kpis.inUse}</div><div class="kpi-label">In Use</div></div>
+                <div class="kpi-card"><div class="kpi-value">${kpis.available}</div><div class="kpi-label">Available</div></div>
+                <div class="kpi-card"><div class="kpi-value">${totalVal}</div><div class="kpi-label">Total Asset Value</div></div>
+                <div class="kpi-card ${kpis.warrantyExpiringSoon > 0 ? 'kpi-card-warn' : ''}"><div class="kpi-value">${kpis.warrantyExpiringSoon}</div><div class="kpi-label">Warranty Expiring (30d)</div></div>
+                <div class="kpi-card"><div class="kpi-value">${avgAge}</div><div class="kpi-label">Avg Asset Age</div></div>
+            `;
+        }
+
+        // By type
+        const typeEl = document.getElementById('assets-by-type');
+        if (typeEl) {
+            const entries = Object.entries(kpis.byType).sort((a, b) => b[1] - a[1]);
+            if (entries.length === 0) {
+                typeEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No assets yet.</p>';
+            } else {
+                const max = Math.max(...entries.map(e => e[1]));
+                typeEl.innerHTML = entries.map(([type, count]) => {
+                    const icon = ASSET_TYPE_ICONS[type] || '📦';
+                    const pct = Math.round((count / max) * 100);
+                    return `<div class="asset-kpi-row">
+                        <span class="asset-kpi-icon">${icon}</span>
+                        <span class="asset-kpi-label">${escapeHtml(type)}</span>
+                        <div class="asset-kpi-bar-wrap"><div class="asset-kpi-bar" style="width:${pct}%"></div></div>
+                        <span class="asset-kpi-count">${count}</span>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // By department
+        const deptEl = document.getElementById('assets-by-dept');
+        if (deptEl) {
+            const entries = Object.entries(kpis.byDepartment).sort((a, b) => b[1] - a[1]);
+            if (entries.length === 0) {
+                deptEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No assets yet.</p>';
+            } else {
+                const max = Math.max(...entries.map(e => e[1]));
+                deptEl.innerHTML = entries.map(([dept, count]) => {
+                    const pct = Math.round((count / max) * 100);
+                    return `<div class="asset-kpi-row">
+                        <span class="asset-kpi-label">${escapeHtml(dept)}</span>
+                        <div class="asset-kpi-bar-wrap"><div class="asset-kpi-bar asset-kpi-bar-dept" style="width:${pct}%"></div></div>
+                        <span class="asset-kpi-count">${count}</span>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // Recent assets
+        const recentEl = document.getElementById('assets-recent');
+        if (recentEl) {
+            if (kpis.recentAssets.length === 0) {
+                recentEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No assets added yet.</p>';
+            } else {
+                recentEl.innerHTML = kpis.recentAssets.map(a => {
+                    const sc = ASSET_STATUS_COLORS[a.status] || ASSET_STATUS_COLORS.available;
+                    const icon = ASSET_TYPE_ICONS[a.type] || '📦';
+                    return `<div class="ls-overview-row">
+                        <span class="asset-type-icon" style="flex-shrink:0">${icon}</span>
+                        <div style="flex:1;min-width:0">
+                            <div class="ls-overview-name">${escapeHtml(a.name)}</div>
+                            ${a.assignedTo ? `<div style="font-size:0.78em;color:var(--brand-muted)">${escapeHtml(a.assignedTo)}</div>` : ''}
+                        </div>
+                        <span class="asset-status-badge" style="background:${sc.bg};color:${sc.color};flex-shrink:0">${sc.label}</span>
+                    </div>`;
+                }).join('');
+            }
+        }
+    } catch (err) {
+        const kpiEl = document.getElementById('assets-kpi-cards');
+        if (kpiEl) kpiEl.innerHTML = '<p class="error-state">Failed to load dashboard.</p>';
+    }
+}
+
+function openAssetModal() {
+    const modal = document.getElementById('asset-modal');
+    const form = document.getElementById('asset-form');
+    form.reset();
+    document.getElementById('asset-id').value = '';
+    document.getElementById('asset-modal-title').textContent = 'Add IT Asset';
+    document.getElementById('asset-submit-btn').textContent = 'Add Asset';
+    document.getElementById('asset-success').classList.add('hidden');
+    document.getElementById('asset-error').classList.add('hidden');
+    modal.classList.remove('hidden');
+}
+
+function openEditAssetModal(id) {
+    const asset = allITAssets.find(a => a.id === id);
+    if (!asset) return;
+    document.getElementById('asset-modal-title').textContent = 'Edit IT Asset';
+    document.getElementById('asset-submit-btn').textContent = 'Save Changes';
+    document.getElementById('asset-id').value = asset.id;
+    document.getElementById('asset-name').value = asset.name || '';
+    document.getElementById('asset-tag').value = asset.assetTag || '';
+    document.getElementById('asset-type').value = asset.type || '';
+    document.getElementById('asset-brand').value = asset.brand || '';
+    document.getElementById('asset-model').value = asset.model || '';
+    document.getElementById('asset-serial').value = asset.serialNumber || '';
+    document.getElementById('asset-status').value = asset.status || 'available';
+    document.getElementById('asset-condition').value = asset.condition || 'good';
+    document.getElementById('asset-assigned-to').value = asset.assignedTo || '';
+    document.getElementById('asset-assigned-email').value = asset.assignedEmail || '';
+    document.getElementById('asset-department').value = asset.department || '';
+    document.getElementById('asset-location').value = asset.location || '';
+    document.getElementById('asset-purchase-date').value = asset.purchaseDate || '';
+    document.getElementById('asset-price').value = asset.purchasePrice !== null && asset.purchasePrice !== undefined ? asset.purchasePrice : '';
+    document.getElementById('asset-currency').value = asset.currency || 'EUR';
+    document.getElementById('asset-warranty').value = asset.warrantyExpiry || '';
+    document.getElementById('asset-notes').value = asset.notes || '';
+    document.getElementById('asset-success').classList.add('hidden');
+    document.getElementById('asset-error').classList.add('hidden');
+    document.getElementById('asset-modal').classList.remove('hidden');
+}
+
+function closeAssetModal() {
+    document.getElementById('asset-modal').classList.add('hidden');
+}
+
+function closeAssetModalOnBg(e) {
+    if (e.target === document.getElementById('asset-modal')) closeAssetModal();
+}
+
+async function submitAsset(event) {
+    event.preventDefault();
+    const id = document.getElementById('asset-id').value;
+    const successEl = document.getElementById('asset-success');
+    const errorEl = document.getElementById('asset-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        assetTag: document.getElementById('asset-tag').value.trim(),
+        name: document.getElementById('asset-name').value.trim(),
+        type: document.getElementById('asset-type').value,
+        brand: document.getElementById('asset-brand').value.trim(),
+        model: document.getElementById('asset-model').value.trim(),
+        serialNumber: document.getElementById('asset-serial').value.trim(),
+        status: document.getElementById('asset-status').value,
+        condition: document.getElementById('asset-condition').value,
+        assignedTo: document.getElementById('asset-assigned-to').value.trim(),
+        assignedEmail: document.getElementById('asset-assigned-email').value.trim(),
+        department: document.getElementById('asset-department').value.trim(),
+        location: document.getElementById('asset-location').value.trim(),
+        purchaseDate: document.getElementById('asset-purchase-date').value || null,
+        purchasePrice: document.getElementById('asset-price').value !== '' ? parseFloat(document.getElementById('asset-price').value) : null,
+        currency: document.getElementById('asset-currency').value,
+        warrantyExpiry: document.getElementById('asset-warranty').value || null,
+        notes: document.getElementById('asset-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/it-assets/${id}` : `${API_URL}/it-assets`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving asset';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Asset updated successfully!' : 'Asset added successfully!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allITAssets.findIndex(a => a.id === id);
+            if (idx !== -1) allITAssets[idx] = data;
+        } else {
+            allITAssets.push(data);
+        }
+        populateAssetDeptFilter();
+        renderITAssets();
+        renderAssetDashboard();
+        setTimeout(() => closeAssetModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteAsset(id) {
+    if (!confirm('Are you sure you want to delete this asset?')) return;
+    try {
+        const res = await fetch(`${API_URL}/it-assets/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting asset'); return; }
+        allITAssets = allITAssets.filter(a => a.id !== id);
+        populateAssetDeptFilter();
+        renderITAssets();
+        renderAssetDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
 

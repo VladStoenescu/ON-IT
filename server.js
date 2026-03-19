@@ -16,6 +16,7 @@ const EMPLOYEES_FILE = path.join(__dirname, 'data', 'employees.json');
 const TRAINING_TEMPLATES_FILE = path.join(__dirname, 'data', 'training-templates.json');
 const TRAINING_ASSIGNMENTS_FILE = path.join(__dirname, 'data', 'training-assignments.json');
 const IT_LANDSCAPE_FILE = path.join(__dirname, 'data', 'it-landscape.json');
+const IT_ASSETS_FILE = path.join(__dirname, 'data', 'it-assets.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -60,6 +61,9 @@ if (!fsSync.existsSync(TRAINING_ASSIGNMENTS_FILE)) {
 }
 if (!fsSync.existsSync(IT_LANDSCAPE_FILE)) {
     fsSync.writeFileSync(IT_LANDSCAPE_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(IT_ASSETS_FILE)) {
+    fsSync.writeFileSync(IT_ASSETS_FILE, JSON.stringify([], null, 2));
 }
 
 // Helper utilities
@@ -978,6 +982,214 @@ app.delete('/api/it-landscape/:id', strictLimiter, async (req, res) => {
         res.json({ message: 'IT tool deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting IT tool' });
+    }
+});
+
+// ─── IT Asset Inventory API ───────────────────────────────────────────────────
+
+const ASSET_TYPES = ['Laptop', 'Desktop', 'Monitor', 'Phone', 'Tablet', 'Printer', 'Server', 'Network Equipment', 'Peripheral', 'Other'];
+const ASSET_STATUSES = ['in-use', 'available', 'maintenance', 'retired', 'lost'];
+const ASSET_CONDITIONS = ['excellent', 'good', 'fair', 'poor'];
+const ASSET_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF'];
+
+app.get('/api/it-assets', async (req, res) => {
+    try {
+        const assets = await readJson(IT_ASSETS_FILE);
+        res.json(assets);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading IT assets' });
+    }
+});
+
+app.post('/api/it-assets', strictLimiter, async (req, res) => {
+    try {
+        const { assetTag, name, type, brand, model, serialNumber, purchaseDate, purchasePrice, currency,
+                warrantyExpiry, assignedTo, assignedEmail, department, location, status, condition, notes } = req.body;
+        if (!name || !type) {
+            return res.status(400).json({ error: 'Name and type are required' });
+        }
+        if (!ASSET_TYPES.includes(type)) {
+            return res.status(400).json({ error: 'Invalid asset type' });
+        }
+        if (status && !ASSET_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        if (condition && !ASSET_CONDITIONS.includes(condition)) {
+            return res.status(400).json({ error: 'Invalid condition' });
+        }
+        if (currency && !ASSET_CURRENCIES.includes(currency)) {
+            return res.status(400).json({ error: 'Invalid currency' });
+        }
+        const priceValue = purchasePrice !== undefined && purchasePrice !== '' ? parseFloat(purchasePrice) : null;
+        if (priceValue !== null && (isNaN(priceValue) || priceValue < 0)) {
+            return res.status(400).json({ error: 'Purchase price must be a non-negative number' });
+        }
+        const assets = await readJson(IT_ASSETS_FILE);
+        if (assetTag && assetTag.trim() && assets.some(a => a.assetTag && a.assetTag.toLowerCase() === assetTag.trim().toLowerCase())) {
+            return res.status(400).json({ error: 'Asset tag already exists' });
+        }
+        const newAsset = {
+            id: generateId(),
+            assetTag: assetTag ? assetTag.trim() : '',
+            name: name.trim(),
+            type,
+            brand: brand ? brand.trim() : '',
+            model: model ? model.trim() : '',
+            serialNumber: serialNumber ? serialNumber.trim() : '',
+            purchaseDate: purchaseDate || null,
+            purchasePrice: priceValue,
+            currency: currency || 'EUR',
+            warrantyExpiry: warrantyExpiry || null,
+            assignedTo: assignedTo ? assignedTo.trim() : '',
+            assignedEmail: assignedEmail ? assignedEmail.trim() : '',
+            department: department ? department.trim() : '',
+            location: location ? location.trim() : '',
+            status: status || 'available',
+            condition: condition || 'good',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        assets.push(newAsset);
+        await writeJson(IT_ASSETS_FILE, assets);
+        res.status(201).json(newAsset);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating IT asset' });
+    }
+});
+
+app.put('/api/it-assets/:id', strictLimiter, async (req, res) => {
+    try {
+        const assets = await readJson(IT_ASSETS_FILE);
+        const idx = assets.findIndex(a => a.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'IT asset not found' });
+        const { assetTag, name, type, brand, model, serialNumber, purchaseDate, purchasePrice, currency,
+                warrantyExpiry, assignedTo, assignedEmail, department, location, status, condition, notes } = req.body;
+        if (type && !ASSET_TYPES.includes(type)) {
+            return res.status(400).json({ error: 'Invalid asset type' });
+        }
+        if (status && !ASSET_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        if (condition && !ASSET_CONDITIONS.includes(condition)) {
+            return res.status(400).json({ error: 'Invalid condition' });
+        }
+        if (currency && !ASSET_CURRENCIES.includes(currency)) {
+            return res.status(400).json({ error: 'Invalid currency' });
+        }
+        const priceValue = purchasePrice !== undefined && purchasePrice !== '' ? parseFloat(purchasePrice) : assets[idx].purchasePrice;
+        if (priceValue !== null && priceValue !== undefined && (isNaN(priceValue) || priceValue < 0)) {
+            return res.status(400).json({ error: 'Purchase price must be a non-negative number' });
+        }
+        if (assetTag && assetTag.trim() && assetTag.trim().toLowerCase() !== (assets[idx].assetTag || '').toLowerCase()) {
+            if (assets.some((a, i) => i !== idx && a.assetTag && a.assetTag.toLowerCase() === assetTag.trim().toLowerCase())) {
+                return res.status(400).json({ error: 'Asset tag already exists' });
+            }
+        }
+        assets[idx] = {
+            ...assets[idx],
+            assetTag: assetTag !== undefined ? assetTag.trim() : assets[idx].assetTag,
+            name: name ? name.trim() : assets[idx].name,
+            type: type || assets[idx].type,
+            brand: brand !== undefined ? brand.trim() : assets[idx].brand,
+            model: model !== undefined ? model.trim() : assets[idx].model,
+            serialNumber: serialNumber !== undefined ? serialNumber.trim() : assets[idx].serialNumber,
+            purchaseDate: purchaseDate !== undefined ? (purchaseDate || null) : assets[idx].purchaseDate,
+            purchasePrice: purchasePrice !== undefined && purchasePrice !== '' ? priceValue : assets[idx].purchasePrice,
+            currency: currency || assets[idx].currency,
+            warrantyExpiry: warrantyExpiry !== undefined ? (warrantyExpiry || null) : assets[idx].warrantyExpiry,
+            assignedTo: assignedTo !== undefined ? assignedTo.trim() : assets[idx].assignedTo,
+            assignedEmail: assignedEmail !== undefined ? assignedEmail.trim() : assets[idx].assignedEmail,
+            department: department !== undefined ? department.trim() : assets[idx].department,
+            location: location !== undefined ? location.trim() : assets[idx].location,
+            status: status || assets[idx].status,
+            condition: condition || assets[idx].condition,
+            notes: notes !== undefined ? notes.trim() : assets[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(IT_ASSETS_FILE, assets);
+        res.json(assets[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating IT asset' });
+    }
+});
+
+app.delete('/api/it-assets/:id', strictLimiter, async (req, res) => {
+    try {
+        const assets = await readJson(IT_ASSETS_FILE);
+        const idx = assets.findIndex(a => a.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'IT asset not found' });
+        assets.splice(idx, 1);
+        await writeJson(IT_ASSETS_FILE, assets);
+        res.json({ message: 'IT asset deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting IT asset' });
+    }
+});
+
+app.get('/api/it-assets/kpis', async (req, res) => {
+    try {
+        const assets = await readJson(IT_ASSETS_FILE);
+        const now = new Date();
+        const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        const totalAssets = assets.length;
+        const inUse = assets.filter(a => a.status === 'in-use').length;
+        const available = assets.filter(a => a.status === 'available').length;
+        const maintenance = assets.filter(a => a.status === 'maintenance').length;
+        const retired = assets.filter(a => a.status === 'retired').length;
+
+        const totalValue = assets.reduce((sum, a) => sum + (a.purchasePrice || 0), 0);
+
+        const warrantyExpiringSoon = assets.filter(a => {
+            if (!a.warrantyExpiry) return false;
+            const exp = new Date(a.warrantyExpiry);
+            return exp >= now && exp <= in30Days;
+        }).length;
+
+        const warrantyExpired = assets.filter(a => {
+            if (!a.warrantyExpiry) return false;
+            return new Date(a.warrantyExpiry) < now;
+        }).length;
+
+        // Average asset age in months
+        const assetsWithPurchaseDate = assets.filter(a => a.purchaseDate);
+        const avgAgeMonths = assetsWithPurchaseDate.length > 0
+            ? Math.round(assetsWithPurchaseDate.reduce((sum, a) => {
+                const months = (now - new Date(a.purchaseDate)) / (1000 * 60 * 60 * 24 * 30.44);
+                return sum + months;
+            }, 0) / assetsWithPurchaseDate.length)
+            : null;
+
+        // By type breakdown
+        const byType = {};
+        assets.forEach(a => {
+            byType[a.type] = (byType[a.type] || 0) + 1;
+        });
+
+        // By department breakdown
+        const byDepartment = {};
+        assets.forEach(a => {
+            const dept = a.department || 'Unassigned';
+            byDepartment[dept] = (byDepartment[dept] || 0) + 1;
+        });
+
+        // By status breakdown
+        const byStatus = { 'in-use': inUse, available, maintenance, retired, lost: assets.filter(a => a.status === 'lost').length };
+
+        // Recently updated assets (top 8)
+        const recentAssets = [...assets]
+            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+            .slice(0, 8)
+            .map(a => ({ id: a.id, assetTag: a.assetTag, name: a.name, type: a.type, assignedTo: a.assignedTo, department: a.department, status: a.status, condition: a.condition }));
+
+        res.json({
+            totalAssets, inUse, available, maintenance, retired, totalValue,
+            warrantyExpiringSoon, warrantyExpired, avgAgeMonths,
+            byType, byDepartment, byStatus, recentAssets
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Error computing IT asset KPIs' });
     }
 });
 
