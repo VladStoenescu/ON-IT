@@ -405,6 +405,12 @@ body {
     gap: 20px;
 }
 
+.form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+}
+
 .submit-button {
     width: 100%;
     padding: 14px 24px;
@@ -559,6 +565,9 @@ body {
 
 @media (max-width: 768px) {
     .form-row {
+        grid-template-columns: 1fr;
+    }
+    .form-row-3 {
         grid-template-columns: 1fr;
     }
     .filter-bar {
@@ -1495,4 +1504,214 @@ body {
     .emp-table th:nth-child(4), .emp-table td:nth-child(4),
     .emp-table th:nth-child(5), .emp-table td:nth-child(5) { display: none; }
     .it-tools-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── IT Asset Inventory ─────────────────────────────────────────────────────── */
+
+.asset-table-wrapper {
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--brand-border);
+}
+
+.asset-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.asset-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875em;
+    background: #fff;
+}
+
+.asset-table thead {
+    background: var(--brand-gray);
+}
+
+.asset-table th {
+    padding: 11px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.82em;
+    color: var(--brand-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--brand-border);
+}
+
+.asset-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--brand-border);
+    vertical-align: middle;
+    color: var(--brand-text);
+}
+
+.asset-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.asset-table tbody tr:hover {
+    background: #fafaf9;
+}
+
+.asset-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.asset-type-icon {
+    font-size: 1.4em;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.asset-name {
+    font-weight: 600;
+    color: var(--brand-black);
+    font-size: 0.95em;
+}
+
+.asset-tag {
+    font-size: 0.78em;
+    color: var(--brand-muted);
+    font-family: monospace;
+    background: var(--brand-gray);
+    border: 1px solid var(--brand-border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    display: inline-block;
+    margin-top: 2px;
+}
+
+.asset-assigned-name {
+    font-weight: 500;
+    color: var(--brand-text);
+    font-size: 0.92em;
+}
+
+.asset-assigned-email {
+    font-size: 0.78em;
+    color: var(--brand-muted);
+    margin-top: 2px;
+}
+
+.asset-unassigned {
+    color: var(--brand-muted);
+}
+
+.asset-status-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.asset-condition-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.asset-warranty-cell {
+    white-space: nowrap;
+    font-size: 0.85em;
+}
+
+.asset-warranty-expired {
+    color: #b71c1c;
+    font-weight: 600;
+}
+
+.asset-warranty-soon {
+    color: #f57f17;
+    font-weight: 600;
+}
+
+/* Dashboard KPI breakdown rows */
+.asset-kpi-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--brand-border);
+}
+
+.asset-kpi-row:last-child {
+    border-bottom: none;
+}
+
+.asset-kpi-icon {
+    font-size: 1.1em;
+    flex-shrink: 0;
+    width: 22px;
+    text-align: center;
+}
+
+.asset-kpi-label {
+    font-size: 0.85em;
+    color: var(--brand-text);
+    min-width: 120px;
+    flex-shrink: 0;
+}
+
+.asset-kpi-bar-wrap {
+    flex: 1;
+    background: var(--brand-gray);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.asset-kpi-bar {
+    height: 100%;
+    background: var(--brand-red);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.asset-kpi-bar-dept {
+    background: #1565c0;
+}
+
+.asset-kpi-count {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--brand-black);
+    min-width: 24px;
+    text-align: right;
+}
+
+/* Warning KPI card */
+.kpi-card-warn {
+    border-color: #ffe082;
+    background: #fffde7;
+}
+
+.kpi-card-warn .kpi-value {
+    color: #f57f17;
+}
+
+/* Dashboard three-column bottom for assets */
+#assets-tab .dashboard-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-top: 24px;
+}
+
+@media (max-width: 900px) {
+    #assets-tab .dashboard-bottom {
+        grid-template-columns: 1fr;
+    }
+    .asset-table th:nth-child(4),
+    .asset-table td:nth-child(4) { display: none; }
 }

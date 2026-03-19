@@ -70,6 +70,11 @@
                     <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="7" height="7" rx="1"/><rect x="11" y="3" width="7" height="7" rx="1"/><rect x="2" y="11" width="7" height="7" rx="1"/><rect x="11" y="11" width="7" height="7" rx="1"/></svg>
                     <span>IT Landscape</span>
                 </button>
+
+                <button class="nav-item" data-section="assets" onclick="showTab('assets', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="16" height="12" rx="1.5"/><path d="M6 5V4a2 2 0 014 0v1"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="8" y1="12" x2="12" y2="12"/></svg>
+                    <span>IT Assets</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -534,6 +539,75 @@
                     </div>
                 </div>
 
+                <!-- ─── IT Asset Inventory Tab ─────────────────────────── -->
+                <div id="assets-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showAssetsSection('assets-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showAssetsSection('assets-list', this)">All Assets</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="assets-dashboard" class="ob-section active">
+                        <h2 class="section-title">IT Asset Dashboard</h2>
+                        <div id="assets-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>Assets by Type</h3>
+                                <div id="assets-by-type"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>Assets by Department</h3>
+                                <div id="assets-by-dept"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Recent Assets</h3>
+                                <div id="assets-recent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Assets Section -->
+                    <div id="assets-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">IT Assets</h2>
+                            <button class="btn-primary" onclick="openAssetModal()">+ Add Asset</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="assets-search" placeholder="Search by name, tag, serial, person…" oninput="renderITAssets()" class="ls-filter-input">
+                            <select id="assets-filter-type" onchange="renderITAssets()" class="ls-filter-select">
+                                <option value="">All Types</option>
+                                <option value="Laptop">Laptop</option>
+                                <option value="Desktop">Desktop</option>
+                                <option value="Monitor">Monitor</option>
+                                <option value="Phone">Phone</option>
+                                <option value="Tablet">Tablet</option>
+                                <option value="Printer">Printer</option>
+                                <option value="Server">Server</option>
+                                <option value="Network Equipment">Network Equipment</option>
+                                <option value="Peripheral">Peripheral</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <select id="assets-filter-status" onchange="renderITAssets()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="in-use">In Use</option>
+                                <option value="available">Available</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="retired">Retired</option>
+                                <option value="lost">Lost</option>
+                            </select>
+                            <select id="assets-filter-dept" onchange="renderITAssets()" class="ls-filter-select">
+                                <option value="">All Departments</option>
+                            </select>
+                        </div>
+                        <div id="assets-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading IT assets…</p>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     </div>
@@ -837,6 +911,135 @@
                     </div>
                     <div id="tool-success" class="message success hidden"></div>
                     <div id="tool-error" class="message error hidden"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- IT Asset Modal -->
+    <div id="asset-modal" class="modal-overlay hidden" onclick="closeAssetModalOnBg(event)">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3 id="asset-modal-title">Add IT Asset</h3>
+                <button class="modal-close" onclick="closeAssetModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="asset-form" onsubmit="submitAsset(event)">
+                    <input type="hidden" id="asset-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Asset Name *</label>
+                            <input type="text" id="asset-name" required placeholder="e.g. MacBook Pro 14">
+                        </div>
+                        <div class="form-group">
+                            <label>Asset Tag</label>
+                            <input type="text" id="asset-tag" placeholder="e.g. ONP-LAPTOP-001">
+                        </div>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label>Type *</label>
+                            <select id="asset-type" required>
+                                <option value="">Select type</option>
+                                <option value="Laptop">Laptop</option>
+                                <option value="Desktop">Desktop</option>
+                                <option value="Monitor">Monitor</option>
+                                <option value="Phone">Phone</option>
+                                <option value="Tablet">Tablet</option>
+                                <option value="Printer">Printer</option>
+                                <option value="Server">Server</option>
+                                <option value="Network Equipment">Network Equipment</option>
+                                <option value="Peripheral">Peripheral</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Brand</label>
+                            <input type="text" id="asset-brand" placeholder="e.g. Apple, Dell, HP">
+                        </div>
+                        <div class="form-group">
+                            <label>Model</label>
+                            <input type="text" id="asset-model" placeholder="e.g. MBP14,2023">
+                        </div>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label>Serial Number</label>
+                            <input type="text" id="asset-serial" placeholder="e.g. C02XL0HJJG5J">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="asset-status">
+                                <option value="available">Available</option>
+                                <option value="in-use">In Use</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="retired">Retired</option>
+                                <option value="lost">Lost</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Condition</label>
+                            <select id="asset-condition">
+                                <option value="excellent">Excellent</option>
+                                <option value="good">Good</option>
+                                <option value="fair">Fair</option>
+                                <option value="poor">Poor</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label>Assigned To</label>
+                            <input type="text" id="asset-assigned-to" placeholder="Employee name">
+                        </div>
+                        <div class="form-group">
+                            <label>Assigned Email</label>
+                            <input type="email" id="asset-assigned-email" placeholder="employee@company.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Department</label>
+                            <input type="text" id="asset-department" placeholder="e.g. IT, HR, Finance">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Location / Office</label>
+                            <input type="text" id="asset-location" placeholder="e.g. Zurich Office, Remote">
+                        </div>
+                        <div class="form-group">
+                            <label>Purchase Date</label>
+                            <input type="date" id="asset-purchase-date">
+                        </div>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label>Purchase Price</label>
+                            <input type="number" id="asset-price" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select id="asset-currency">
+                                <option value="EUR">EUR</option>
+                                <option value="USD">USD</option>
+                                <option value="GBP">GBP</option>
+                                <option value="CHF">CHF</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Warranty Expiry</label>
+                            <input type="date" id="asset-warranty">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="asset-notes" rows="2" placeholder="Any additional notes (e.g. accessories, damage history)"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeAssetModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="asset-submit-btn">Add Asset</button>
+                    </div>
+                    <div id="asset-success" class="message success hidden"></div>
+                    <div id="asset-error" class="message error hidden"></div>
                 </form>
             </div>
         </div>
