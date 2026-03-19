@@ -7,6 +7,7 @@ const fsSync = require('fs');
 const path = require('path');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'ideas.json');
 const TEMPLATES_FILE = path.join(__dirname, 'data', 'onboarding-templates.json');
