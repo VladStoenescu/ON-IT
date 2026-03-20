@@ -80,6 +80,18 @@
                     <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="16" height="12" rx="1.5"/><path d="M6 5V4a2 2 0 014 0v1"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="8" y1="12" x2="12" y2="12"/></svg>
                     <span>IT Assets</span>
                 </button>
+
+                <p class="nav-group-label">Sales &amp; CRM</p>
+
+                <button class="nav-item" data-section="crm" onclick="showTab('crm', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="7" r="3"/><path d="M2 17a6 6 0 0112 0"/><circle cx="15" cy="8" r="2.5"/><path d="M14 17a3 3 0 012-2.5"/></svg>
+                    <span>CRM Contacts</span>
+                </button>
+
+                <button class="nav-item" data-section="pipeline" onclick="showTab('pipeline', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="3.5" height="12" rx="1"/><rect x="8.25" y="4" width="3.5" height="12" rx="1"/><rect x="14.5" y="4" width="3.5" height="12" rx="1"/></svg>
+                    <span>Sales Pipeline</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -186,6 +198,26 @@
                             <div class="hmc-body">
                                 <div class="hmc-title">IT Landscape</div>
                                 <div class="hmc-desc">Track IT tools, costs and department usage</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </div>
+                        <div class="home-module-card" onclick="showTab('crm', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><circle cx="9" cy="8" r="4"/><path d="M3 21a6 6 0 0112 0"/><circle cx="18" cy="9" r="3"/><path d="M17 21a3 3 0 012-2.8"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">CRM Contacts</div>
+                                <div class="hmc-desc">Manage clients, prospects and leads</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </div>
+                        <div class="home-module-card" onclick="showTab('pipeline', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><rect x="2" y="4" width="4" height="16" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1"/><rect x="18" y="4" width="4" height="16" rx="1"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">Sales Pipeline</div>
+                                <div class="hmc-desc">Track deals and forecast consulting revenue</div>
                             </div>
                             <span class="hmc-arrow">→</span>
                         </div>
@@ -684,6 +716,109 @@
                         </div>
                         <div id="skill-categories-container">
                             <p class="loading">Loading categories…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── CRM Contacts Tab ──────────────────────────────────── -->
+                <div id="crm-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showCRMSection('crm-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showCRMSection('crm-contacts-list', this)">All Contacts</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="crm-dashboard" class="ob-section active">
+                        <h2 class="section-title">CRM Dashboard</h2>
+                        <div id="crm-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>Contacts by Type</h3>
+                                <div id="crm-by-type"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>Contacts by Company</h3>
+                                <div id="crm-by-company"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Recent Contacts</h3>
+                                <div id="crm-recent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Contacts Section -->
+                    <div id="crm-contacts-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">CRM Contacts</h2>
+                            <button class="btn-primary" onclick="openContactModal()">+ Add Contact</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="crm-search" placeholder="Search by name, company, email…" oninput="renderCRMContacts()" class="ls-filter-input">
+                            <select id="crm-filter-type" onchange="renderCRMContacts()" class="ls-filter-select">
+                                <option value="">All Types</option>
+                                <option value="Lead">Lead</option>
+                                <option value="Prospect">Prospect</option>
+                                <option value="Client">Client</option>
+                                <option value="Partner">Partner</option>
+                            </select>
+                            <select id="crm-filter-status" onchange="renderCRMContacts()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div id="crm-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading contacts…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Sales Pipeline Tab ────────────────────────────────── -->
+                <div id="pipeline-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showPipelineSection('pipeline-board', this)">Pipeline Board</button>
+                        <button class="sub-tab-btn" onclick="showPipelineSection('pipeline-list', this)">All Deals</button>
+                    </div>
+
+                    <!-- Pipeline Board Section -->
+                    <div id="pipeline-board" class="ob-section active">
+                        <div class="section-header">
+                            <h2 class="section-title">Sales Pipeline</h2>
+                            <button class="btn-primary" onclick="openDealModal()">+ Add Deal</button>
+                        </div>
+                        <div id="pipeline-kpi-row" class="pipeline-kpi-row">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div id="pipeline-kanban" class="pipeline-kanban">
+                            <p class="loading">Loading pipeline…</p>
+                        </div>
+                    </div>
+
+                    <!-- All Deals Section -->
+                    <div id="pipeline-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">All Deals</h2>
+                            <button class="btn-primary" onclick="openDealModal()">+ Add Deal</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="pipeline-search" placeholder="Search by title or company…" oninput="renderDealsList()" class="ls-filter-input">
+                            <select id="pipeline-filter-stage" onchange="renderDealsList()" class="ls-filter-select">
+                                <option value="">All Stages</option>
+                                <option value="Lead">Lead</option>
+                                <option value="Qualified">Qualified</option>
+                                <option value="Proposal">Proposal</option>
+                                <option value="Negotiation">Negotiation</option>
+                                <option value="Won">Won</option>
+                                <option value="Lost">Lost</option>
+                            </select>
+                        </div>
+                        <div id="pipeline-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading deals…</p>
                         </div>
                     </div>
                 </div>
@@ -1221,6 +1356,164 @@
                     </div>
                     <div id="sc-success" class="message success hidden"></div>
                     <div id="sc-error" class="message error hidden"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRM Contact Modal -->
+    <div id="contact-modal" class="modal-overlay hidden" onclick="closeContactModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="contact-modal-title">Add Contact</h3>
+                <button class="modal-close" onclick="closeContactModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="contact-form" onsubmit="submitContact(event)">
+                    <input type="hidden" id="contact-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>First Name *</label>
+                            <input type="text" id="contact-firstname" required placeholder="e.g. Sophie">
+                        </div>
+                        <div class="form-group">
+                            <label>Last Name *</label>
+                            <input type="text" id="contact-lastname" required placeholder="e.g. Müller">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Company</label>
+                            <input type="text" id="contact-company" placeholder="e.g. FinanzBank AG">
+                        </div>
+                        <div class="form-group">
+                            <label>Job Title</label>
+                            <input type="text" id="contact-jobtitle" placeholder="e.g. Head of IT">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="contact-email" placeholder="e.g. s.muller@bank.de">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="text" id="contact-phone" placeholder="e.g. +49 30 1234 5678">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Type *</label>
+                            <select id="contact-type" required>
+                                <option value="">Select type</option>
+                                <option value="Lead">Lead</option>
+                                <option value="Prospect">Prospect</option>
+                                <option value="Client">Client</option>
+                                <option value="Partner">Partner</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="contact-status">
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="contact-notes" rows="2" placeholder="Key notes about this contact"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeContactModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="contact-submit-btn">Add Contact</button>
+                    </div>
+                    <div id="contact-success" class="message success hidden"></div>
+                    <div id="contact-error" class="message error hidden"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deal Modal -->
+    <div id="deal-modal" class="modal-overlay hidden" onclick="closeDealModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="deal-modal-title">Add Deal</h3>
+                <button class="modal-close" onclick="closeDealModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="deal-form" onsubmit="submitDeal(event)">
+                    <input type="hidden" id="deal-id">
+                    <div class="form-group">
+                        <label>Deal Title *</label>
+                        <input type="text" id="deal-title" required placeholder="e.g. SAP Cutover Management Programme">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Company</label>
+                            <input type="text" id="deal-company" placeholder="e.g. FinanzBank AG">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact</label>
+                            <select id="deal-contact">
+                                <option value="">— None —</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Deal Value</label>
+                            <input type="number" id="deal-value" min="0" step="1000" placeholder="e.g. 85000">
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select id="deal-currency">
+                                <option value="EUR">EUR €</option>
+                                <option value="GBP">GBP £</option>
+                                <option value="USD">USD $</option>
+                                <option value="CHF">CHF</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Stage *</label>
+                            <select id="deal-stage" required onchange="autoFillProbability()">
+                                <option value="">Select stage</option>
+                                <option value="Lead">Lead</option>
+                                <option value="Qualified">Qualified</option>
+                                <option value="Proposal">Proposal</option>
+                                <option value="Negotiation">Negotiation</option>
+                                <option value="Won">Won</option>
+                                <option value="Lost">Lost</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Probability (%)</label>
+                            <input type="number" id="deal-probability" min="0" max="100" placeholder="e.g. 50">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Expected Close Date</label>
+                            <input type="date" id="deal-close-date">
+                        </div>
+                        <div class="form-group">
+                            <label>Deal Owner</label>
+                            <input type="text" id="deal-owner" placeholder="e.g. Vlad Stoenescu">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="deal-notes" rows="2" placeholder="Key notes about this deal"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeDealModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="deal-submit-btn">Add Deal</button>
+                    </div>
+                    <div id="deal-success" class="message success hidden"></div>
+                    <div id="deal-error" class="message error hidden"></div>
                 </form>
             </div>
         </div>

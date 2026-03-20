@@ -19,6 +19,8 @@ const IT_LANDSCAPE_FILE = path.join(__dirname, 'data', 'it-landscape.json');
 const IT_ASSETS_FILE = path.join(__dirname, 'data', 'it-assets.json');
 const EMPLOYEE_SKILLS_FILE = path.join(__dirname, 'data', 'employee-skills.json');
 const SKILL_CATEGORIES_FILE = path.join(__dirname, 'data', 'skill-categories.json');
+const CRM_CONTACTS_FILE = path.join(__dirname, 'data', 'crm-contacts.json');
+const CRM_DEALS_FILE = path.join(__dirname, 'data', 'crm-deals.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -69,6 +71,12 @@ if (!fsSync.existsSync(IT_ASSETS_FILE)) {
 }
 if (!fsSync.existsSync(EMPLOYEE_SKILLS_FILE)) {
     fsSync.writeFileSync(EMPLOYEE_SKILLS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(CRM_CONTACTS_FILE)) {
+    fsSync.writeFileSync(CRM_CONTACTS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(CRM_DEALS_FILE)) {
+    fsSync.writeFileSync(CRM_DEALS_FILE, JSON.stringify([], null, 2));
 }
 if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     const defaultCategories = [
@@ -1403,6 +1411,220 @@ app.delete('/api/skill-categories/:id', strictLimiter, async (req, res) => {
         res.json({ message: 'Skill category deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting skill category' });
+    }
+});
+
+// ─── CRM Contacts API ────────────────────────────────────────────────────────
+
+app.get('/api/crm/contacts', async (req, res) => {
+    try {
+        const contacts = await readJson(CRM_CONTACTS_FILE);
+        res.json(contacts);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading CRM contacts' });
+    }
+});
+
+app.post('/api/crm/contacts', strictLimiter, async (req, res) => {
+    try {
+        const { firstName, lastName, company, email, phone, jobTitle, type, status, notes } = req.body;
+        if (!firstName || !lastName || !type) {
+            return res.status(400).json({ error: 'First name, last name and type are required' });
+        }
+        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const newContact = {
+            id: generateId(),
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            company: company ? company.trim() : '',
+            email: email ? email.trim() : '',
+            phone: phone ? phone.trim() : '',
+            jobTitle: jobTitle ? jobTitle.trim() : '',
+            type,
+            status: status || 'Active',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        contacts.push(newContact);
+        await writeJson(CRM_CONTACTS_FILE, contacts);
+        res.status(201).json(newContact);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating CRM contact' });
+    }
+});
+
+app.get('/api/crm/contacts/:id', async (req, res) => {
+    try {
+        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const contact = contacts.find(c => c.id === req.params.id);
+        if (!contact) return res.status(404).json({ error: 'Contact not found' });
+        res.json(contact);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading CRM contact' });
+    }
+});
+
+app.put('/api/crm/contacts/:id', strictLimiter, async (req, res) => {
+    try {
+        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const idx = contacts.findIndex(c => c.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Contact not found' });
+        const { firstName, lastName, company, email, phone, jobTitle, type, status, notes } = req.body;
+        if (!firstName || !lastName || !type) {
+            return res.status(400).json({ error: 'First name, last name and type are required' });
+        }
+        contacts[idx] = {
+            ...contacts[idx],
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            company: company !== undefined ? company.trim() : contacts[idx].company,
+            email: email !== undefined ? email.trim() : contacts[idx].email,
+            phone: phone !== undefined ? phone.trim() : contacts[idx].phone,
+            jobTitle: jobTitle !== undefined ? jobTitle.trim() : contacts[idx].jobTitle,
+            type,
+            status: status || contacts[idx].status,
+            notes: notes !== undefined ? notes.trim() : contacts[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(CRM_CONTACTS_FILE, contacts);
+        res.json(contacts[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating CRM contact' });
+    }
+});
+
+app.delete('/api/crm/contacts/:id', strictLimiter, async (req, res) => {
+    try {
+        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const idx = contacts.findIndex(c => c.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Contact not found' });
+        contacts.splice(idx, 1);
+        await writeJson(CRM_CONTACTS_FILE, contacts);
+        res.json({ message: 'Contact deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting CRM contact' });
+    }
+});
+
+// ─── CRM Deals / Sales Pipeline API ─────────────────────────────────────────
+
+app.get('/api/crm/deals/kpis', async (req, res) => {
+    try {
+        const deals = await readJson(CRM_DEALS_FILE);
+        const active = deals.filter(d => d.stage !== 'Won' && d.stage !== 'Lost');
+        const won = deals.filter(d => d.stage === 'Won');
+        const lost = deals.filter(d => d.stage === 'Lost');
+        const pipelineValue = active.reduce((sum, d) => sum + (parseFloat(d.value) || 0), 0);
+        const weightedValue = active.reduce((sum, d) => sum + (parseFloat(d.value) || 0) * ((parseFloat(d.probability) || 0) / 100), 0);
+        const closedTotal = won.length + lost.length;
+        const winRate = closedTotal > 0 ? Math.round((won.length / closedTotal) * 100) : 0;
+        const byStage = {};
+        deals.forEach(d => { byStage[d.stage] = (byStage[d.stage] || 0) + 1; });
+        res.json({ total: deals.length, active: active.length, won: won.length, lost: lost.length, pipelineValue, weightedValue, winRate, byStage });
+    } catch (error) {
+        res.status(500).json({ error: 'Error computing deal KPIs' });
+    }
+});
+
+app.get('/api/crm/deals', async (req, res) => {
+    try {
+        const deals = await readJson(CRM_DEALS_FILE);
+        res.json(deals);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading CRM deals' });
+    }
+});
+
+app.post('/api/crm/deals', strictLimiter, async (req, res) => {
+    try {
+        const { title, contactId, company, value, currency, stage, probability, expectedCloseDate, owner, notes } = req.body;
+        if (!title || !stage) {
+            return res.status(400).json({ error: 'Title and stage are required' });
+        }
+        const validStages = ['Lead', 'Qualified', 'Proposal', 'Negotiation', 'Won', 'Lost'];
+        if (!validStages.includes(stage)) {
+            return res.status(400).json({ error: 'Invalid stage value' });
+        }
+        const deals = await readJson(CRM_DEALS_FILE);
+        const newDeal = {
+            id: generateId(),
+            title: title.trim(),
+            contactId: contactId || '',
+            company: company ? company.trim() : '',
+            value: parseFloat(value) || 0,
+            currency: currency || 'EUR',
+            stage,
+            probability: Math.min(100, Math.max(0, parseInt(probability, 10) || 0)),
+            expectedCloseDate: expectedCloseDate || '',
+            owner: owner ? owner.trim() : '',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        deals.push(newDeal);
+        await writeJson(CRM_DEALS_FILE, deals);
+        res.status(201).json(newDeal);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating deal' });
+    }
+});
+
+app.get('/api/crm/deals/:id', async (req, res) => {
+    try {
+        const deals = await readJson(CRM_DEALS_FILE);
+        const deal = deals.find(d => d.id === req.params.id);
+        if (!deal) return res.status(404).json({ error: 'Deal not found' });
+        res.json(deal);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading deal' });
+    }
+});
+
+app.put('/api/crm/deals/:id', strictLimiter, async (req, res) => {
+    try {
+        const deals = await readJson(CRM_DEALS_FILE);
+        const idx = deals.findIndex(d => d.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Deal not found' });
+        const { title, contactId, company, value, currency, stage, probability, expectedCloseDate, owner, notes } = req.body;
+        if (!title || !stage) {
+            return res.status(400).json({ error: 'Title and stage are required' });
+        }
+        const validStages = ['Lead', 'Qualified', 'Proposal', 'Negotiation', 'Won', 'Lost'];
+        if (!validStages.includes(stage)) {
+            return res.status(400).json({ error: 'Invalid stage value' });
+        }
+        deals[idx] = {
+            ...deals[idx],
+            title: title.trim(),
+            contactId: contactId !== undefined ? contactId : deals[idx].contactId,
+            company: company !== undefined ? company.trim() : deals[idx].company,
+            value: value !== undefined ? (parseFloat(value) || 0) : deals[idx].value,
+            currency: currency || deals[idx].currency,
+            stage,
+            probability: probability !== undefined ? Math.min(100, Math.max(0, parseInt(probability, 10) || 0)) : deals[idx].probability,
+            expectedCloseDate: expectedCloseDate !== undefined ? expectedCloseDate : deals[idx].expectedCloseDate,
+            owner: owner !== undefined ? owner.trim() : deals[idx].owner,
+            notes: notes !== undefined ? notes.trim() : deals[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(CRM_DEALS_FILE, deals);
+        res.json(deals[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating deal' });
+    }
+});
+
+app.delete('/api/crm/deals/:id', strictLimiter, async (req, res) => {
+    try {
+        const deals = await readJson(CRM_DEALS_FILE);
+        const idx = deals.findIndex(d => d.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Deal not found' });
+        deals.splice(idx, 1);
+        await writeJson(CRM_DEALS_FILE, deals);
+        res.json({ message: 'Deal deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting deal' });
     }
 });
 

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "deal-001",
+    "title": "SAP Cutover Management Programme",
+    "contactId": "contact-001",
+    "company": "FinanzBank AG",
+    "value": 320000,
+    "currency": "EUR",
+    "stage": "Negotiation",
+    "probability": 75,
+    "expectedCloseDate": "2025-06-30",
+    "owner": "Vlad Stoenescu",
+    "notes": "SOW under review. Legal sign-off expected end of May.",
+    "createdAt": "2025-01-15T09:00:00.000Z",
+    "updatedAt": "2025-04-10T14:30:00.000Z"
+  },
+  {
+    "id": "deal-002",
+    "title": "Regulatory Reporting Advisory",
+    "contactId": "contact-002",
+    "company": "Meridian Capital Partners",
+    "value": 85000,
+    "currency": "GBP",
+    "stage": "Proposal",
+    "probability": 50,
+    "expectedCloseDate": "2025-07-15",
+    "owner": "Vlad Stoenescu",
+    "notes": "Proposal submitted 3 April. Follow-up call scheduled.",
+    "createdAt": "2025-02-10T11:00:00.000Z",
+    "updatedAt": "2025-04-05T09:00:00.000Z"
+  },
+  {
+    "id": "deal-003",
+    "title": "Solvency II Cutover Support",
+    "contactId": "contact-003",
+    "company": "EuroInsure Group",
+    "value": 210000,
+    "currency": "EUR",
+    "stage": "Won",
+    "probability": 100,
+    "expectedCloseDate": "2025-04-01",
+    "owner": "Vlad Stoenescu",
+    "notes": "Contract signed. Kick-off scheduled for 14 April.",
+    "createdAt": "2025-02-25T14:00:00.000Z",
+    "updatedAt": "2025-04-01T16:00:00.000Z"
+  },
+  {
+    "id": "deal-004",
+    "title": "Cloud Migration Strategy",
+    "contactId": "contact-004",
+    "company": "NorthStar Logistics",
+    "value": 55000,
+    "currency": "EUR",
+    "stage": "Qualified",
+    "probability": 30,
+    "expectedCloseDate": "2025-08-31",
+    "owner": "Vlad Stoenescu",
+    "notes": "Discovery call completed. Budget confirmed. Awaiting business case approval.",
+    "createdAt": "2025-03-05T10:00:00.000Z",
+    "updatedAt": "2025-03-20T11:00:00.000Z"
+  }
+]
