@@ -67,6 +67,11 @@
                     <span>Open Positions</span>
                 </button>
 
+                <button class="nav-item" data-section="recruitment-templates" onclick="showTab('recruitment-templates', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><line x1="7" y1="6" x2="13" y2="6"/><line x1="7" y1="9" x2="13" y2="9"/><line x1="7" y1="12" x2="10" y2="12"/><polyline points="11 15 13 17 17 13"/></svg>
+                    <span>Recruitment Templates</span>
+                </button>
+
                 <p class="nav-group-label">Learning</p>
 
                 <button class="nav-item" data-section="trainings" onclick="showTab('trainings', event)">
@@ -846,6 +851,59 @@
                         </div>
                         <div id="op-table-container" class="asset-table-wrapper">
                             <p class="loading">Loading open positions…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Recruitment Templates Tab ─────────────────────────── -->
+                <div id="recruitment-templates-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showRecruitmentTemplatesSection('rt-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showRecruitmentTemplatesSection('rt-list', this)">All Templates</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="rt-dashboard" class="ob-section active">
+                        <h2 class="section-title">Recruitment Templates Dashboard</h2>
+                        <div id="rt-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>By Type</h3>
+                                <div id="rt-by-type"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>By Department</h3>
+                                <div id="rt-by-department"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Recent Templates</h3>
+                                <div id="rt-recent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Templates Section -->
+                    <div id="rt-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Recruitment Templates</h2>
+                            <button class="btn-primary" onclick="openRecruitmentTemplateModal()">+ New Template</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="rt-search" placeholder="Search by name or department…" oninput="renderRecruitmentTemplates()" class="ls-filter-input">
+                            <select id="rt-filter-type" onchange="renderRecruitmentTemplates()" class="ls-filter-select">
+                                <option value="">All Types</option>
+                                <option value="Technical">Technical</option>
+                                <option value="Non-Technical">Non-Technical</option>
+                                <option value="Executive">Executive</option>
+                                <option value="Intern">Intern</option>
+                                <option value="Contractor">Contractor</option>
+                            </select>
+                        </div>
+                        <div id="rt-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading recruitment templates…</p>
                         </div>
                     </div>
                 </div>
@@ -2465,6 +2523,82 @@
             </div>
         </div>
     </div>
+    <!-- ─── Recruitment Template Modal ───────────────────────────────────────── -->
+    <div id="recruitment-template-modal" class="modal-overlay hidden" onclick="closeRecruitmentTemplateModalOnBg(event)">
+        <div class="modal modal-lg">
+            <h3 id="rt-modal-title">New Recruitment Template</h3>
+            <form onsubmit="submitRecruitmentTemplate(event)">
+                <input type="hidden" id="rt-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Template Name <span class="required">*</span></label>
+                        <input type="text" id="rt-name" required placeholder="e.g. Standard Technical Hiring">
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="rt-type" class="ls-filter-select" style="width:100%">
+                            <option value="">Select type</option>
+                            <option value="Technical">Technical</option>
+                            <option value="Non-Technical">Non-Technical</option>
+                            <option value="Executive">Executive</option>
+                            <option value="Intern">Intern</option>
+                            <option value="Contractor">Contractor</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Department / Team</label>
+                    <input type="text" id="rt-department" placeholder="e.g. Engineering">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="rt-description" rows="2" placeholder="Describe the purpose and scope of this recruitment template…"></textarea>
+                </div>
+
+                <!-- Stages -->
+                <div class="form-group">
+                    <label>Hiring Stages</label>
+                    <div id="rt-stages-list" class="ob-steps-list"></div>
+                    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:8px;background:var(--bg-card)">
+                        <p style="font-size:var(--fs-sm);font-weight:600;margin:0 0 8px">Add a Stage</p>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Stage Name <span class="required">*</span></label>
+                                <input type="text" id="rt-stage-name" placeholder="e.g. Phone Screening">
+                            </div>
+                            <div class="form-group">
+                                <label>Owner</label>
+                                <input type="text" id="rt-stage-owner" placeholder="e.g. HR Team">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Owner Email</label>
+                                <input type="email" id="rt-stage-owner-email" placeholder="e.g. hr@company.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Days from Start</label>
+                                <input type="number" id="rt-stage-due-days" min="0" placeholder="e.g. 3">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Stage Description</label>
+                            <input type="text" id="rt-stage-description" placeholder="What happens in this stage?">
+                        </div>
+                        <button type="button" class="btn-secondary" onclick="addRecruitmentStage()">+ Add Stage</button>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeRecruitmentTemplateModal()">Cancel</button>
+                    <button type="submit" class="btn-primary" id="rt-submit-btn">Create Template</button>
+                </div>
+                <div id="rt-success" class="message success hidden"></div>
+                <div id="rt-error" class="message error hidden"></div>
+            </form>
+        </div>
+    </div>
+
     <!-- ─── Open Position Modal ──────────────────────────────────────────────── -->
     <div id="open-position-modal" class="modal-overlay hidden" onclick="closePositionModalOnBg(event)">
         <div class="modal modal-lg">

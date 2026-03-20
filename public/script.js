@@ -19,7 +19,8 @@ const PAGE_TITLES = {
     partnerships: 'Partnerships',
     meetings: 'Meetings',
     evaluations: 'Evaluations',
-    'open-positions': 'Open Positions'
+    'open-positions': 'Open Positions',
+    'recruitment-templates': 'Recruitment Templates'
 };
 
 // Store all ideas for filtering
@@ -49,6 +50,9 @@ let allEvaluations = [];
 
 // Store all open positions for filtering
 let allOpenPositions = [];
+
+// Store all recruitment templates
+let allRecruitmentTemplates = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -113,6 +117,9 @@ function showTab(tabName) {
     }
     if (tabName === 'open-positions') {
         loadOpenPositions();
+    }
+    if (tabName === 'recruitment-templates') {
+        loadRecruitmentTemplates();
     }
 
     // Close sidebar on mobile after navigating
@@ -5475,6 +5482,292 @@ async function deletePosition(positionId) {
         allOpenPositions = allOpenPositions.filter(p => p.id !== positionId);
         renderOpenPositions();
         renderOpenPositionsDashboard();
+    } catch {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Recruitment Templates ────────────────────────────────────────────────────
+
+let pendingRecruitmentStages = [];
+let _rtStageCounter = 0;
+
+function rtTypeClassName(type) {
+    return (type || 'other').toLowerCase().replace(/[^a-z]/g, '-');
+}
+
+function showRecruitmentTemplatesSection(sectionId, btn) {
+    document.querySelectorAll('#recruitment-templates-tab .ob-section').forEach(el => el.classList.remove('active'));
+    document.getElementById(sectionId).classList.add('active');
+    document.querySelectorAll('#recruitment-templates-tab .sub-tab-btn').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+async function loadRecruitmentTemplates() {
+    try {
+        const res = await fetch(`${API_URL}/recruitment-templates`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        allRecruitmentTemplates = await res.json();
+        renderRecruitmentTemplates();
+        renderRecruitmentTemplatesDashboard();
+    } catch {
+        document.getElementById('rt-table-container').innerHTML = '<p class="error-state">Failed to load recruitment templates.</p>';
+    }
+}
+
+function renderRecruitmentTemplatesDashboard() {
+    const templates = allRecruitmentTemplates;
+    const total = templates.length;
+    const withStages = templates.filter(t => t.stages && t.stages.length > 0).length;
+    const avgStages = total ? Math.round(templates.reduce((sum, t) => sum + (t.stages ? t.stages.length : 0), 0) / total) : 0;
+
+    const kpiEl = document.getElementById('rt-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-label">Total Templates</div><div class="kpi-value">${total}</div></div>
+            <div class="kpi-card"><div class="kpi-label">With Stages</div><div class="kpi-value">${withStages}</div></div>
+            <div class="kpi-card"><div class="kpi-label">Avg. Stages</div><div class="kpi-value">${avgStages}</div></div>
+        `;
+    }
+
+    const typeCounts = {};
+    templates.forEach(t => { if (t.type) typeCounts[t.type] = (typeCounts[t.type] || 0) + 1; });
+    const typeEl = document.getElementById('rt-by-type');
+    if (typeEl) {
+        const typeTotal = Object.values(typeCounts).reduce((a, b) => a + b, 0);
+        if (!typeTotal) { typeEl.innerHTML = '<p class="text-muted-sm">No data yet.</p>'; }
+        else {
+            typeEl.innerHTML = Object.entries(typeCounts).map(([label, count]) =>
+                `<div class="chart-bar-row"><span class="chart-bar-label">${escapeHtml(label)}</span>
+                 <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round((count/typeTotal)*100)}%"></div></div>
+                 <span class="chart-bar-count">${count}</span></div>`
+            ).join('');
+        }
+    }
+
+    const deptCounts = {};
+    templates.forEach(t => { if (t.department) deptCounts[t.department] = (deptCounts[t.department] || 0) + 1; });
+    const deptEl = document.getElementById('rt-by-department');
+    if (deptEl) {
+        const deptTotal = Object.values(deptCounts).reduce((a, b) => a + b, 0);
+        if (!deptTotal) { deptEl.innerHTML = '<p class="text-muted-sm">No data yet.</p>'; }
+        else {
+            deptEl.innerHTML = Object.entries(deptCounts).map(([label, count]) =>
+                `<div class="chart-bar-row"><span class="chart-bar-label">${escapeHtml(label)}</span>
+                 <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round((count/deptTotal)*100)}%"></div></div>
+                 <span class="chart-bar-count">${count}</span></div>`
+            ).join('');
+        }
+    }
+
+    const recentEl = document.getElementById('rt-recent');
+    if (recentEl) {
+        if (!total) { recentEl.innerHTML = '<p class="text-muted-sm">No templates yet.</p>'; }
+        else {
+            const recent = [...templates].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+            recentEl.innerHTML = recent.map(t =>
+                `<div class="chart-bar-row"><span class="chart-bar-label">${escapeHtml(t.name)}</span>
+                 <span class="chart-bar-count rt-type-badge rt-type-${rtTypeClassName(t.type)}">${escapeHtml(t.type || 'General')}</span></div>`
+            ).join('');
+        }
+    }
+}
+
+function renderRecruitmentTemplates() {
+    const search = (document.getElementById('rt-search')?.value || '').toLowerCase();
+    const filterType = document.getElementById('rt-filter-type')?.value || '';
+    const container = document.getElementById('rt-table-container');
+    if (!container) return;
+
+    let templates = allRecruitmentTemplates.filter(t => {
+        if (filterType && t.type !== filterType) return false;
+        if (search) {
+            const haystack = [t.name, t.department, t.description].join(' ').toLowerCase();
+            if (!haystack.includes(search)) return false;
+        }
+        return true;
+    });
+
+    if (!templates.length) {
+        container.innerHTML = '<p class="empty-state">No recruitment templates found.</p>';
+        return;
+    }
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Department</th>
+            <th>Stages</th>
+            <th>Description</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${templates.map(t => {
+            const stageCount = (t.stages || []).length;
+            const createdDate = t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+            return `<tr>
+                <td><strong>${escapeHtml(t.name)}</strong></td>
+                <td>${t.type ? `<span class="rt-type-badge rt-type-${rtTypeClassName(t.type)}">${escapeHtml(t.type)}</span>` : '<span class="text-muted-sm">—</span>'}</td>
+                <td>${escapeHtml(t.department || '—')}</td>
+                <td><span class="rt-stage-count">${stageCount} stage${stageCount !== 1 ? 's' : ''}</span></td>
+                <td class="text-muted-sm">${t.description ? escapeHtml(t.description.substring(0, 60)) + (t.description.length > 60 ? '…' : '') : '—'}</td>
+                <td class="text-muted-sm">${createdDate}</td>
+                <td class="action-btns">
+                    <button class="btn-icon" title="Edit" onclick="openRecruitmentTemplateModal('${t.id}')">✏️</button>
+                    <button class="btn-icon btn-icon-danger" title="Delete" onclick="deleteRecruitmentTemplate('${t.id}')">🗑️</button>
+                </td>
+            </tr>`;
+        }).join('')}</tbody>
+    </table></div>`;
+}
+
+async function openRecruitmentTemplateModal(templateId) {
+    pendingRecruitmentStages = [];
+    const modal = document.getElementById('recruitment-template-modal');
+    const titleEl = document.getElementById('rt-modal-title');
+    const submitBtn = document.getElementById('rt-submit-btn');
+
+    document.getElementById('rt-id').value = '';
+    document.getElementById('rt-name').value = '';
+    document.getElementById('rt-type').value = '';
+    document.getElementById('rt-department').value = '';
+    document.getElementById('rt-description').value = '';
+    document.getElementById('rt-stage-name').value = '';
+    document.getElementById('rt-stage-owner').value = '';
+    document.getElementById('rt-stage-owner-email').value = '';
+    document.getElementById('rt-stage-due-days').value = '';
+    document.getElementById('rt-stage-description').value = '';
+    document.getElementById('rt-success').classList.add('hidden');
+    document.getElementById('rt-error').classList.add('hidden');
+
+    if (templateId) {
+        const tmpl = allRecruitmentTemplates.find(t => t.id === templateId);
+        if (!tmpl) return;
+        titleEl.textContent = 'Edit Recruitment Template';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('rt-id').value = tmpl.id;
+        document.getElementById('rt-name').value = tmpl.name;
+        document.getElementById('rt-type').value = tmpl.type || '';
+        document.getElementById('rt-department').value = tmpl.department || '';
+        document.getElementById('rt-description').value = tmpl.description || '';
+        pendingRecruitmentStages = (tmpl.stages || []).map(s => ({ ...s }));
+    } else {
+        titleEl.textContent = 'New Recruitment Template';
+        submitBtn.textContent = 'Create Template';
+    }
+
+    renderRecruitmentStagesList();
+    modal.classList.remove('hidden');
+}
+
+function closeRecruitmentTemplateModal() {
+    document.getElementById('recruitment-template-modal').classList.add('hidden');
+}
+
+function closeRecruitmentTemplateModalOnBg(event) {
+    if (event.target === document.getElementById('recruitment-template-modal')) closeRecruitmentTemplateModal();
+}
+
+function addRecruitmentStage() {
+    const name = (document.getElementById('rt-stage-name').value || '').trim();
+    if (!name) return;
+    const owner = document.getElementById('rt-stage-owner').value.trim();
+    const ownerEmail = document.getElementById('rt-stage-owner-email').value.trim();
+    const dueDaysOffset = parseInt(document.getElementById('rt-stage-due-days').value, 10) || 0;
+    const description = document.getElementById('rt-stage-description').value.trim();
+    pendingRecruitmentStages.push({ id: `stage-${Date.now()}-${++_rtStageCounter}`, order: pendingRecruitmentStages.length + 1, name, description, owner, ownerEmail, dueDaysOffset });
+    document.getElementById('rt-stage-name').value = '';
+    document.getElementById('rt-stage-owner').value = '';
+    document.getElementById('rt-stage-owner-email').value = '';
+    document.getElementById('rt-stage-due-days').value = '';
+    document.getElementById('rt-stage-description').value = '';
+    renderRecruitmentStagesList();
+}
+
+function removeRecruitmentStage(idx) {
+    pendingRecruitmentStages.splice(idx, 1);
+    pendingRecruitmentStages.forEach((s, i) => { s.order = i + 1; });
+    renderRecruitmentStagesList();
+}
+
+function renderRecruitmentStagesList() {
+    const container = document.getElementById('rt-stages-list');
+    if (!container) return;
+    if (!pendingRecruitmentStages.length) {
+        container.innerHTML = '<p class="text-muted-sm" style="margin:0 0 8px">No stages added yet.</p>';
+        return;
+    }
+    container.innerHTML = pendingRecruitmentStages.map((s, i) =>
+        `<div class="ob-step-item" style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;background:var(--bg-main)">
+            <span class="rt-stage-order">${s.order}</span>
+            <div style="flex:1">
+                <div style="font-weight:600;font-size:var(--fs-sm)">${escapeHtml(s.name)}</div>
+                ${s.description ? `<div class="text-muted-sm">${escapeHtml(s.description)}</div>` : ''}
+                <div class="text-muted-sm">${s.owner ? `Owner: ${escapeHtml(s.owner)}` : ''}${s.owner && s.dueDaysOffset ? ' · ' : ''}${s.dueDaysOffset ? `Day ${s.dueDaysOffset}` : ''}</div>
+            </div>
+            <button type="button" class="btn-icon btn-icon-danger" onclick="removeRecruitmentStage(${i})">×</button>
+        </div>`
+    ).join('');
+}
+
+async function submitRecruitmentTemplate(event) {
+    event.preventDefault();
+    const successEl = document.getElementById('rt-success');
+    const errorEl = document.getElementById('rt-error');
+    const submitBtn = document.getElementById('rt-submit-btn');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+    submitBtn.disabled = true;
+
+    const id = document.getElementById('rt-id').value;
+    const isEdit = !!id;
+    const payload = {
+        name: document.getElementById('rt-name').value.trim(),
+        type: document.getElementById('rt-type').value,
+        department: document.getElementById('rt-department').value.trim(),
+        description: document.getElementById('rt-description').value.trim(),
+        stages: pendingRecruitmentStages
+    };
+
+    try {
+        const url = isEdit ? `${API_URL}/recruitment-templates/${id}` : `${API_URL}/recruitment-templates`;
+        const method = isEdit ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) {
+            const d = await res.json();
+            errorEl.textContent = d.error || 'Error saving template';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        const saved = await res.json();
+        if (isEdit) {
+            const idx = allRecruitmentTemplates.findIndex(t => t.id === saved.id);
+            if (idx !== -1) allRecruitmentTemplates[idx] = saved;
+        } else {
+            allRecruitmentTemplates.push(saved);
+        }
+        successEl.textContent = isEdit ? 'Template updated!' : 'Template created!';
+        successEl.classList.remove('hidden');
+        renderRecruitmentTemplates();
+        renderRecruitmentTemplatesDashboard();
+        setTimeout(() => closeRecruitmentTemplateModal(), 900);
+    } catch {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+    }
+}
+
+async function deleteRecruitmentTemplate(templateId) {
+    if (!confirm('Delete this recruitment template? This cannot be undone.')) return;
+    try {
+        const res = await fetch(`${API_URL}/recruitment-templates/${templateId}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting template'); return; }
+        allRecruitmentTemplates = allRecruitmentTemplates.filter(t => t.id !== templateId);
+        renderRecruitmentTemplates();
+        renderRecruitmentTemplatesDashboard();
     } catch {
         alert('Network error. Please try again.');
     }

@@ -26,6 +26,7 @@ const PARTNERSHIPS_FILE = path.join(__dirname, 'data', 'partnerships.json');
 const MEETINGS_FILE = path.join(__dirname, 'data', 'meetings.json');
 const EVALUATIONS_FILE = path.join(__dirname, 'data', 'evaluations.json');
 const OPEN_POSITIONS_FILE = path.join(__dirname, 'data', 'open-positions.json');
+const RECRUITMENT_TEMPLATES_FILE = path.join(__dirname, 'data', 'recruitment-templates.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -97,6 +98,9 @@ if (!fsSync.existsSync(EVALUATIONS_FILE)) {
 }
 if (!fsSync.existsSync(OPEN_POSITIONS_FILE)) {
     fsSync.writeFileSync(OPEN_POSITIONS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(RECRUITMENT_TEMPLATES_FILE)) {
+    fsSync.writeFileSync(RECRUITMENT_TEMPLATES_FILE, JSON.stringify([], null, 2));
 }
 if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     const defaultCategories = [
@@ -2402,6 +2406,119 @@ app.delete('/api/open-positions/:id', strictLimiter, async (req, res) => {
         res.status(204).send();
     } catch {
         res.status(500).json({ error: 'Error deleting open position' });
+    }
+});
+
+// ─── Recruitment Templates API ───────────────────────────────────────────────
+
+const RECRUITMENT_TEMPLATE_TYPES = ['Technical', 'Non-Technical', 'Executive', 'Intern', 'Contractor'];
+
+app.get('/api/recruitment-templates', async (req, res) => {
+    try {
+        const templates = await readJson(RECRUITMENT_TEMPLATES_FILE);
+        res.json(templates);
+    } catch {
+        res.status(500).json({ error: 'Error reading recruitment templates' });
+    }
+});
+
+app.post('/api/recruitment-templates', strictLimiter, async (req, res) => {
+    try {
+        const { name, type, department, description, stages } = req.body;
+        if (!name || !name.trim()) return res.status(400).json({ error: 'Template name is required' });
+        if (type && !RECRUITMENT_TEMPLATE_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid template type' });
+
+        const resolvedStages = Array.isArray(stages)
+            ? stages.map((s, i) => ({
+                id: generateId(),
+                order: Number(s.order) || i + 1,
+                name: String(s.name || '').trim(),
+                description: String(s.description || '').trim(),
+                owner: String(s.owner || '').trim(),
+                ownerEmail: String(s.ownerEmail || '').trim(),
+                dueDaysOffset: Number(s.dueDaysOffset) || 0
+            })).filter(s => s.name)
+            : [];
+
+        const newTemplate = {
+            id: generateId(),
+            name: name.trim(),
+            type: type || '',
+            department: department ? department.trim() : '',
+            description: description ? description.trim() : '',
+            stages: resolvedStages,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const templates = await readJson(RECRUITMENT_TEMPLATES_FILE);
+        templates.push(newTemplate);
+        await writeJson(RECRUITMENT_TEMPLATES_FILE, templates);
+        res.status(201).json(newTemplate);
+    } catch {
+        res.status(500).json({ error: 'Error creating recruitment template' });
+    }
+});
+
+app.get('/api/recruitment-templates/:id', async (req, res) => {
+    try {
+        const templates = await readJson(RECRUITMENT_TEMPLATES_FILE);
+        const tmpl = templates.find(t => t.id === req.params.id);
+        if (!tmpl) return res.status(404).json({ error: 'Template not found' });
+        res.json(tmpl);
+    } catch {
+        res.status(500).json({ error: 'Error reading recruitment template' });
+    }
+});
+
+app.put('/api/recruitment-templates/:id', strictLimiter, async (req, res) => {
+    try {
+        const templates = await readJson(RECRUITMENT_TEMPLATES_FILE);
+        const idx = templates.findIndex(t => t.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Template not found' });
+        const { name, type, department, description, stages } = req.body;
+        if (name !== undefined && !name.trim()) return res.status(400).json({ error: 'Template name cannot be empty' });
+        if (type && !RECRUITMENT_TEMPLATE_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid template type' });
+
+        const resolvedStages = stages !== undefined
+            ? (Array.isArray(stages)
+                ? stages.map((s, i) => ({
+                    id: s.id || generateId(),
+                    order: Number(s.order) || i + 1,
+                    name: String(s.name || '').trim(),
+                    description: String(s.description || '').trim(),
+                    owner: String(s.owner || '').trim(),
+                    ownerEmail: String(s.ownerEmail || '').trim(),
+                    dueDaysOffset: Number(s.dueDaysOffset) || 0
+                })).filter(s => s.name)
+                : templates[idx].stages)
+            : templates[idx].stages;
+
+        templates[idx] = {
+            ...templates[idx],
+            name: name !== undefined ? name.trim() : templates[idx].name,
+            type: type !== undefined ? type : templates[idx].type,
+            department: department !== undefined ? department.trim() : templates[idx].department,
+            description: description !== undefined ? description.trim() : templates[idx].description,
+            stages: resolvedStages,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(RECRUITMENT_TEMPLATES_FILE, templates);
+        res.json(templates[idx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating recruitment template' });
+    }
+});
+
+app.delete('/api/recruitment-templates/:id', strictLimiter, async (req, res) => {
+    try {
+        const templates = await readJson(RECRUITMENT_TEMPLATES_FILE);
+        const idx = templates.findIndex(t => t.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Template not found' });
+        templates.splice(idx, 1);
+        await writeJson(RECRUITMENT_TEMPLATES_FILE, templates);
+        res.status(204).send();
+    } catch {
+        res.status(500).json({ error: 'Error deleting recruitment template' });
     }
 });
 
