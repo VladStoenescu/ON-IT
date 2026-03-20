@@ -123,6 +123,11 @@
                     <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><line x1="7" y1="7" x2="13" y2="7"/><line x1="7" y1="10" x2="13" y2="10"/><polyline points="7 13 9 15 13 11"/></svg>
                     <span>Evaluations</span>
                 </button>
+
+                <button class="nav-item" data-section="outlook" onclick="showTab('outlook', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><line x1="10" y1="6" x2="10" y2="10"/><line x1="10" y1="10" x2="13" y2="13"/><circle cx="10" cy="10" r="1" fill="currentColor"/></svg>
+                    <span>Outlook</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -279,6 +284,16 @@
                             <div class="hmc-body">
                                 <div class="hmc-title">Evaluations</div>
                                 <div class="hmc-desc">Run employee performance reviews and track goals &amp; scores</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </div>
+                        <div class="home-module-card" onclick="showTab('outlook', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><circle cx="12" cy="12" r="9"/><line x1="12" y1="7" x2="12" y2="12"/><line x1="12" y1="12" x2="15" y2="15"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">Outlook</div>
+                                <div class="hmc-desc">Track strategic improvement points with RAG status, owners and tasks</div>
                             </div>
                             <span class="hmc-arrow">→</span>
                         </div>
@@ -1253,6 +1268,83 @@
                     </div>
                 </div>
 
+                <!-- ─── Outlook Tab ──────────────────────────────────────────── -->
+                <div id="outlook-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showOutlookSection('outlook-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showOutlookSection('outlook-list', this)">All Points</button>
+                        <button class="sub-tab-btn" onclick="showOutlookSection('outlook-tasks', this)">All Tasks</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="outlook-dashboard" class="ob-section active">
+                        <h2 class="section-title">Outlook Dashboard</h2>
+                        <div id="outlook-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>By RAG Status</h3>
+                                <div id="outlook-by-rag"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>By Status</h3>
+                                <div id="outlook-by-status"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Recent Points</h3>
+                                <div id="outlook-recent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Points Section -->
+                    <div id="outlook-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Improvement Points</h2>
+                            <button class="btn-primary" onclick="openOutlookModal()">+ Add Point</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="outlook-search" placeholder="Search by title, owner…" oninput="renderOutlook()" class="ls-filter-input">
+                            <select id="outlook-filter-rag" onchange="renderOutlook()" class="ls-filter-select">
+                                <option value="">All RAG Statuses</option>
+                                <option value="Red">Red</option>
+                                <option value="Amber">Amber</option>
+                                <option value="Green">Green</option>
+                            </select>
+                            <select id="outlook-filter-status" onchange="renderOutlook()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="Draft">Draft</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                        <div id="outlook-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading outlook items…</p>
+                        </div>
+                    </div>
+
+                    <!-- All Tasks Section -->
+                    <div id="outlook-tasks" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">All Tasks</h2>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="outlook-tasks-search" placeholder="Search by task title, assignee, point…" oninput="renderAllOutlookTasks()" class="ls-filter-input">
+                            <select id="outlook-tasks-filter-status" onchange="renderAllOutlookTasks()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="To Do">To Do</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Done">Done</option>
+                            </select>
+                        </div>
+                        <div id="outlook-tasks-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading tasks…</p>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     </div>
@@ -1547,6 +1639,111 @@
                     <div class="modal-footer">
                         <button type="button" class="btn-secondary" onclick="closeEvalGoalModal()">Cancel</button>
                         <button type="submit" id="eval-goal-submit-btn" class="btn-primary">Add Goal</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Outlook Point Modal -->
+    <div id="outlook-modal" class="modal-overlay hidden" onclick="closeOutlookModalOnBg(event)">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3 id="outlook-modal-title">Add Improvement Point</h3>
+                <button class="modal-close" onclick="closeOutlookModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="outlook-form" onsubmit="submitOutlook(event)">
+                    <input type="hidden" id="outlook-id">
+                    <div class="form-group">
+                        <label>Point Title *</label>
+                        <input type="text" id="outlook-title" required placeholder="e.g. Be value-driven and reliable">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Owner *</label>
+                            <input type="text" id="outlook-owner" required placeholder="e.g. Jane Smith">
+                        </div>
+                        <div class="form-group">
+                            <label>Implementation Date</label>
+                            <input type="date" id="outlook-implementation-date">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>RAG Status</label>
+                            <select id="outlook-rag-status">
+                                <option value="Amber">Amber</option>
+                                <option value="Red">Red</option>
+                                <option value="Green">Green</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="outlook-status">
+                                <option value="Draft">Draft</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="outlook-description" rows="3" placeholder="Describe this improvement point…"></textarea>
+                    </div>
+                    <p id="outlook-success" class="form-success hidden"></p>
+                    <p id="outlook-error" class="form-error hidden"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeOutlookModal()">Cancel</button>
+                        <button type="submit" id="outlook-submit-btn" class="btn-primary">Add Point</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Outlook Task Modal -->
+    <div id="outlook-task-modal" class="modal-overlay hidden" onclick="closeOutlookTaskModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="outlook-task-modal-title">Add Task</h3>
+                <button class="modal-close" onclick="closeOutlookTaskModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="outlook-task-form" onsubmit="submitOutlookTask(event)">
+                    <input type="hidden" id="outlook-task-outlook-id">
+                    <input type="hidden" id="outlook-task-id">
+                    <div class="form-group">
+                        <label>Task Title *</label>
+                        <input type="text" id="outlook-task-title" required placeholder="e.g. Define KPIs for value delivery">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="outlook-task-description" rows="3" placeholder="Describe the task…"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Assignee</label>
+                            <input type="text" id="outlook-task-assignee" placeholder="e.g. John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label>Due Date</label>
+                            <input type="date" id="outlook-task-due-date">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="outlook-task-status">
+                            <option value="To Do">To Do</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Done">Done</option>
+                        </select>
+                    </div>
+                    <p id="outlook-task-success" class="form-success hidden"></p>
+                    <p id="outlook-task-error" class="form-error hidden"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeOutlookTaskModal()">Cancel</button>
+                        <button type="submit" id="outlook-task-submit-btn" class="btn-primary">Add Task</button>
                     </div>
                 </form>
             </div>
