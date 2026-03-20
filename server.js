@@ -23,6 +23,7 @@ const CRM_CONTACTS_FILE = path.join(__dirname, 'data', 'crm-contacts.json');
 const CRM_DEALS_FILE = path.join(__dirname, 'data', 'crm-deals.json');
 const PROCESS_OWNERSHIP_FILE = path.join(__dirname, 'data', 'process-ownership.json');
 const PARTNERSHIPS_FILE = path.join(__dirname, 'data', 'partnerships.json');
+const MEETINGS_FILE = path.join(__dirname, 'data', 'meetings.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -85,6 +86,9 @@ if (!fsSync.existsSync(PROCESS_OWNERSHIP_FILE)) {
 }
 if (!fsSync.existsSync(PARTNERSHIPS_FILE)) {
     fsSync.writeFileSync(PARTNERSHIPS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(MEETINGS_FILE)) {
+    fsSync.writeFileSync(MEETINGS_FILE, JSON.stringify([], null, 2));
 }
 if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     const defaultCategories = [
@@ -1907,6 +1911,161 @@ app.delete('/api/partnerships/:id', strictLimiter, async (req, res) => {
         res.json({ message: 'Partnership deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting partnership' });
+    }
+});
+
+// ─── Meetings API ─────────────────────────────────────────────────────────────
+
+app.get('/api/meetings', async (req, res) => {
+    try {
+        const meetings = await readJson(MEETINGS_FILE);
+        res.json(meetings);
+    } catch {
+        res.status(500).json({ error: 'Error reading meetings' });
+    }
+});
+
+app.post('/api/meetings', strictLimiter, async (req, res) => {
+    try {
+        const { title, date, time, type, status, location, attendees, agenda, notes } = req.body;
+        if (!title || !title.trim()) return res.status(400).json({ error: 'Title is required' });
+        if (!date) return res.status(400).json({ error: 'Date is required' });
+        const meetings = await readJson(MEETINGS_FILE);
+        const newMeeting = {
+            id: generateId(),
+            title: title.trim(),
+            date,
+            time: time || '',
+            type: type || 'Management',
+            status: status || 'Upcoming',
+            location: location ? location.trim() : '',
+            attendees: attendees ? attendees.trim() : '',
+            agenda: agenda ? agenda.trim() : '',
+            notes: notes ? notes.trim() : '',
+            todos: [],
+            createdAt: new Date().toISOString()
+        };
+        meetings.push(newMeeting);
+        await writeJson(MEETINGS_FILE, meetings);
+        res.status(201).json(newMeeting);
+    } catch {
+        res.status(500).json({ error: 'Error creating meeting' });
+    }
+});
+
+app.get('/api/meetings/:id', async (req, res) => {
+    try {
+        const meetings = await readJson(MEETINGS_FILE);
+        const meeting = meetings.find(m => m.id === req.params.id);
+        if (!meeting) return res.status(404).json({ error: 'Meeting not found' });
+        res.json(meeting);
+    } catch {
+        res.status(500).json({ error: 'Error reading meeting' });
+    }
+});
+
+app.put('/api/meetings/:id', strictLimiter, async (req, res) => {
+    try {
+        const { title, date, time, type, status, location, attendees, agenda, notes } = req.body;
+        const meetings = await readJson(MEETINGS_FILE);
+        const idx = meetings.findIndex(m => m.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Meeting not found' });
+        meetings[idx] = {
+            ...meetings[idx],
+            title: title !== undefined ? title.trim() : meetings[idx].title,
+            date: date !== undefined ? date : meetings[idx].date,
+            time: time !== undefined ? time : meetings[idx].time,
+            type: type || meetings[idx].type,
+            status: status || meetings[idx].status,
+            location: location !== undefined ? location.trim() : meetings[idx].location,
+            attendees: attendees !== undefined ? attendees.trim() : meetings[idx].attendees,
+            agenda: agenda !== undefined ? agenda.trim() : meetings[idx].agenda,
+            notes: notes !== undefined ? notes.trim() : meetings[idx].notes
+        };
+        await writeJson(MEETINGS_FILE, meetings);
+        res.json(meetings[idx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating meeting' });
+    }
+});
+
+app.delete('/api/meetings/:id', strictLimiter, async (req, res) => {
+    try {
+        const meetings = await readJson(MEETINGS_FILE);
+        const idx = meetings.findIndex(m => m.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Meeting not found' });
+        meetings.splice(idx, 1);
+        await writeJson(MEETINGS_FILE, meetings);
+        res.json({ message: 'Meeting deleted' });
+    } catch {
+        res.status(500).json({ error: 'Error deleting meeting' });
+    }
+});
+
+// ─── Meeting Todos API ─────────────────────────────────────────────────────────
+
+app.post('/api/meetings/:id/todos', strictLimiter, async (req, res) => {
+    try {
+        const { task, assignee, dueDate, priority } = req.body;
+        if (!task || !task.trim()) return res.status(400).json({ error: 'Task is required' });
+        const meetings = await readJson(MEETINGS_FILE);
+        const idx = meetings.findIndex(m => m.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Meeting not found' });
+        const newTodo = {
+            id: generateId(),
+            task: task.trim(),
+            assignee: assignee ? assignee.trim() : '',
+            dueDate: dueDate || '',
+            priority: priority || 'Medium',
+            status: 'Open',
+            createdAt: new Date().toISOString()
+        };
+        if (!Array.isArray(meetings[idx].todos)) meetings[idx].todos = [];
+        meetings[idx].todos.push(newTodo);
+        await writeJson(MEETINGS_FILE, meetings);
+        res.status(201).json(newTodo);
+    } catch {
+        res.status(500).json({ error: 'Error creating todo' });
+    }
+});
+
+app.put('/api/meetings/:id/todos/:todoId', strictLimiter, async (req, res) => {
+    try {
+        const { task, assignee, dueDate, priority, status } = req.body;
+        const meetings = await readJson(MEETINGS_FILE);
+        const mIdx = meetings.findIndex(m => m.id === req.params.id);
+        if (mIdx === -1) return res.status(404).json({ error: 'Meeting not found' });
+        if (!Array.isArray(meetings[mIdx].todos)) meetings[mIdx].todos = [];
+        const tIdx = meetings[mIdx].todos.findIndex(t => t.id === req.params.todoId);
+        if (tIdx === -1) return res.status(404).json({ error: 'Todo not found' });
+        meetings[mIdx].todos[tIdx] = {
+            ...meetings[mIdx].todos[tIdx],
+            task: task !== undefined ? task.trim() : meetings[mIdx].todos[tIdx].task,
+            assignee: assignee !== undefined ? assignee.trim() : meetings[mIdx].todos[tIdx].assignee,
+            dueDate: dueDate !== undefined ? dueDate : meetings[mIdx].todos[tIdx].dueDate,
+            priority: priority || meetings[mIdx].todos[tIdx].priority,
+            status: status || meetings[mIdx].todos[tIdx].status
+        };
+        await writeJson(MEETINGS_FILE, meetings);
+        res.json(meetings[mIdx].todos[tIdx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating todo' });
+    }
+});
+
+app.delete('/api/meetings/:id/todos/:todoId', strictLimiter, async (req, res) => {
+    try {
+        const meetings = await readJson(MEETINGS_FILE);
+        const mIdx = meetings.findIndex(m => m.id === req.params.id);
+        if (mIdx === -1) return res.status(404).json({ error: 'Meeting not found' });
+        if (!Array.isArray(meetings[mIdx].todos)) meetings[mIdx].todos = [];
+        const tIdx = meetings[mIdx].todos.findIndex(t => t.id === req.params.todoId);
+        if (tIdx === -1) return res.status(404).json({ error: 'Todo not found' });
+        meetings[mIdx].todos.splice(tIdx, 1);
+        await writeJson(MEETINGS_FILE, meetings);
+        res.json({ message: 'Todo deleted' });
+    } catch {
+        res.status(500).json({ error: 'Error deleting todo' });
     }
 });
 
