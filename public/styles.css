@@ -1734,3 +1734,125 @@ body {
     .asset-table th:nth-child(4),
     .asset-table td:nth-child(4) { display: none; }
 }
+
+/* ─── Skills & Talent Module ────────────────────────────────────────────────── */
+
+/* Dashboard three-column bottom for skills */
+#skills-tab .dashboard-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-top: 24px;
+}
+
+@media (max-width: 900px) {
+    #skills-tab .dashboard-bottom {
+        grid-template-columns: 1fr;
+    }
+    .asset-table .skills-hide-mobile { display: none; }
+}
+
+/* Skill tags in table cell */
+.skill-tags-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    max-width: 280px;
+}
+
+.skill-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.skill-tag-more {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    background: var(--brand-gray);
+    color: var(--brand-muted);
+    white-space: nowrap;
+}
+
+/* Count badge used in dashboard charts */
+.skills-count-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    min-width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* Add-skill row inside the profile modal */
+.sp-add-skill-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.sp-add-skill-row .ls-filter-input,
+.sp-add-skill-row .ls-filter-select {
+    min-width: 0;
+}
+
+/* Skill list inside profile modal */
+.sp-skills-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 32px;
+    padding: 6px 0;
+}
+
+.sp-no-skills {
+    color: var(--brand-muted);
+    font-size: var(--fs-sm);
+    font-style: italic;
+}
+
+.sp-skill-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--brand-gray);
+    border: 1px solid var(--brand-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+.sp-skill-cat {
+    font-size: var(--fs-xs);
+    color: var(--brand-muted);
+}
+
+.sp-skill-level {
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--brand-muted);
+}
+
+.sp-remove-skill {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--brand-muted);
+    font-size: var(--fs-sm);
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.sp-remove-skill:hover {
+    color: var(--brand-red);
+}

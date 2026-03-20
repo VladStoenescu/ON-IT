@@ -11,7 +11,8 @@ const PAGE_TITLES = {
     onboarding: 'Onboarding',
     trainings: 'Trainings',
     landscape: 'IT Landscape',
-    assets: 'IT Asset Inventory'
+    assets: 'IT Asset Inventory',
+    skills: 'Skills & Talent'
 };
 
 // Store all ideas for filtering
@@ -61,6 +62,10 @@ function showTab(tabName) {
     }
     if (tabName === 'assets') {
         loadITAssets();
+    }
+    if (tabName === 'skills') {
+        loadSkillProfiles();
+        loadSkillCategoriesForFilter();
     }
 
     // Close sidebar on mobile after navigating
@@ -2169,3 +2174,518 @@ async function deleteAsset(id) {
     }
 }
 
+
+// ─── Skills & Talent Module ───────────────────────────────────────────────────
+
+let allSkillProfiles = [];
+let allSkillCategories = [];
+// Transient skills being built in the add/edit modal
+let pendingProfileSkills = [];
+
+const COMPETENCE_CENTRE_COLORS = {
+    'Cutover & Release Management':    { bg: '#fce4ec', color: '#880e4f' },
+    'Programme & Project Management':  { bg: '#e8eaf6', color: '#283593' },
+    'Regulatory Reporting':            { bg: '#fff8e1', color: '#f57f17' },
+    'Core Integration':                { bg: '#e8f5e9', color: '#1b5e20' }
+};
+
+const EMPLOYMENT_TYPE_COLORS = {
+    Permanent:   { bg: '#e3f2fd', color: '#1565c0' },
+    Contractor:  { bg: '#f3e5f5', color: '#4a148c' },
+    Freelancer:  { bg: '#fff3e0', color: '#bf360c' },
+    'Part-time': { bg: '#e0f2f1', color: '#004d40' },
+    Intern:      { bg: '#f9fbe7', color: '#558b2f' },
+    Other:       { bg: '#f5f5f5', color: '#616161' }
+};
+
+const SKILL_LEVEL_COLORS = {
+    Beginner:     { bg: '#f5f5f5', color: '#757575' },
+    Intermediate: { bg: '#e3f2fd', color: '#1565c0' },
+    Advanced:     { bg: '#e8f5e9', color: '#2e7d32' },
+    Expert:       { bg: '#fce4ec', color: '#880e4f' }
+};
+
+function showSkillsSection(sectionId, btn) {
+    document.querySelectorAll('#skills-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#skills-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (sectionId === 'skills-categories') renderSkillCategories();
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+
+async function loadSkillProfiles() {
+    try {
+        const res = await fetch(`${API_URL}/employee-skills`);
+        if (!res.ok) throw new Error('Failed to load skill profiles');
+        allSkillProfiles = await res.json();
+        renderSkillProfiles();
+        renderSkillsDashboard();
+    } catch (err) {
+        document.getElementById('skills-table-container').innerHTML = '<p class="error-state">Failed to load talent profiles.</p>';
+    }
+}
+
+async function loadSkillCategoriesForFilter() {
+    try {
+        const res = await fetch(`${API_URL}/skill-categories`);
+        if (!res.ok) throw new Error('Failed to load skill categories');
+        allSkillCategories = await res.json();
+    } catch (_) {
+        allSkillCategories = [];
+    }
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+function renderSkillsDashboard() {
+    const total = allSkillProfiles.length;
+    const totalSkills = allSkillProfiles.reduce((s, p) => s + (p.skills ? p.skills.length : 0), 0);
+
+    // KPI cards
+    const kpiContainer = document.getElementById('skills-kpi-cards');
+    if (kpiContainer) {
+        kpiContainer.innerHTML = `
+            <div class="kpi-card">
+                <div class="kpi-value">${total}</div>
+                <div class="kpi-label">Total Profiles</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value">${totalSkills}</div>
+                <div class="kpi-label">Skills Mapped</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value">${total > 0 ? Math.round(totalSkills / total * 10) / 10 : 0}</div>
+                <div class="kpi-label">Avg Skills / Person</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value">${allSkillProfiles.filter(p => p.employmentType === 'Permanent').length}</div>
+                <div class="kpi-label">Permanent Staff</div>
+            </div>`;
+    }
+
+    // By competence centre
+    const byCentre = {};
+    allSkillProfiles.forEach(p => {
+        byCentre[p.competenceCentre] = (byCentre[p.competenceCentre] || 0) + 1;
+    });
+    const centreEl = document.getElementById('skills-by-centre');
+    if (centreEl) {
+        if (Object.keys(byCentre).length === 0) {
+            centreEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No data yet.</p>';
+        } else {
+            centreEl.innerHTML = Object.entries(byCentre)
+                .sort((a, b) => b[1] - a[1])
+                .map(([name, count]) => {
+                    const c = COMPETENCE_CENTRE_COLORS[name] || { bg: '#f5f5f5', color: '#616161' };
+                    const pct = total > 0 ? Math.round(count / total * 100) : 0;
+                    return `<div class="asset-kpi-row">
+                        <div class="asset-kpi-label" style="min-width:180px">${escapeHtml(name)}</div>
+                        <div class="asset-kpi-bar-wrap"><div class="asset-kpi-bar" style="width:${pct}%;background:${c.color}"></div></div>
+                        <span class="skills-count-badge" style="background:${c.bg};color:${c.color}">${count}</span>
+                    </div>`;
+                }).join('');
+        }
+    }
+
+    // By employment type
+    const byEmployment = {};
+    allSkillProfiles.forEach(p => {
+        byEmployment[p.employmentType] = (byEmployment[p.employmentType] || 0) + 1;
+    });
+    const empEl = document.getElementById('skills-by-employment');
+    if (empEl) {
+        if (Object.keys(byEmployment).length === 0) {
+            empEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No data yet.</p>';
+        } else {
+            empEl.innerHTML = Object.entries(byEmployment)
+                .sort((a, b) => b[1] - a[1])
+                .map(([type, count]) => {
+                    const c = EMPLOYMENT_TYPE_COLORS[type] || EMPLOYMENT_TYPE_COLORS.Other;
+                    const pct = total > 0 ? Math.round(count / total * 100) : 0;
+                    return `<div class="asset-kpi-row">
+                        <div class="asset-kpi-label" style="min-width:100px">${escapeHtml(type)}</div>
+                        <div class="asset-kpi-bar-wrap"><div class="asset-kpi-bar" style="width:${pct}%;background:${c.color}"></div></div>
+                        <span class="skills-count-badge" style="background:${c.bg};color:${c.color}">${count}</span>
+                    </div>`;
+                }).join('');
+        }
+    }
+
+    // Top skills
+    const skillCount = {};
+    allSkillProfiles.forEach(p => {
+        (p.skills || []).forEach(s => {
+            skillCount[s.name] = (skillCount[s.name] || 0) + 1;
+        });
+    });
+    const topSkillsEl = document.getElementById('skills-top-skills');
+    if (topSkillsEl) {
+        const top = Object.entries(skillCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        if (top.length === 0) {
+            topSkillsEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No skills added yet.</p>';
+        } else {
+            topSkillsEl.innerHTML = top.map(([name, count]) =>
+                `<div class="asset-kpi-row">
+                    <div class="asset-kpi-label" style="flex:1">${escapeHtml(name)}</div>
+                    <span class="skills-count-badge" style="background:#e3f2fd;color:#1565c0">${count}</span>
+                </div>`
+            ).join('');
+        }
+    }
+}
+
+// ── Talent Directory ──────────────────────────────────────────────────────────
+
+function renderSkillProfiles() {
+    const search = (document.getElementById('skills-search')?.value || '').toLowerCase();
+    const centre = document.getElementById('skills-filter-centre')?.value || '';
+    const employment = document.getElementById('skills-filter-employment')?.value || '';
+
+    let profiles = allSkillProfiles.filter(p => {
+        if (centre && p.competenceCentre !== centre) return false;
+        if (employment && p.employmentType !== employment) return false;
+        if (search) {
+            const skillNames = (p.skills || []).map(s => s.name).join(' ').toLowerCase();
+            const haystack = [p.employeeName, skillNames].join(' ').toLowerCase();
+            if (!haystack.includes(search)) return false;
+        }
+        return true;
+    });
+
+    const container = document.getElementById('skills-table-container');
+    if (!container) return;
+
+    if (profiles.length === 0) {
+        container.innerHTML = '<p class="empty-state">No talent profiles found. Click "+ Add Profile" to get started.</p>';
+        return;
+    }
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead>
+            <tr>
+                <th>Employee</th>
+                <th>Employment Type</th>
+                <th>Competence Centre</th>
+                <th>Skills</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${profiles.map(profile => {
+                const cc = COMPETENCE_CENTRE_COLORS[profile.competenceCentre] || { bg: '#f5f5f5', color: '#616161' };
+                const ec = EMPLOYMENT_TYPE_COLORS[profile.employmentType] || EMPLOYMENT_TYPE_COLORS.Other;
+                const skillTags = (profile.skills || []).slice(0, 4).map(s => {
+                    const lc = SKILL_LEVEL_COLORS[s.level] || SKILL_LEVEL_COLORS.Intermediate;
+                    return `<span class="skill-tag" style="background:${lc.bg};color:${lc.color}">${escapeHtml(s.name)}</span>`;
+                }).join('');
+                const extraCount = (profile.skills || []).length > 4 ? `<span class="skill-tag-more">+${profile.skills.length - 4}</span>` : '';
+                return `<tr>
+                    <td><span class="asset-name">${escapeHtml(profile.employeeName)}</span></td>
+                    <td><span class="asset-status-badge" style="background:${ec.bg};color:${ec.color}">${escapeHtml(profile.employmentType)}</span></td>
+                    <td><span class="asset-status-badge" style="background:${cc.bg};color:${cc.color}">${escapeHtml(profile.competenceCentre)}</span></td>
+                    <td><div class="skill-tags-cell">${skillTags}${extraCount}</div></td>
+                    <td>
+                        <div class="it-tool-actions">
+                            <button class="it-tool-btn it-tool-btn-edit" onclick="openSkillProfileModal('${escapeHtml(profile.id)}')">Edit</button>
+                            <button class="it-tool-btn it-tool-btn-delete" onclick="deleteSkillProfile('${escapeHtml(profile.id)}')">Delete</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+// ── Skill Categories ──────────────────────────────────────────────────────────
+
+async function renderSkillCategories() {
+    if (allSkillCategories.length === 0) {
+        try {
+            const res = await fetch(`${API_URL}/skill-categories`);
+            if (res.ok) allSkillCategories = await res.json();
+        } catch (_) {}
+    }
+
+    const container = document.getElementById('skill-categories-container');
+    if (!container) return;
+
+    if (allSkillCategories.length === 0) {
+        container.innerHTML = '<p class="empty-state">No skill categories found.</p>';
+        return;
+    }
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead>
+            <tr>
+                <th>Category Name</th>
+                <th>Description</th>
+                <th>Type</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${allSkillCategories.map(cat => `<tr>
+                <td><span class="asset-name">${escapeHtml(cat.name)}</span></td>
+                <td>${escapeHtml(cat.description || '—')}</td>
+                <td><span class="asset-status-badge" style="background:${cat.isCustom ? '#e8f5e9' : '#e3f2fd'};color:${cat.isCustom ? '#2e7d32' : '#1565c0'}">${cat.isCustom ? 'Custom' : 'Built-in'}</span></td>
+                <td>
+                    <div class="it-tool-actions">
+                        ${cat.isCustom
+                            ? `<button class="it-tool-btn it-tool-btn-edit" onclick="openSkillCategoryModal('${escapeHtml(cat.id)}')">Edit</button>
+                               <button class="it-tool-btn it-tool-btn-delete" onclick="deleteSkillCategory('${escapeHtml(cat.id)}')">Delete</button>`
+                            : '<span style="color:var(--brand-muted);font-size:var(--fs-sm)">Built-in</span>'
+                        }
+                    </div>
+                </td>
+            </tr>`).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+// ── Skill Profile Modal ───────────────────────────────────────────────────────
+
+function populateCategoryDropdown() {
+    const sel = document.getElementById('sp-skill-category');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Category</option>' +
+        allSkillCategories.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+}
+
+function renderPendingSkills() {
+    const list = document.getElementById('sp-skills-list');
+    if (!list) return;
+    if (pendingProfileSkills.length === 0) {
+        list.innerHTML = '<p class="sp-no-skills">No skills added yet.</p>';
+        return;
+    }
+    list.innerHTML = pendingProfileSkills.map((s, i) => {
+        const lc = SKILL_LEVEL_COLORS[s.level] || SKILL_LEVEL_COLORS.Intermediate;
+        return `<div class="sp-skill-item">
+            <span class="skill-tag" style="background:${lc.bg};color:${lc.color}">${escapeHtml(s.name)}</span>
+            ${s.category ? `<span class="sp-skill-cat">${escapeHtml(s.category)}</span>` : ''}
+            <span class="sp-skill-level">${escapeHtml(s.level)}</span>
+            <button type="button" class="sp-remove-skill" onclick="removePendingSkill(${i})">✕</button>
+        </div>`;
+    }).join('');
+}
+
+function addSkillToProfile() {
+    const name = document.getElementById('sp-skill-name')?.value.trim();
+    if (!name) return;
+    const category = document.getElementById('sp-skill-category')?.value || '';
+    const level = document.getElementById('sp-skill-level')?.value || 'Intermediate';
+    if (pendingProfileSkills.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+        return;
+    }
+    pendingProfileSkills.push({ name, category, level });
+    document.getElementById('sp-skill-name').value = '';
+    renderPendingSkills();
+}
+
+function removePendingSkill(idx) {
+    pendingProfileSkills.splice(idx, 1);
+    renderPendingSkills();
+}
+
+async function openSkillProfileModal(profileId) {
+    if (allSkillCategories.length === 0) {
+        await loadSkillCategoriesForFilter();
+    }
+    pendingProfileSkills = [];
+
+    const modal = document.getElementById('skill-profile-modal');
+    const titleEl = document.getElementById('skill-profile-modal-title');
+    const submitBtn = document.getElementById('sp-submit-btn');
+    document.getElementById('skill-profile-id').value = '';
+    document.getElementById('sp-employee-name').value = '';
+    document.getElementById('sp-employment-type').value = '';
+    document.getElementById('sp-competence-centre').value = '';
+    document.getElementById('sp-notes').value = '';
+    document.getElementById('sp-success').classList.add('hidden');
+    document.getElementById('sp-error').classList.add('hidden');
+
+    populateCategoryDropdown();
+    renderPendingSkills();
+
+    if (profileId) {
+        const profile = allSkillProfiles.find(p => p.id === profileId);
+        if (profile) {
+            titleEl.textContent = 'Edit Talent Profile';
+            submitBtn.textContent = 'Save Changes';
+            document.getElementById('skill-profile-id').value = profile.id;
+            document.getElementById('sp-employee-name').value = profile.employeeName;
+            document.getElementById('sp-employment-type').value = profile.employmentType;
+            document.getElementById('sp-competence-centre').value = profile.competenceCentre;
+            document.getElementById('sp-notes').value = profile.notes || '';
+            pendingProfileSkills = (profile.skills || []).map(s => ({ ...s }));
+            renderPendingSkills();
+        }
+    } else {
+        titleEl.textContent = 'Add Talent Profile';
+        submitBtn.textContent = 'Add Profile';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeSkillProfileModal() {
+    document.getElementById('skill-profile-modal').classList.add('hidden');
+}
+
+function closeSkillProfileModalOnBg(event) {
+    if (event.target === document.getElementById('skill-profile-modal')) closeSkillProfileModal();
+}
+
+async function submitSkillProfile(event) {
+    event.preventDefault();
+    const id = document.getElementById('skill-profile-id').value;
+    const successEl = document.getElementById('sp-success');
+    const errorEl = document.getElementById('sp-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        employeeName: document.getElementById('sp-employee-name').value.trim(),
+        employmentType: document.getElementById('sp-employment-type').value,
+        competenceCentre: document.getElementById('sp-competence-centre').value,
+        skills: pendingProfileSkills,
+        notes: document.getElementById('sp-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/employee-skills/${id}` : `${API_URL}/employee-skills`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving profile';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Profile updated successfully!' : 'Profile added successfully!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allSkillProfiles.findIndex(p => p.id === id);
+            if (idx !== -1) allSkillProfiles[idx] = data;
+        } else {
+            allSkillProfiles.push(data);
+        }
+        renderSkillProfiles();
+        renderSkillsDashboard();
+        setTimeout(() => closeSkillProfileModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteSkillProfile(id) {
+    if (!confirm('Are you sure you want to delete this talent profile?')) return;
+    try {
+        const res = await fetch(`${API_URL}/employee-skills/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting profile'); return; }
+        allSkillProfiles = allSkillProfiles.filter(p => p.id !== id);
+        renderSkillProfiles();
+        renderSkillsDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ── Skill Category Modal ──────────────────────────────────────────────────────
+
+function openSkillCategoryModal(categoryId) {
+    const modal = document.getElementById('skill-category-modal');
+    const titleEl = document.getElementById('skill-category-modal-title');
+    const submitBtn = document.getElementById('sc-submit-btn');
+    document.getElementById('sc-id').value = '';
+    document.getElementById('sc-name').value = '';
+    document.getElementById('sc-description').value = '';
+    document.getElementById('sc-success').classList.add('hidden');
+    document.getElementById('sc-error').classList.add('hidden');
+
+    if (categoryId) {
+        const cat = allSkillCategories.find(c => c.id === categoryId);
+        if (cat) {
+            titleEl.textContent = 'Edit Skill Category';
+            submitBtn.textContent = 'Save Changes';
+            document.getElementById('sc-id').value = cat.id;
+            document.getElementById('sc-name').value = cat.name;
+            document.getElementById('sc-description').value = cat.description || '';
+        }
+    } else {
+        titleEl.textContent = 'Add Skill Category';
+        submitBtn.textContent = 'Add Category';
+    }
+    modal.classList.remove('hidden');
+}
+
+function closeSkillCategoryModal() {
+    document.getElementById('skill-category-modal').classList.add('hidden');
+}
+
+function closeSkillCategoryModalOnBg(event) {
+    if (event.target === document.getElementById('skill-category-modal')) closeSkillCategoryModal();
+}
+
+async function submitSkillCategory(event) {
+    event.preventDefault();
+    const id = document.getElementById('sc-id').value;
+    const successEl = document.getElementById('sc-success');
+    const errorEl = document.getElementById('sc-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        name: document.getElementById('sc-name').value.trim(),
+        description: document.getElementById('sc-description').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/skill-categories/${id}` : `${API_URL}/skill-categories`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving category';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Category updated!' : 'Category added!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allSkillCategories.findIndex(c => c.id === id);
+            if (idx !== -1) allSkillCategories[idx] = data;
+        } else {
+            allSkillCategories.push(data);
+        }
+        renderSkillCategories();
+        setTimeout(() => closeSkillCategoryModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteSkillCategory(id) {
+    if (!confirm('Are you sure you want to delete this skill category?')) return;
+    try {
+        const res = await fetch(`${API_URL}/skill-categories/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting category'); return; }
+        allSkillCategories = allSkillCategories.filter(c => c.id !== id);
+        renderSkillCategories();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}

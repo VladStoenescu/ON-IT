@@ -17,6 +17,8 @@ const TRAINING_TEMPLATES_FILE = path.join(__dirname, 'data', 'training-templates
 const TRAINING_ASSIGNMENTS_FILE = path.join(__dirname, 'data', 'training-assignments.json');
 const IT_LANDSCAPE_FILE = path.join(__dirname, 'data', 'it-landscape.json');
 const IT_ASSETS_FILE = path.join(__dirname, 'data', 'it-assets.json');
+const EMPLOYEE_SKILLS_FILE = path.join(__dirname, 'data', 'employee-skills.json');
+const SKILL_CATEGORIES_FILE = path.join(__dirname, 'data', 'skill-categories.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -64,6 +66,24 @@ if (!fsSync.existsSync(IT_LANDSCAPE_FILE)) {
 }
 if (!fsSync.existsSync(IT_ASSETS_FILE)) {
     fsSync.writeFileSync(IT_ASSETS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(EMPLOYEE_SKILLS_FILE)) {
+    fsSync.writeFileSync(EMPLOYEE_SKILLS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
+    const defaultCategories = [
+        { id: 'cat-001', name: 'Project Management', description: 'Planning, scheduling, and delivering projects', isCustom: false },
+        { id: 'cat-002', name: 'Change & Release Management', description: 'Managing system changes, cutover, and release cycles', isCustom: false },
+        { id: 'cat-003', name: 'Regulatory & Compliance', description: 'Regulatory reporting, compliance frameworks, and audit', isCustom: false },
+        { id: 'cat-004', name: 'Integration & Architecture', description: 'System integration, APIs, middleware, and solution architecture', isCustom: false },
+        { id: 'cat-005', name: 'Data & Analytics', description: 'Data modelling, BI, reporting, and analytics', isCustom: false },
+        { id: 'cat-006', name: 'Leadership & Stakeholder Management', description: 'Team leadership, executive communication, and relationship management', isCustom: false },
+        { id: 'cat-007', name: 'Agile & Lean', description: 'Scrum, Kanban, SAFe, and continuous-improvement practices', isCustom: false },
+        { id: 'cat-008', name: 'Cloud & Infrastructure', description: 'Cloud platforms, infrastructure, and DevOps', isCustom: false },
+        { id: 'cat-009', name: 'Business Analysis', description: 'Requirements gathering, process mapping, and gap analysis', isCustom: false },
+        { id: 'cat-010', name: 'Finance & Accounting', description: 'Financial reporting, budgeting, and accounting practices', isCustom: false }
+    ];
+    fsSync.writeFileSync(SKILL_CATEGORIES_FILE, JSON.stringify(defaultCategories, null, 2));
 }
 
 // Helper utilities
@@ -1191,6 +1211,198 @@ app.delete('/api/it-assets/:id', strictLimiter, async (req, res) => {
         res.json({ message: 'IT asset deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting IT asset' });
+    }
+});
+
+// ─── Employee Skills & Talent API ─────────────────────────────────────────────
+
+const COMPETENCE_CENTRES = [
+    'Cutover & Release Management',
+    'Programme & Project Management',
+    'Regulatory Reporting',
+    'Core Integration'
+];
+
+const EMPLOYMENT_TYPES = ['Permanent', 'Contractor', 'Freelancer', 'Part-time', 'Intern', 'Other'];
+const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
+
+app.get('/api/employee-skills', async (req, res) => {
+    try {
+        const profiles = await readJson(EMPLOYEE_SKILLS_FILE);
+        res.json(profiles);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading employee skill profiles' });
+    }
+});
+
+app.post('/api/employee-skills', strictLimiter, async (req, res) => {
+    try {
+        const { employeeId, employeeName, employmentType, competenceCentre, skills, notes } = req.body;
+        if (!employeeName || !employeeName.trim()) {
+            return res.status(400).json({ error: 'Employee name is required' });
+        }
+        if (!employmentType || !EMPLOYMENT_TYPES.includes(employmentType)) {
+            return res.status(400).json({ error: 'Valid employment type is required' });
+        }
+        if (!competenceCentre || !COMPETENCE_CENTRES.includes(competenceCentre)) {
+            return res.status(400).json({ error: 'Valid competence centre is required' });
+        }
+        const profiles = await readJson(EMPLOYEE_SKILLS_FILE);
+        if (employeeId && profiles.some(p => p.employeeId === employeeId)) {
+            return res.status(400).json({ error: 'A skill profile already exists for this employee' });
+        }
+        const sanitisedSkills = Array.isArray(skills)
+            ? skills.filter(s => s && s.name && s.name.trim()).map(s => ({
+                name: s.name.trim(),
+                category: s.category ? s.category.trim() : '',
+                level: SKILL_LEVELS.includes(s.level) ? s.level : 'Intermediate'
+            }))
+            : [];
+        const newProfile = {
+            id: generateId(),
+            employeeId: employeeId || null,
+            employeeName: employeeName.trim(),
+            employmentType,
+            competenceCentre,
+            skills: sanitisedSkills,
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        profiles.push(newProfile);
+        await writeJson(EMPLOYEE_SKILLS_FILE, profiles);
+        res.status(201).json(newProfile);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating employee skill profile' });
+    }
+});
+
+app.put('/api/employee-skills/:id', strictLimiter, async (req, res) => {
+    try {
+        const profiles = await readJson(EMPLOYEE_SKILLS_FILE);
+        const idx = profiles.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Employee skill profile not found' });
+        const { employeeId, employeeName, employmentType, competenceCentre, skills, notes } = req.body;
+        if (employmentType && !EMPLOYMENT_TYPES.includes(employmentType)) {
+            return res.status(400).json({ error: 'Invalid employment type' });
+        }
+        if (competenceCentre && !COMPETENCE_CENTRES.includes(competenceCentre)) {
+            return res.status(400).json({ error: 'Invalid competence centre' });
+        }
+        const sanitisedSkills = Array.isArray(skills)
+            ? skills.filter(s => s && s.name && s.name.trim()).map(s => ({
+                name: s.name.trim(),
+                category: s.category ? s.category.trim() : '',
+                level: SKILL_LEVELS.includes(s.level) ? s.level : 'Intermediate'
+            }))
+            : profiles[idx].skills;
+        profiles[idx] = {
+            ...profiles[idx],
+            employeeId: employeeId !== undefined ? (employeeId || null) : profiles[idx].employeeId,
+            employeeName: employeeName ? employeeName.trim() : profiles[idx].employeeName,
+            employmentType: employmentType || profiles[idx].employmentType,
+            competenceCentre: competenceCentre || profiles[idx].competenceCentre,
+            skills: sanitisedSkills,
+            notes: notes !== undefined ? notes.trim() : profiles[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(EMPLOYEE_SKILLS_FILE, profiles);
+        res.json(profiles[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating employee skill profile' });
+    }
+});
+
+app.delete('/api/employee-skills/:id', strictLimiter, async (req, res) => {
+    try {
+        const profiles = await readJson(EMPLOYEE_SKILLS_FILE);
+        const idx = profiles.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Employee skill profile not found' });
+        profiles.splice(idx, 1);
+        await writeJson(EMPLOYEE_SKILLS_FILE, profiles);
+        res.json({ message: 'Employee skill profile deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting employee skill profile' });
+    }
+});
+
+// ─── Skill Categories API ──────────────────────────────────────────────────────
+
+app.get('/api/skill-categories', async (req, res) => {
+    try {
+        const categories = await readJson(SKILL_CATEGORIES_FILE);
+        res.json(categories);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading skill categories' });
+    }
+});
+
+app.post('/api/skill-categories', strictLimiter, async (req, res) => {
+    try {
+        const { name, description } = req.body;
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'Category name is required' });
+        }
+        const categories = await readJson(SKILL_CATEGORIES_FILE);
+        if (categories.some(c => c.name.toLowerCase() === name.trim().toLowerCase())) {
+            return res.status(400).json({ error: 'A category with this name already exists' });
+        }
+        const newCategory = {
+            id: generateId(),
+            name: name.trim(),
+            description: description ? description.trim() : '',
+            isCustom: true,
+            createdAt: new Date().toISOString()
+        };
+        categories.push(newCategory);
+        await writeJson(SKILL_CATEGORIES_FILE, categories);
+        res.status(201).json(newCategory);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating skill category' });
+    }
+});
+
+app.put('/api/skill-categories/:id', strictLimiter, async (req, res) => {
+    try {
+        const categories = await readJson(SKILL_CATEGORIES_FILE);
+        const idx = categories.findIndex(c => c.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Skill category not found' });
+        if (!categories[idx].isCustom) {
+            return res.status(403).json({ error: 'Built-in categories cannot be edited' });
+        }
+        const { name, description } = req.body;
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'Category name is required' });
+        }
+        if (categories.some((c, i) => i !== idx && c.name.toLowerCase() === name.trim().toLowerCase())) {
+            return res.status(400).json({ error: 'A category with this name already exists' });
+        }
+        categories[idx] = {
+            ...categories[idx],
+            name: name.trim(),
+            description: description !== undefined ? description.trim() : categories[idx].description,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(SKILL_CATEGORIES_FILE, categories);
+        res.json(categories[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating skill category' });
+    }
+});
+
+app.delete('/api/skill-categories/:id', strictLimiter, async (req, res) => {
+    try {
+        const categories = await readJson(SKILL_CATEGORIES_FILE);
+        const idx = categories.findIndex(c => c.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Skill category not found' });
+        if (!categories[idx].isCustom) {
+            return res.status(403).json({ error: 'Built-in categories cannot be deleted' });
+        }
+        categories.splice(idx, 1);
+        await writeJson(SKILL_CATEGORIES_FILE, categories);
+        res.json({ message: 'Skill category deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting skill category' });
     }
 });
 
