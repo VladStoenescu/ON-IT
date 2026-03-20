@@ -57,6 +57,11 @@
                     <span>Onboarding</span>
                 </button>
 
+                <button class="nav-item" data-section="skills" onclick="showTab('skills', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3.5"/><path d="M4 18a6 6 0 0112 0"/><polyline points="8 12 10 14 13 10"/></svg>
+                    <span>Skills &amp; Talent</span>
+                </button>
+
                 <p class="nav-group-label">Learning</p>
 
                 <button class="nav-item" data-section="trainings" onclick="showTab('trainings', event)">
@@ -610,6 +615,79 @@
                     </div>
                 </div>
 
+                <!-- ─── Skills & Talent Tab ───────────────────────────────── -->
+                <div id="skills-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showSkillsSection('skills-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showSkillsSection('skills-directory', this)">Talent Directory</button>
+                        <button class="sub-tab-btn" onclick="showSkillsSection('skills-categories', this)">Skill Categories</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="skills-dashboard" class="ob-section active">
+                        <h2 class="section-title">Skills &amp; Talent Dashboard</h2>
+                        <div id="skills-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>By Competence Centre</h3>
+                                <div id="skills-by-centre"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>By Employment Type</h3>
+                                <div id="skills-by-employment"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Top Skills</h3>
+                                <div id="skills-top-skills"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Talent Directory Section -->
+                    <div id="skills-directory" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Talent Directory</h2>
+                            <button class="btn-primary" onclick="openSkillProfileModal()">+ Add Profile</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="skills-search" placeholder="Search by name or skill…" oninput="renderSkillProfiles()" class="ls-filter-input">
+                            <select id="skills-filter-centre" onchange="renderSkillProfiles()" class="ls-filter-select">
+                                <option value="">All Competence Centres</option>
+                                <option value="Cutover &amp; Release Management">Cutover &amp; Release Management</option>
+                                <option value="Programme &amp; Project Management">Programme &amp; Project Management</option>
+                                <option value="Regulatory Reporting">Regulatory Reporting</option>
+                                <option value="Core Integration">Core Integration</option>
+                            </select>
+                            <select id="skills-filter-employment" onchange="renderSkillProfiles()" class="ls-filter-select">
+                                <option value="">All Employment Types</option>
+                                <option value="Permanent">Permanent</option>
+                                <option value="Contractor">Contractor</option>
+                                <option value="Freelancer">Freelancer</option>
+                                <option value="Part-time">Part-time</option>
+                                <option value="Intern">Intern</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div id="skills-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading talent profiles…</p>
+                        </div>
+                    </div>
+
+                    <!-- Skill Categories Section -->
+                    <div id="skills-categories" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Skill Categories</h2>
+                            <button class="btn-primary" onclick="openSkillCategoryModal()">+ Add Category</button>
+                        </div>
+                        <div id="skill-categories-container">
+                            <p class="loading">Loading categories…</p>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     </div>
@@ -1048,5 +1126,104 @@
     </div>
 
     <script src="script.js"></script>
+
+    <!-- Skill Profile Modal -->
+    <div id="skill-profile-modal" class="modal-overlay hidden" onclick="closeSkillProfileModalOnBg(event)">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3 id="skill-profile-modal-title">Add Talent Profile</h3>
+                <button class="modal-close" onclick="closeSkillProfileModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="skill-profile-form" onsubmit="submitSkillProfile(event)">
+                    <input type="hidden" id="skill-profile-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Employee Name *</label>
+                            <input type="text" id="sp-employee-name" required placeholder="Full name">
+                        </div>
+                        <div class="form-group">
+                            <label>Employment Type *</label>
+                            <select id="sp-employment-type" required>
+                                <option value="">Select type</option>
+                                <option value="Permanent">Permanent</option>
+                                <option value="Contractor">Contractor</option>
+                                <option value="Freelancer">Freelancer</option>
+                                <option value="Part-time">Part-time</option>
+                                <option value="Intern">Intern</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Competence Centre *</label>
+                        <select id="sp-competence-centre" required>
+                            <option value="">Select competence centre</option>
+                            <option value="Cutover &amp; Release Management">Cutover &amp; Release Management</option>
+                            <option value="Programme &amp; Project Management">Programme &amp; Project Management</option>
+                            <option value="Regulatory Reporting">Regulatory Reporting</option>
+                            <option value="Core Integration">Core Integration</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Skills &amp; Talents</label>
+                        <div id="sp-skills-list" class="sp-skills-list"></div>
+                        <div class="sp-add-skill-row">
+                            <input type="text" id="sp-skill-name" placeholder="Skill name" class="ls-filter-input" style="flex:2">
+                            <select id="sp-skill-category" class="ls-filter-select" style="flex:2">
+                                <option value="">Category</option>
+                            </select>
+                            <select id="sp-skill-level" class="ls-filter-select" style="flex:1">
+                                <option value="Beginner">Beginner</option>
+                                <option value="Intermediate" selected>Intermediate</option>
+                                <option value="Advanced">Advanced</option>
+                                <option value="Expert">Expert</option>
+                            </select>
+                            <button type="button" class="btn-secondary" onclick="addSkillToProfile()">Add</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="sp-notes" rows="2" placeholder="Additional notes about this employee's profile"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeSkillProfileModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="sp-submit-btn">Add Profile</button>
+                    </div>
+                    <div id="sp-success" class="message success hidden"></div>
+                    <div id="sp-error" class="message error hidden"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skill Category Modal -->
+    <div id="skill-category-modal" class="modal-overlay hidden" onclick="closeSkillCategoryModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="skill-category-modal-title">Add Skill Category</h3>
+                <button class="modal-close" onclick="closeSkillCategoryModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="skill-category-form" onsubmit="submitSkillCategory(event)">
+                    <input type="hidden" id="sc-id">
+                    <div class="form-group">
+                        <label>Category Name *</label>
+                        <input type="text" id="sc-name" required placeholder="e.g. Cloud Technologies">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="sc-description" rows="2" placeholder="Brief description of this skill category"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeSkillCategoryModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="sc-submit-btn">Add Category</button>
+                    </div>
+                    <div id="sc-success" class="message success hidden"></div>
+                    <div id="sc-error" class="message error hidden"></div>
+                </form>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
