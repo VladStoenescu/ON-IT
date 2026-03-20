@@ -3332,11 +3332,23 @@ function showProcessesSection(sectionId, btn) {
 async function loadProcessOwnership() {
     try {
         const res = await fetch(`${API_URL}/process-ownership`);
-        allProcessOwnership = await res.json();
+        if (!res.ok) {
+            console.error('Error loading processes: HTTP', res.status, res.statusText);
+            allProcessOwnership = [];
+            return;
+        }
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+            console.error('Unexpected process ownership payload shape; expected an array.', data);
+            allProcessOwnership = [];
+            return;
+        }
+        allProcessOwnership = data;
         renderProcessMap();
         renderProcessDashboard();
     } catch (err) {
         console.error('Error loading processes', err);
+        allProcessOwnership = [];
     }
 }
 
@@ -3469,28 +3481,30 @@ function renderProcessMap() {
             <td><span class="po-status-badge ${statusClass}">${statusLabel}</span></td>
             <td>${p.nextReviewDate ? new Date(p.nextReviewDate).toLocaleDateString() : '—'}</td>
             <td class="table-actions">
-                <button class="btn-icon" onclick="openProcessOwnershipModal('${p.id}')" title="Edit">✏️</button>
-                <button class="btn-icon btn-icon-danger" onclick="deleteProcess('${p.id}')" title="Delete">🗑️</button>
+                <button class="btn-icon" onclick="openProcessOwnershipModal('${escapeHtml(p.id)}')" title="Edit">✏️</button>
+                <button class="btn-icon btn-danger" onclick="deleteProcess('${escapeHtml(p.id)}')" title="Delete">🗑️</button>
             </td>
         </tr>`;
     }).join('');
 
     container.innerHTML = `
-        <table class="asset-table">
-            <thead>
-                <tr>
-                    <th>Process</th>
-                    <th>Category</th>
-                    <th>Department</th>
-                    <th>Owner(s)</th>
-                    <th>Criticality</th>
-                    <th>Status</th>
-                    <th>Next Review</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>`;
+        <div class="asset-table-scroll">
+            <table class="asset-table">
+                <thead>
+                    <tr>
+                        <th>Process</th>
+                        <th>Category</th>
+                        <th>Department</th>
+                        <th>Owner(s)</th>
+                        <th>Criticality</th>
+                        <th>Status</th>
+                        <th>Next Review</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
 }
 
 function openProcessOwnershipModal(id) {
