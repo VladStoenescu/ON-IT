@@ -62,6 +62,11 @@
                     <span>Skills &amp; Talent</span>
                 </button>
 
+                <button class="nav-item" data-section="open-positions" onclick="showTab('open-positions', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><line x1="7" y1="7" x2="13" y2="7"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="13" x2="10" y2="13"/><circle cx="15" cy="15" r="3.5"/><line x1="13.5" y1="15" x2="16.5" y2="15"/><line x1="15" y1="13.5" x2="15" y2="16.5"/></svg>
+                    <span>Open Positions</span>
+                </button>
+
                 <p class="nav-group-label">Learning</p>
 
                 <button class="nav-item" data-section="trainings" onclick="showTab('trainings', event)">
@@ -772,6 +777,73 @@
                         </div>
                         <div id="skill-categories-container">
                             <p class="loading">Loading categories…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Open Positions Tab ──────────────────────────────────── -->
+                <div id="open-positions-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showOpenPositionsSection('op-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showOpenPositionsSection('op-list', this)">All Positions</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="op-dashboard" class="ob-section active">
+                        <h2 class="section-title">Open Positions Dashboard</h2>
+                        <div id="op-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>By Status</h3>
+                                <div id="op-by-status"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>By Priority</h3>
+                                <div id="op-by-priority"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>By Employment Type</h3>
+                                <div id="op-by-employment"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Positions Section -->
+                    <div id="op-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Open Positions</h2>
+                            <button class="btn-primary" onclick="openPositionModal()">+ New Position</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="op-search" placeholder="Search by title, department or skill…" oninput="renderOpenPositions()" class="ls-filter-input">
+                            <select id="op-filter-status" onchange="renderOpenPositions()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="Open">Open</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Filled">Filled</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                            <select id="op-filter-priority" onchange="renderOpenPositions()" class="ls-filter-select">
+                                <option value="">All Priorities</option>
+                                <option value="Urgent">Urgent</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                            <select id="op-filter-employment" onchange="renderOpenPositions()" class="ls-filter-select">
+                                <option value="">All Employment Types</option>
+                                <option value="Permanent">Permanent</option>
+                                <option value="Contractor">Contractor</option>
+                                <option value="Freelancer">Freelancer</option>
+                                <option value="Part-time">Part-time</option>
+                                <option value="Intern">Intern</option>
+                            </select>
+                        </div>
+                        <div id="op-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading open positions…</p>
                         </div>
                     </div>
                 </div>
@@ -2391,5 +2463,95 @@
             </div>
         </div>
     </div>
+    <!-- ─── Open Position Modal ──────────────────────────────────────────────── -->
+    <div id="open-position-modal" class="modal-overlay hidden" onclick="closePositionModalOnBg(event)">
+        <div class="modal modal-lg">
+            <h3 id="op-modal-title">New Open Position</h3>
+            <form onsubmit="submitPosition(event)">
+                <input type="hidden" id="op-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Position Title <span class="required">*</span></label>
+                        <input type="text" id="op-title" required placeholder="e.g. SAP Integration Developer">
+                    </div>
+                    <div class="form-group">
+                        <label>Department / Team</label>
+                        <input type="text" id="op-department" placeholder="e.g. Core Integration">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Employment Type</label>
+                        <select id="op-employment-type" class="ls-filter-select" style="width:100%">
+                            <option value="">Select type</option>
+                            <option value="Permanent">Permanent</option>
+                            <option value="Contractor">Contractor</option>
+                            <option value="Freelancer">Freelancer</option>
+                            <option value="Part-time">Part-time</option>
+                            <option value="Intern">Intern</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select id="op-priority" class="ls-filter-select" style="width:100%">
+                            <option value="Low">Low</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="High">High</option>
+                            <option value="Urgent">Urgent</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="op-status" class="ls-filter-select" style="width:100%">
+                            <option value="Open" selected>Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Filled">Filled</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Target Date</label>
+                        <input type="date" id="op-target-date">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Requested By <span class="required">*</span></label>
+                    <input type="text" id="op-requested-by" required placeholder="e.g. Jane Smith">
+                </div>
+                <div class="form-group">
+                    <label>Profile Description</label>
+                    <textarea id="op-description" rows="3" placeholder="Describe the ideal candidate profile, responsibilities, and requirements…"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Required Skills</label>
+                    <div id="op-skills-list" class="sp-skills-list"></div>
+                    <div class="sp-add-skill-row" style="margin-top:8px">
+                        <input type="text" id="op-skill-name" placeholder="Skill name" class="ls-filter-input" style="flex:2">
+                        <select id="op-skill-category" class="ls-filter-select" style="flex:2"></select>
+                        <select id="op-skill-level" class="ls-filter-select" style="flex:1">
+                            <option value="Beginner">Beginner</option>
+                            <option value="Intermediate" selected>Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                            <option value="Expert">Expert</option>
+                        </select>
+                        <button type="button" class="btn-secondary" onclick="addSkillToPosition()" style="white-space:nowrap">+ Add Skill</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="op-notes" rows="2" placeholder="Additional notes or context…"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closePositionModal()">Cancel</button>
+                    <button type="submit" class="btn-primary" id="op-submit-btn">Create Position</button>
+                </div>
+                <div id="op-success" class="message success hidden"></div>
+                <div id="op-error" class="message error hidden"></div>
+            </form>
+        </div>
+    </div>
+
 </body>
 </html>
