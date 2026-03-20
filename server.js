@@ -25,6 +25,7 @@ const PROCESS_OWNERSHIP_FILE = path.join(__dirname, 'data', 'process-ownership.j
 const PARTNERSHIPS_FILE = path.join(__dirname, 'data', 'partnerships.json');
 const MEETINGS_FILE = path.join(__dirname, 'data', 'meetings.json');
 const EVALUATIONS_FILE = path.join(__dirname, 'data', 'evaluations.json');
+const OPEN_POSITIONS_FILE = path.join(__dirname, 'data', 'open-positions.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -93,6 +94,9 @@ if (!fsSync.existsSync(MEETINGS_FILE)) {
 }
 if (!fsSync.existsSync(EVALUATIONS_FILE)) {
     fsSync.writeFileSync(EVALUATIONS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(OPEN_POSITIONS_FILE)) {
+    fsSync.writeFileSync(OPEN_POSITIONS_FILE, JSON.stringify([], null, 2));
 }
 if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     const defaultCategories = [
@@ -2293,6 +2297,111 @@ app.delete('/api/evaluations/:id/goals/:goalId', strictLimiter, async (req, res)
         res.json({ message: 'Goal deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting goal' });
+    }
+});
+
+// ─── Open Positions API ──────────────────────────────────────────────────────
+
+const POSITION_STATUSES = ['Open', 'In Progress', 'Filled', 'Cancelled'];
+const POSITION_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
+const POSITION_EMPLOYMENT_TYPES = ['Permanent', 'Contractor', 'Freelancer', 'Part-time', 'Intern'];
+
+app.get('/api/open-positions', async (req, res) => {
+    try {
+        const positions = await readJson(OPEN_POSITIONS_FILE);
+        res.json(positions);
+    } catch {
+        res.status(500).json({ error: 'Error reading open positions' });
+    }
+});
+
+app.post('/api/open-positions', strictLimiter, async (req, res) => {
+    try {
+        const { title, department, employmentType, priority, status, requestedBy, targetDate, requiredSkills, description, notes } = req.body;
+        if (!title || !title.trim()) return res.status(400).json({ error: 'Position title is required' });
+        if (!requestedBy || !requestedBy.trim()) return res.status(400).json({ error: 'Requested by is required' });
+        if (employmentType && !POSITION_EMPLOYMENT_TYPES.includes(employmentType)) return res.status(400).json({ error: 'Invalid employment type' });
+        if (priority && !POSITION_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority' });
+        const resolvedStatus = status || 'Open';
+        if (!POSITION_STATUSES.includes(resolvedStatus)) return res.status(400).json({ error: 'Invalid status' });
+
+        const skills = Array.isArray(requiredSkills)
+            ? requiredSkills.map(s => ({ name: String(s.name || '').trim(), category: String(s.category || '').trim(), level: String(s.level || '').trim() })).filter(s => s.name)
+            : [];
+
+        const newPosition = {
+            id: generateId(),
+            title: title.trim(),
+            department: department ? department.trim() : '',
+            employmentType: employmentType || '',
+            priority: priority || 'Medium',
+            status: resolvedStatus,
+            requestedBy: requestedBy.trim(),
+            targetDate: targetDate || null,
+            requiredSkills: skills,
+            description: description ? description.trim() : '',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const positions = await readJson(OPEN_POSITIONS_FILE);
+        positions.push(newPosition);
+        await writeJson(OPEN_POSITIONS_FILE, positions);
+        res.status(201).json(newPosition);
+    } catch {
+        res.status(500).json({ error: 'Error creating open position' });
+    }
+});
+
+app.put('/api/open-positions/:id', strictLimiter, async (req, res) => {
+    try {
+        const positions = await readJson(OPEN_POSITIONS_FILE);
+        const idx = positions.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Position not found' });
+        const { title, department, employmentType, priority, status, requestedBy, targetDate, requiredSkills, description, notes } = req.body;
+        if (title !== undefined && !title.trim()) return res.status(400).json({ error: 'Position title cannot be empty' });
+        if (requestedBy !== undefined && !requestedBy.trim()) return res.status(400).json({ error: 'Requested by cannot be empty' });
+        if (employmentType && !POSITION_EMPLOYMENT_TYPES.includes(employmentType)) return res.status(400).json({ error: 'Invalid employment type' });
+        if (priority && !POSITION_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority' });
+        if (status && !POSITION_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+
+        const skills = requiredSkills !== undefined
+            ? (Array.isArray(requiredSkills)
+                ? requiredSkills.map(s => ({ name: String(s.name || '').trim(), category: String(s.category || '').trim(), level: String(s.level || '').trim() })).filter(s => s.name)
+                : positions[idx].requiredSkills)
+            : positions[idx].requiredSkills;
+
+        positions[idx] = {
+            ...positions[idx],
+            title: title !== undefined ? title.trim() : positions[idx].title,
+            department: department !== undefined ? department.trim() : positions[idx].department,
+            employmentType: employmentType !== undefined ? employmentType : positions[idx].employmentType,
+            priority: priority !== undefined ? priority : positions[idx].priority,
+            status: status !== undefined ? status : positions[idx].status,
+            requestedBy: requestedBy !== undefined ? requestedBy.trim() : positions[idx].requestedBy,
+            targetDate: targetDate !== undefined ? (targetDate || null) : positions[idx].targetDate,
+            requiredSkills: skills,
+            description: description !== undefined ? description.trim() : positions[idx].description,
+            notes: notes !== undefined ? notes.trim() : positions[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(OPEN_POSITIONS_FILE, positions);
+        res.json(positions[idx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating open position' });
+    }
+});
+
+app.delete('/api/open-positions/:id', strictLimiter, async (req, res) => {
+    try {
+        const positions = await readJson(OPEN_POSITIONS_FILE);
+        const idx = positions.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Position not found' });
+        positions.splice(idx, 1);
+        await writeJson(OPEN_POSITIONS_FILE, positions);
+        res.status(204).send();
+    } catch {
+        res.status(500).json({ error: 'Error deleting open position' });
     }
 });
 

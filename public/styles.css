@@ -2317,3 +2317,35 @@ body {
     color: #e65100;
     font-weight: 600;
 }
+
+/* ─── Open Positions ─────────────────────────────────────────────────────────── */
+
+.op-status-badge,
+.op-priority-badge,
+.op-emp-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Status colours */
+.op-status-open        { background: #e3f2fd; color: #1565c0; }
+.op-status-in-progress { background: #fff8e1; color: #e65100; }
+.op-status-filled      { background: #e8f5e9; color: #2e7d32; }
+.op-status-cancelled   { background: #f5f5f5; color: #757575; }
+
+/* Priority colours */
+.op-priority-low    { background: #f1f8e9; color: #558b2f; }
+.op-priority-medium { background: #e3f2fd; color: #1565c0; }
+.op-priority-high   { background: #fff3e0; color: #e65100; }
+.op-priority-urgent { background: #fce4ec; color: #c62828; }
+
+/* Employment type badge */
+.op-emp-badge { background: #ede7f6; color: #4527a0; }
+
+/* Skill tag variant */
+.op-skill-tag { background: #e8eaf6; color: #283593; font-size: var(--fs-xs); }
+.op-skill-level { font-style: normal; opacity: 0.75; }

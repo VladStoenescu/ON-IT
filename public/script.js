@@ -18,7 +18,8 @@ const PAGE_TITLES = {
     processes: 'Process Ownership Map',
     partnerships: 'Partnerships',
     meetings: 'Meetings',
-    evaluations: 'Evaluations'
+    evaluations: 'Evaluations',
+    'open-positions': 'Open Positions'
 };
 
 // Store all ideas for filtering
@@ -45,6 +46,9 @@ let allMeetings = [];
 
 // Store all evaluations for filtering
 let allEvaluations = [];
+
+// Store all open positions for filtering
+let allOpenPositions = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -106,6 +110,9 @@ function showTab(tabName) {
     }
     if (tabName === 'evaluations') {
         loadEvaluations();
+    }
+    if (tabName === 'open-positions') {
+        loadOpenPositions();
     }
 
     // Close sidebar on mobile after navigating
@@ -5163,6 +5170,311 @@ async function deleteEvalGoal(evaluationId, goalId) {
         renderAllEvalGoals();
         renderEvaluations();
         renderEvaluationsDashboard();
+    } catch {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Open Positions ──────────────────────────────────────────────────────────
+
+let pendingPositionSkills = [];
+
+function showOpenPositionsSection(sectionId, btn) {
+    document.querySelectorAll('#open-positions-tab .ob-section').forEach(el => el.classList.remove('active'));
+    document.getElementById(sectionId).classList.add('active');
+    document.querySelectorAll('#open-positions-tab .sub-tab-btn').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+async function loadOpenPositions() {
+    try {
+        const res = await fetch(`${API_URL}/open-positions`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        allOpenPositions = await res.json();
+        renderOpenPositions();
+        renderOpenPositionsDashboard();
+    } catch {
+        document.getElementById('op-table-container').innerHTML = '<p class="error-state">Failed to load open positions.</p>';
+    }
+}
+
+function renderOpenPositionsDashboard() {
+    const positions = allOpenPositions;
+    const total = positions.length;
+    const open = positions.filter(p => p.status === 'Open').length;
+    const inProgress = positions.filter(p => p.status === 'In Progress').length;
+    const filled = positions.filter(p => p.status === 'Filled').length;
+    const urgent = positions.filter(p => p.priority === 'Urgent' && p.status !== 'Filled' && p.status !== 'Cancelled').length;
+
+    const kpiEl = document.getElementById('op-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-label">Total Positions</div><div class="kpi-value">${total}</div></div>
+            <div class="kpi-card"><div class="kpi-label">Open</div><div class="kpi-value">${open}</div></div>
+            <div class="kpi-card"><div class="kpi-label">In Progress</div><div class="kpi-value">${inProgress}</div></div>
+            <div class="kpi-card ${urgent > 0 ? 'kpi-card-warn' : ''}"><div class="kpi-label">Urgent</div><div class="kpi-value">${urgent}</div></div>
+        `;
+    }
+
+    const statusCounts = {};
+    positions.forEach(p => { statusCounts[p.status] = (statusCounts[p.status] || 0) + 1; });
+    const statusEl = document.getElementById('op-by-status');
+    if (statusEl) {
+        if (!total) { statusEl.innerHTML = '<p class="text-muted-sm">No data yet.</p>'; }
+        else {
+            statusEl.innerHTML = Object.entries(statusCounts).map(([label, count]) =>
+                `<div class="chart-bar-row"><span class="chart-bar-label">${escapeHtml(label)}</span>
+                 <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round((count/total)*100)}%"></div></div>
+                 <span class="chart-bar-count">${count}</span></div>`
+            ).join('');
+        }
+    }
+
+    const priorityCounts = {};
+    positions.forEach(p => { if (p.status !== 'Filled' && p.status !== 'Cancelled') priorityCounts[p.priority] = (priorityCounts[p.priority] || 0) + 1; });
+    const priorityEl = document.getElementById('op-by-priority');
+    if (priorityEl) {
+        const activeTotal = Object.values(priorityCounts).reduce((a, b) => a + b, 0);
+        if (!activeTotal) { priorityEl.innerHTML = '<p class="text-muted-sm">No active positions.</p>'; }
+        else {
+            priorityEl.innerHTML = Object.entries(priorityCounts).map(([label, count]) =>
+                `<div class="chart-bar-row"><span class="chart-bar-label">${escapeHtml(label)}</span>
+                 <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round((count/activeTotal)*100)}%"></div></div>
+                 <span class="chart-bar-count">${count}</span></div>`
+            ).join('');
+        }
+    }
+
+    const empCounts = {};
+    positions.forEach(p => { if (p.employmentType) empCounts[p.employmentType] = (empCounts[p.employmentType] || 0) + 1; });
+    const empEl = document.getElementById('op-by-employment');
+    if (empEl) {
+        const empTotal = Object.values(empCounts).reduce((a, b) => a + b, 0);
+        if (!empTotal) { empEl.innerHTML = '<p class="text-muted-sm">No data yet.</p>'; }
+        else {
+            empEl.innerHTML = Object.entries(empCounts).map(([label, count]) =>
+                `<div class="chart-bar-row"><span class="chart-bar-label">${escapeHtml(label)}</span>
+                 <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round((count/empTotal)*100)}%"></div></div>
+                 <span class="chart-bar-count">${count}</span></div>`
+            ).join('');
+        }
+    }
+}
+
+function renderOpenPositions() {
+    const search = (document.getElementById('op-search')?.value || '').toLowerCase();
+    const filterStatus = document.getElementById('op-filter-status')?.value || '';
+    const filterPriority = document.getElementById('op-filter-priority')?.value || '';
+    const filterEmployment = document.getElementById('op-filter-employment')?.value || '';
+    const container = document.getElementById('op-table-container');
+    if (!container) return;
+
+    let positions = allOpenPositions.filter(p => {
+        if (filterStatus && p.status !== filterStatus) return false;
+        if (filterPriority && p.priority !== filterPriority) return false;
+        if (filterEmployment && p.employmentType !== filterEmployment) return false;
+        if (search) {
+            const skillNames = (p.requiredSkills || []).map(s => s.name).join(' ').toLowerCase();
+            const haystack = [p.title, p.department, p.requestedBy, skillNames].join(' ').toLowerCase();
+            if (!haystack.includes(search)) return false;
+        }
+        return true;
+    });
+
+    if (!positions.length) {
+        container.innerHTML = '<p class="empty-state">No open positions found.</p>';
+        return;
+    }
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Employment Type</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Requested By</th>
+            <th>Target Date</th>
+            <th>Required Skills</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${positions.map(p => {
+            const skills = (p.requiredSkills || []);
+            const skillsHtml = skills.length
+                ? skills.slice(0, 3).map(s => `<span class="skill-tag op-skill-tag">${escapeHtml(s.name)}${s.level ? ` <em class="op-skill-level">${escapeHtml(s.level)}</em>` : ''}</span>`).join('')
+                  + (skills.length > 3 ? `<span class="skill-tag-more">+${skills.length - 3} more</span>` : '')
+                : '<span class="text-muted-sm">—</span>';
+            const targetDate = p.targetDate ? new Date(p.targetDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+            return `<tr>
+                <td><strong>${escapeHtml(p.title)}</strong>${p.description ? `<div class="text-muted-sm" style="margin-top:2px">${escapeHtml(p.description.substring(0, 60))}${p.description.length > 60 ? '…' : ''}</div>` : ''}</td>
+                <td>${escapeHtml(p.department || '—')}</td>
+                <td>${p.employmentType ? `<span class="op-emp-badge">${escapeHtml(p.employmentType)}</span>` : '—'}</td>
+                <td><span class="op-priority-badge op-priority-${(p.priority || 'medium').toLowerCase()}">${escapeHtml(p.priority || '—')}</span></td>
+                <td><span class="op-status-badge op-status-${(p.status || 'open').toLowerCase().replace(' ', '-')}">${escapeHtml(p.status)}</span></td>
+                <td>${escapeHtml(p.requestedBy || '—')}</td>
+                <td>${targetDate}</td>
+                <td><div class="skill-tags-cell">${skillsHtml}</div></td>
+                <td class="action-btns">
+                    <button class="btn-icon" title="Edit" onclick="openPositionModal('${p.id}')">✏️</button>
+                    <button class="btn-icon btn-icon-danger" title="Delete" onclick="deletePosition('${p.id}')">🗑️</button>
+                </td>
+            </tr>`;
+        }).join('')}</tbody>
+    </table></div>`;
+}
+
+async function openPositionModal(positionId) {
+    if (allSkillCategories.length === 0) {
+        await loadSkillCategoriesForFilter();
+    }
+    pendingPositionSkills = [];
+    const modal = document.getElementById('open-position-modal');
+    const titleEl = document.getElementById('op-modal-title');
+    const submitBtn = document.getElementById('op-submit-btn');
+
+    // Populate skill category dropdown
+    const catSelect = document.getElementById('op-skill-category');
+    catSelect.innerHTML = '<option value="">Category (optional)</option>'
+        + allSkillCategories.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+
+    document.getElementById('op-id').value = '';
+    document.getElementById('op-title').value = '';
+    document.getElementById('op-department').value = '';
+    document.getElementById('op-employment-type').value = '';
+    document.getElementById('op-priority').value = 'Medium';
+    document.getElementById('op-status').value = 'Open';
+    document.getElementById('op-target-date').value = '';
+    document.getElementById('op-requested-by').value = '';
+    document.getElementById('op-description').value = '';
+    document.getElementById('op-notes').value = '';
+    document.getElementById('op-success').classList.add('hidden');
+    document.getElementById('op-error').classList.add('hidden');
+
+    if (positionId) {
+        const pos = allOpenPositions.find(p => p.id === positionId);
+        if (!pos) return;
+        titleEl.textContent = 'Edit Position';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('op-id').value = pos.id;
+        document.getElementById('op-title').value = pos.title;
+        document.getElementById('op-department').value = pos.department || '';
+        document.getElementById('op-employment-type').value = pos.employmentType || '';
+        document.getElementById('op-priority').value = pos.priority || 'Medium';
+        document.getElementById('op-status').value = pos.status || 'Open';
+        document.getElementById('op-target-date').value = pos.targetDate ? pos.targetDate.split('T')[0] : '';
+        document.getElementById('op-requested-by').value = pos.requestedBy || '';
+        document.getElementById('op-description').value = pos.description || '';
+        document.getElementById('op-notes').value = pos.notes || '';
+        pendingPositionSkills = (pos.requiredSkills || []).map(s => ({ ...s }));
+    } else {
+        titleEl.textContent = 'New Open Position';
+        submitBtn.textContent = 'Create Position';
+    }
+
+    renderPositionSkillsList();
+    modal.classList.remove('hidden');
+}
+
+function closePositionModal() {
+    document.getElementById('open-position-modal').classList.add('hidden');
+}
+
+function closePositionModalOnBg(event) {
+    if (event.target === document.getElementById('open-position-modal')) closePositionModal();
+}
+
+function addSkillToPosition() {
+    const name = (document.getElementById('op-skill-name').value || '').trim();
+    if (!name) return;
+    const category = document.getElementById('op-skill-category').value || '';
+    const level = document.getElementById('op-skill-level').value || 'Intermediate';
+    pendingPositionSkills.push({ name, category, level });
+    document.getElementById('op-skill-name').value = '';
+    renderPositionSkillsList();
+}
+
+function removePositionSkill(idx) {
+    pendingPositionSkills.splice(idx, 1);
+    renderPositionSkillsList();
+}
+
+function renderPositionSkillsList() {
+    const container = document.getElementById('op-skills-list');
+    if (!container) return;
+    if (!pendingPositionSkills.length) {
+        container.innerHTML = '<p class="text-muted-sm" style="margin:0">No skills added yet.</p>';
+        return;
+    }
+    container.innerHTML = pendingPositionSkills.map((s, i) =>
+        `<div class="sp-skill-item">
+            <span class="skill-tag">${escapeHtml(s.name)}${s.category ? ` · ${escapeHtml(s.category)}` : ''} · <em>${escapeHtml(s.level)}</em></span>
+            <button type="button" class="btn-icon btn-icon-danger sp-remove-skill" onclick="removePositionSkill(${i})">×</button>
+        </div>`
+    ).join('');
+}
+
+async function submitPosition(event) {
+    event.preventDefault();
+    const successEl = document.getElementById('op-success');
+    const errorEl = document.getElementById('op-error');
+    const submitBtn = document.getElementById('op-submit-btn');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+    submitBtn.disabled = true;
+
+    const id = document.getElementById('op-id').value;
+    const isEdit = !!id;
+    const payload = {
+        title: document.getElementById('op-title').value.trim(),
+        department: document.getElementById('op-department').value.trim(),
+        employmentType: document.getElementById('op-employment-type').value,
+        priority: document.getElementById('op-priority').value,
+        status: document.getElementById('op-status').value,
+        targetDate: document.getElementById('op-target-date').value || null,
+        requestedBy: document.getElementById('op-requested-by').value.trim(),
+        description: document.getElementById('op-description').value.trim(),
+        notes: document.getElementById('op-notes').value.trim(),
+        requiredSkills: pendingPositionSkills
+    };
+
+    try {
+        const url = isEdit ? `${API_URL}/open-positions/${id}` : `${API_URL}/open-positions`;
+        const method = isEdit ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) {
+            const d = await res.json();
+            errorEl.textContent = d.error || 'Error saving position';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        const saved = await res.json();
+        if (isEdit) {
+            const idx = allOpenPositions.findIndex(p => p.id === saved.id);
+            if (idx !== -1) allOpenPositions[idx] = saved;
+        } else {
+            allOpenPositions.push(saved);
+        }
+        successEl.textContent = isEdit ? 'Position updated!' : 'Position created!';
+        successEl.classList.remove('hidden');
+        renderOpenPositions();
+        renderOpenPositionsDashboard();
+        setTimeout(() => closePositionModal(), 900);
+    } catch {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+    }
+}
+
+async function deletePosition(positionId) {
+    if (!confirm('Delete this open position? This cannot be undone.')) return;
+    try {
+        const res = await fetch(`${API_URL}/open-positions/${positionId}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting position'); return; }
+        allOpenPositions = allOpenPositions.filter(p => p.id !== positionId);
+        renderOpenPositions();
+        renderOpenPositionsDashboard();
     } catch {
         alert('Network error. Please try again.');
     }
