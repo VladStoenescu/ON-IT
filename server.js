@@ -24,6 +24,7 @@ const CRM_DEALS_FILE = path.join(__dirname, 'data', 'crm-deals.json');
 const PROCESS_OWNERSHIP_FILE = path.join(__dirname, 'data', 'process-ownership.json');
 const PARTNERSHIPS_FILE = path.join(__dirname, 'data', 'partnerships.json');
 const MEETINGS_FILE = path.join(__dirname, 'data', 'meetings.json');
+const EVALUATIONS_FILE = path.join(__dirname, 'data', 'evaluations.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -89,6 +90,9 @@ if (!fsSync.existsSync(PARTNERSHIPS_FILE)) {
 }
 if (!fsSync.existsSync(MEETINGS_FILE)) {
     fsSync.writeFileSync(MEETINGS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(EVALUATIONS_FILE)) {
+    fsSync.writeFileSync(EVALUATIONS_FILE, JSON.stringify([], null, 2));
 }
 if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     const defaultCategories = [
@@ -2133,6 +2137,162 @@ app.delete('/api/meetings/:id/protocols/:protocolId', strictLimiter, async (req,
         res.json({ message: 'Protocol deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting protocol' });
+    }
+});
+
+// ─── Evaluations API ──────────────────────────────────────────────────────────
+
+app.get('/api/evaluations', async (req, res) => {
+    try {
+        const evaluations = await readJson(EVALUATIONS_FILE);
+        res.json(evaluations);
+    } catch {
+        res.status(500).json({ error: 'Error reading evaluations' });
+    }
+});
+
+app.post('/api/evaluations', strictLimiter, async (req, res) => {
+    try {
+        const { employeeName, evaluatorName, period, type, status, dueDate, overallScore, comments } = req.body;
+        if (!employeeName || !employeeName.trim()) return res.status(400).json({ error: 'Employee name is required' });
+        if (!period || !period.trim()) return res.status(400).json({ error: 'Period is required' });
+        const evaluations = await readJson(EVALUATIONS_FILE);
+        const newEvaluation = {
+            id: generateId(),
+            employeeName: employeeName.trim(),
+            evaluatorName: evaluatorName ? evaluatorName.trim() : '',
+            period: period.trim(),
+            type: type || 'Annual Review',
+            status: status || 'Draft',
+            dueDate: dueDate || '',
+            overallScore: overallScore !== undefined && overallScore !== '' ? Number(overallScore) : null,
+            comments: comments ? comments.trim() : '',
+            goals: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        evaluations.push(newEvaluation);
+        await writeJson(EVALUATIONS_FILE, evaluations);
+        res.status(201).json(newEvaluation);
+    } catch {
+        res.status(500).json({ error: 'Error creating evaluation' });
+    }
+});
+
+app.get('/api/evaluations/:id', async (req, res) => {
+    try {
+        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluation = evaluations.find(e => e.id === req.params.id);
+        if (!evaluation) return res.status(404).json({ error: 'Evaluation not found' });
+        res.json(evaluation);
+    } catch {
+        res.status(500).json({ error: 'Error reading evaluation' });
+    }
+});
+
+app.put('/api/evaluations/:id', strictLimiter, async (req, res) => {
+    try {
+        const { employeeName, evaluatorName, period, type, status, dueDate, overallScore, comments } = req.body;
+        const evaluations = await readJson(EVALUATIONS_FILE);
+        const idx = evaluations.findIndex(e => e.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Evaluation not found' });
+        evaluations[idx] = {
+            ...evaluations[idx],
+            employeeName: employeeName !== undefined ? employeeName.trim() : evaluations[idx].employeeName,
+            evaluatorName: evaluatorName !== undefined ? evaluatorName.trim() : evaluations[idx].evaluatorName,
+            period: period !== undefined ? period.trim() : evaluations[idx].period,
+            type: type || evaluations[idx].type,
+            status: status || evaluations[idx].status,
+            dueDate: dueDate !== undefined ? dueDate : evaluations[idx].dueDate,
+            overallScore: overallScore !== undefined && overallScore !== '' ? Number(overallScore) : overallScore === '' ? null : evaluations[idx].overallScore,
+            comments: comments !== undefined ? comments.trim() : evaluations[idx].comments,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(EVALUATIONS_FILE, evaluations);
+        res.json(evaluations[idx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating evaluation' });
+    }
+});
+
+app.delete('/api/evaluations/:id', strictLimiter, async (req, res) => {
+    try {
+        const evaluations = await readJson(EVALUATIONS_FILE);
+        const idx = evaluations.findIndex(e => e.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Evaluation not found' });
+        evaluations.splice(idx, 1);
+        await writeJson(EVALUATIONS_FILE, evaluations);
+        res.json({ message: 'Evaluation deleted' });
+    } catch {
+        res.status(500).json({ error: 'Error deleting evaluation' });
+    }
+});
+
+// ─── Evaluation Goals API ─────────────────────────────────────────────────────
+
+app.post('/api/evaluations/:id/goals', strictLimiter, async (req, res) => {
+    try {
+        const { title, description, score, status } = req.body;
+        if (!title || !title.trim()) return res.status(400).json({ error: 'Goal title is required' });
+        const evaluations = await readJson(EVALUATIONS_FILE);
+        const idx = evaluations.findIndex(e => e.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Evaluation not found' });
+        const newGoal = {
+            id: generateId(),
+            title: title.trim(),
+            description: description ? description.trim() : '',
+            score: score !== undefined && score !== '' ? Number(score) : null,
+            status: status || 'Not Started',
+            createdAt: new Date().toISOString()
+        };
+        if (!Array.isArray(evaluations[idx].goals)) evaluations[idx].goals = [];
+        evaluations[idx].goals.push(newGoal);
+        evaluations[idx].updatedAt = new Date().toISOString();
+        await writeJson(EVALUATIONS_FILE, evaluations);
+        res.status(201).json(newGoal);
+    } catch {
+        res.status(500).json({ error: 'Error creating goal' });
+    }
+});
+
+app.put('/api/evaluations/:id/goals/:goalId', strictLimiter, async (req, res) => {
+    try {
+        const { title, description, score, status } = req.body;
+        const evaluations = await readJson(EVALUATIONS_FILE);
+        const eIdx = evaluations.findIndex(e => e.id === req.params.id);
+        if (eIdx === -1) return res.status(404).json({ error: 'Evaluation not found' });
+        if (!Array.isArray(evaluations[eIdx].goals)) evaluations[eIdx].goals = [];
+        const gIdx = evaluations[eIdx].goals.findIndex(g => g.id === req.params.goalId);
+        if (gIdx === -1) return res.status(404).json({ error: 'Goal not found' });
+        evaluations[eIdx].goals[gIdx] = {
+            ...evaluations[eIdx].goals[gIdx],
+            title: title !== undefined ? title.trim() : evaluations[eIdx].goals[gIdx].title,
+            description: description !== undefined ? description.trim() : evaluations[eIdx].goals[gIdx].description,
+            score: score !== undefined && score !== '' ? Number(score) : score === '' ? null : evaluations[eIdx].goals[gIdx].score,
+            status: status || evaluations[eIdx].goals[gIdx].status
+        };
+        evaluations[eIdx].updatedAt = new Date().toISOString();
+        await writeJson(EVALUATIONS_FILE, evaluations);
+        res.json(evaluations[eIdx].goals[gIdx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating goal' });
+    }
+});
+
+app.delete('/api/evaluations/:id/goals/:goalId', strictLimiter, async (req, res) => {
+    try {
+        const evaluations = await readJson(EVALUATIONS_FILE);
+        const eIdx = evaluations.findIndex(e => e.id === req.params.id);
+        if (eIdx === -1) return res.status(404).json({ error: 'Evaluation not found' });
+        if (!Array.isArray(evaluations[eIdx].goals)) evaluations[eIdx].goals = [];
+        const gIdx = evaluations[eIdx].goals.findIndex(g => g.id === req.params.goalId);
+        if (gIdx === -1) return res.status(404).json({ error: 'Goal not found' });
+        evaluations[eIdx].goals.splice(gIdx, 1);
+        evaluations[eIdx].updatedAt = new Date().toISOString();
+        await writeJson(EVALUATIONS_FILE, evaluations);
+        res.json({ message: 'Goal deleted' });
+    } catch {
+        res.status(500).json({ error: 'Error deleting goal' });
     }
 });
 

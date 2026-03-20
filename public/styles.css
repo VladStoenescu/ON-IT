@@ -2294,3 +2294,26 @@ body {
     font-family: inherit;
     resize: vertical;
 }
+
+/* ─── Employee Evaluations ──────────────────────────────────────────────────── */
+
+.eval-type-badge,
+.eval-status-badge,
+.eval-goal-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.eval-goal-count {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.eval-goal-open {
+    color: #e65100;
+    font-weight: 600;
+}
