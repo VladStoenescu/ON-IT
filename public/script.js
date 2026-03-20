@@ -3973,6 +3973,7 @@ function showMeetingsSection(sectionId, btn) {
     if (el) el.classList.add('active');
     if (btn) btn.classList.add('active');
     if (sectionId === 'meetings-todos') renderAllTodos();
+    if (sectionId === 'meetings-protocols') renderAllProtocols();
 }
 
 async function loadMeetings() {
@@ -3995,6 +3996,8 @@ function renderMeetingsDashboard() {
     const completed = allMeetings.filter(m => m.status === 'Completed').length;
     const allTodos = allMeetings.flatMap(m => m.todos || []);
     const openTodos = allTodos.filter(t => t.status !== 'Done').length;
+    const allProtocols = allMeetings.flatMap(m => m.protocols || []);
+    const draftProtocols = allProtocols.filter(p => p.status === 'Draft').length;
 
     const kpiEl = document.getElementById('meetings-kpi-cards');
     if (kpiEl) {
@@ -4003,6 +4006,7 @@ function renderMeetingsDashboard() {
             <div class="kpi-card"><div class="kpi-value" style="color:#1565c0">${upcoming}</div><div class="kpi-label">Upcoming</div></div>
             <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${completed}</div><div class="kpi-label">Completed</div></div>
             <div class="kpi-card${openTodos > 0 ? ' kpi-card-warn' : ''}"><div class="kpi-value" style="color:#e65100">${openTodos}</div><div class="kpi-label">Open Action Items</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#6a1b9a">${allProtocols.length}</div><div class="kpi-label">Protocols${draftProtocols > 0 ? ' (' + draftProtocols + ' draft)' : ''}</div></div>
         `;
     }
 
@@ -4102,6 +4106,7 @@ function renderMeetings() {
         const typeColors = MEETING_TYPE_COLORS[m.type] || { bg: '#f5f5f5', color: '#616161' };
         const todos = m.todos || [];
         const openTodos = todos.filter(t => t.status !== 'Done').length;
+        const protocols = m.protocols || [];
         const statusClass = m.status === 'Upcoming' ? 'mtg-status-upcoming' : m.status === 'Completed' ? 'mtg-status-completed' : 'mtg-status-cancelled';
         return `<tr>
             <td><strong>${escapeHtml(m.title)}</strong></td>
@@ -4113,8 +4118,12 @@ function renderMeetings() {
             <td>
                 <span class="mtg-todo-count${openTodos > 0 ? ' mtg-todo-open' : ''}">${todos.length} total / ${openTodos} open</span>
             </td>
+            <td>
+                <span class="mtg-todo-count">${protocols.length} protocol${protocols.length !== 1 ? 's' : ''}</span>
+            </td>
             <td class="action-cell">
                 <button class="btn-icon" title="View Todos" onclick="openMeetingTodos('${escapeHtml(m.id)}')">📋</button>
+                <button class="btn-icon" title="Write Protocol" onclick="openMeetingProtocols('${escapeHtml(m.id)}')">📝</button>
                 <button class="btn-icon" title="Edit" onclick="openMeetingModal('${escapeHtml(m.id)}')">✏️</button>
                 <button class="btn-icon" title="Delete" onclick="deleteMeeting('${escapeHtml(m.id)}')">🗑️</button>
             </td>
@@ -4130,6 +4139,7 @@ function renderMeetings() {
             <th>Attendees</th>
             <th>Status</th>
             <th>Action Items</th>
+            <th>Protocols</th>
             <th>Actions</th>
         </tr></thead>
         <tbody>${rows}</tbody>
@@ -4466,6 +4476,195 @@ async function quickMarkTodoDone(meetingId, todoId) {
         renderMeetingsDashboard();
         renderAllTodos();
     } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Meeting Protocols ────────────────────────────────────────────────────────
+
+const PROTOCOL_STATUS_COLORS = {
+    'Draft': { bg: '#fff8e1', color: '#f57f17' },
+    'Final': { bg: '#e8f5e9', color: '#2e7d32' }
+};
+
+function renderAllProtocols() {
+    const search = (document.getElementById('protocols-search')?.value || '').toLowerCase();
+    const status = document.getElementById('protocols-filter-status')?.value || '';
+
+    const container = document.getElementById('protocols-table-container');
+    if (!container) return;
+
+    let protocols = [];
+    allMeetings.forEach(m => {
+        (m.protocols || []).forEach(p => {
+            protocols.push({ ...p, meetingId: m.id, meetingTitle: m.title, meetingDate: m.date });
+        });
+    });
+
+    protocols = protocols.filter(p => {
+        if (status && p.status !== status) return false;
+        if (search) {
+            const hay = [p.title, p.author, p.content, p.meetingTitle].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    protocols.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    if (protocols.length === 0) {
+        container.innerHTML = '<p class="empty-state">No protocols found. Click 📝 on a meeting to write its first protocol.</p>';
+        return;
+    }
+
+    const rows = protocols.map(p => {
+        const sc = PROTOCOL_STATUS_COLORS[p.status] || { bg: '#f5f5f5', color: '#616161' };
+        const preview = p.content ? (p.content.length > 120 ? escapeHtml(p.content.substring(0, 120)) + '\u2026' : escapeHtml(p.content)) : '\u2014';
+        const updatedAt = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : '\u2014';
+        return `<tr>
+            <td><strong>${escapeHtml(p.title)}</strong></td>
+            <td><span class="mtg-link-text">${escapeHtml(p.meetingTitle)}</span><br><span class="text-muted-sm">${escapeHtml(p.meetingDate)}</span></td>
+            <td>${p.author ? escapeHtml(p.author) : '\u2014'}</td>
+            <td><span class="protocol-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(p.status)}</span></td>
+            <td class="text-muted-sm">${preview}</td>
+            <td class="text-muted-sm">${updatedAt}</td>
+            <td class="action-cell">
+                <button class="btn-icon" title="Edit" onclick="openProtocolModal('${escapeHtml(p.meetingId)}', '${escapeHtml(p.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deleteProtocol('${escapeHtml(p.meetingId)}', '${escapeHtml(p.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Title</th>
+            <th>Meeting</th>
+            <th>Author</th>
+            <th>Status</th>
+            <th>Content Preview</th>
+            <th>Last Updated</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function openMeetingProtocols(meetingId) {
+    const btn = document.getElementById('meetings-protocols-tab-btn');
+    showMeetingsSection('meetings-protocols', btn);
+    openProtocolModal(meetingId, null);
+}
+
+function openProtocolModal(meetingId, protocolId) {
+    const meeting = allMeetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+
+    document.getElementById('protocol-meeting-id').value = meetingId;
+    document.getElementById('protocol-id').value = protocolId || '';
+    document.getElementById('protocol-success').classList.add('hidden');
+    document.getElementById('protocol-error').classList.add('hidden');
+
+    if (protocolId) {
+        const protocol = (meeting.protocols || []).find(p => p.id === protocolId);
+        if (!protocol) return;
+        document.getElementById('protocol-modal-title').textContent = 'Edit Protocol';
+        document.getElementById('protocol-submit-btn').textContent = 'Save Changes';
+        document.getElementById('protocol-title').value = protocol.title || '';
+        document.getElementById('protocol-author').value = protocol.author || '';
+        document.getElementById('protocol-status').value = protocol.status || 'Draft';
+        document.getElementById('protocol-content').value = protocol.content || '';
+    } else {
+        document.getElementById('protocol-modal-title').textContent = 'Add Protocol \u2014 ' + meeting.title;
+        document.getElementById('protocol-submit-btn').textContent = 'Add Protocol';
+        document.getElementById('protocol-title').value = '';
+        document.getElementById('protocol-author').value = '';
+        document.getElementById('protocol-status').value = 'Draft';
+        document.getElementById('protocol-content').value = '';
+    }
+
+    document.getElementById('protocol-modal').classList.remove('hidden');
+}
+
+function closeProtocolModal() {
+    document.getElementById('protocol-modal').classList.add('hidden');
+}
+
+function closeProtocolModalOnBg(event) {
+    if (event.target === document.getElementById('protocol-modal')) closeProtocolModal();
+}
+
+async function submitProtocol(event) {
+    event.preventDefault();
+    const meetingId = document.getElementById('protocol-meeting-id').value;
+    const protocolId = document.getElementById('protocol-id').value;
+    const title = document.getElementById('protocol-title').value.trim();
+    const author = document.getElementById('protocol-author').value.trim();
+    const status = document.getElementById('protocol-status').value;
+    const content = document.getElementById('protocol-content').value.trim();
+
+    const successEl = document.getElementById('protocol-success');
+    const errorEl = document.getElementById('protocol-error');
+    const submitBtn = document.getElementById('protocol-submit-btn');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = { title, author, status, content };
+    const isEdit = !!protocolId;
+    const url = isEdit
+        ? `${API_URL}/meetings/${meetingId}/protocols/${protocolId}`
+        : `${API_URL}/meetings/${meetingId}/protocols`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    submitBtn.disabled = true;
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving protocol';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        const mIdx = allMeetings.findIndex(m => m.id === meetingId);
+        if (mIdx !== -1) {
+            if (!Array.isArray(allMeetings[mIdx].protocols)) allMeetings[mIdx].protocols = [];
+            if (isEdit) {
+                const pIdx = allMeetings[mIdx].protocols.findIndex(p => p.id === protocolId);
+                if (pIdx !== -1) allMeetings[mIdx].protocols[pIdx] = data;
+            } else {
+                allMeetings[mIdx].protocols.push(data);
+            }
+        }
+        successEl.textContent = isEdit ? 'Protocol updated!' : 'Protocol added!';
+        successEl.classList.remove('hidden');
+        renderAllProtocols();
+        renderMeetings();
+        renderMeetingsDashboard();
+        setTimeout(() => closeProtocolModal(), 900);
+    } catch {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+    }
+}
+
+async function deleteProtocol(meetingId, protocolId) {
+    if (!confirm('Delete this protocol? This cannot be undone.')) return;
+    try {
+        const res = await fetch(`${API_URL}/meetings/${meetingId}/protocols/${protocolId}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting protocol'); return; }
+        const mIdx = allMeetings.findIndex(m => m.id === meetingId);
+        if (mIdx !== -1) {
+            allMeetings[mIdx].protocols = (allMeetings[mIdx].protocols || []).filter(p => p.id !== protocolId);
+        }
+        renderAllProtocols();
+        renderMeetings();
+        renderMeetingsDashboard();
+    } catch {
         alert('Network error. Please try again.');
     }
 }

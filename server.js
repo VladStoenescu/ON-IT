@@ -2069,6 +2069,73 @@ app.delete('/api/meetings/:id/todos/:todoId', strictLimiter, async (req, res) =>
     }
 });
 
+// ─── Meeting Protocols API ────────────────────────────────────────────────────
+
+app.post('/api/meetings/:id/protocols', strictLimiter, async (req, res) => {
+    try {
+        const { title, content, author, status } = req.body;
+        if (!title || !title.trim()) return res.status(400).json({ error: 'Protocol title is required' });
+        const meetings = await readJson(MEETINGS_FILE);
+        const idx = meetings.findIndex(m => m.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Meeting not found' });
+        const newProtocol = {
+            id: generateId(),
+            title: title.trim(),
+            content: content ? content.trim() : '',
+            author: author ? author.trim() : '',
+            status: status || 'Draft',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        if (!Array.isArray(meetings[idx].protocols)) meetings[idx].protocols = [];
+        meetings[idx].protocols.push(newProtocol);
+        await writeJson(MEETINGS_FILE, meetings);
+        res.status(201).json(newProtocol);
+    } catch {
+        res.status(500).json({ error: 'Error creating protocol' });
+    }
+});
+
+app.put('/api/meetings/:id/protocols/:protocolId', strictLimiter, async (req, res) => {
+    try {
+        const { title, content, author, status } = req.body;
+        const meetings = await readJson(MEETINGS_FILE);
+        const mIdx = meetings.findIndex(m => m.id === req.params.id);
+        if (mIdx === -1) return res.status(404).json({ error: 'Meeting not found' });
+        if (!Array.isArray(meetings[mIdx].protocols)) meetings[mIdx].protocols = [];
+        const pIdx = meetings[mIdx].protocols.findIndex(p => p.id === req.params.protocolId);
+        if (pIdx === -1) return res.status(404).json({ error: 'Protocol not found' });
+        meetings[mIdx].protocols[pIdx] = {
+            ...meetings[mIdx].protocols[pIdx],
+            title: title !== undefined ? title.trim() : meetings[mIdx].protocols[pIdx].title,
+            content: content !== undefined ? content.trim() : meetings[mIdx].protocols[pIdx].content,
+            author: author !== undefined ? author.trim() : meetings[mIdx].protocols[pIdx].author,
+            status: status || meetings[mIdx].protocols[pIdx].status,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(MEETINGS_FILE, meetings);
+        res.json(meetings[mIdx].protocols[pIdx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating protocol' });
+    }
+});
+
+app.delete('/api/meetings/:id/protocols/:protocolId', strictLimiter, async (req, res) => {
+    try {
+        const meetings = await readJson(MEETINGS_FILE);
+        const mIdx = meetings.findIndex(m => m.id === req.params.id);
+        if (mIdx === -1) return res.status(404).json({ error: 'Meeting not found' });
+        if (!Array.isArray(meetings[mIdx].protocols)) meetings[mIdx].protocols = [];
+        const pIdx = meetings[mIdx].protocols.findIndex(p => p.id === req.params.protocolId);
+        if (pIdx === -1) return res.status(404).json({ error: 'Protocol not found' });
+        meetings[mIdx].protocols.splice(pIdx, 1);
+        await writeJson(MEETINGS_FILE, meetings);
+        res.json({ message: 'Protocol deleted' });
+    } catch {
+        res.status(500).json({ error: 'Error deleting protocol' });
+    }
+});
+
 // Health check endpoint used by the CI/CD pipeline to verify the deployment
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime() });
