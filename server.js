@@ -26,6 +26,7 @@ const PARTNERSHIPS_FILE = path.join(__dirname, 'data', 'partnerships.json');
 const MEETINGS_FILE = path.join(__dirname, 'data', 'meetings.json');
 const EVALUATIONS_FILE = path.join(__dirname, 'data', 'evaluations.json');
 const OPEN_POSITIONS_FILE = path.join(__dirname, 'data', 'open-positions.json');
+const OUTLOOK_FILE = path.join(__dirname, 'data', 'outlook.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -2402,6 +2403,174 @@ app.delete('/api/open-positions/:id', strictLimiter, async (req, res) => {
         res.status(204).send();
     } catch {
         res.status(500).json({ error: 'Error deleting open position' });
+    }
+});
+
+// ─── Outlook (Assessment of Outlook) API ─────────────────────────────────────
+
+const OUTLOOK_RAG_STATUSES = ['Red', 'Amber', 'Green'];
+const OUTLOOK_STATUSES = ['Draft', 'In Progress', 'Completed'];
+const OUTLOOK_TASK_STATUSES = ['To Do', 'In Progress', 'Done'];
+
+app.get('/api/outlook', async (req, res) => {
+    try {
+        const items = await readJson(OUTLOOK_FILE);
+        res.json(items);
+    } catch {
+        res.status(500).json({ error: 'Error reading outlook items' });
+    }
+});
+
+app.post('/api/outlook', strictLimiter, async (req, res) => {
+    try {
+        const { title, owner, ragStatus, status, implementationDate, description } = req.body;
+        if (!title || !title.trim()) return res.status(400).json({ error: 'Title is required' });
+        if (!owner || !owner.trim()) return res.status(400).json({ error: 'Owner is required' });
+        const resolvedRag = ragStatus || 'Amber';
+        if (!OUTLOOK_RAG_STATUSES.includes(resolvedRag)) return res.status(400).json({ error: 'Invalid RAG status' });
+        const resolvedStatus = status || 'Draft';
+        if (!OUTLOOK_STATUSES.includes(resolvedStatus)) return res.status(400).json({ error: 'Invalid status' });
+        const newItem = {
+            id: generateId(),
+            title: title.trim(),
+            owner: owner.trim(),
+            ragStatus: resolvedRag,
+            status: resolvedStatus,
+            implementationDate: implementationDate || null,
+            description: description ? description.trim() : '',
+            tasks: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const items = await readJson(OUTLOOK_FILE);
+        items.push(newItem);
+        await writeJson(OUTLOOK_FILE, items);
+        res.status(201).json(newItem);
+    } catch {
+        res.status(500).json({ error: 'Error creating outlook item' });
+    }
+});
+
+app.get('/api/outlook/:id', async (req, res) => {
+    try {
+        const items = await readJson(OUTLOOK_FILE);
+        const item = items.find(i => i.id === req.params.id);
+        if (!item) return res.status(404).json({ error: 'Outlook item not found' });
+        res.json(item);
+    } catch {
+        res.status(500).json({ error: 'Error reading outlook item' });
+    }
+});
+
+app.put('/api/outlook/:id', strictLimiter, async (req, res) => {
+    try {
+        const { title, owner, ragStatus, status, implementationDate, description } = req.body;
+        const items = await readJson(OUTLOOK_FILE);
+        const idx = items.findIndex(i => i.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Outlook item not found' });
+        if (title !== undefined && !title.trim()) return res.status(400).json({ error: 'Title cannot be empty' });
+        if (owner !== undefined && !owner.trim()) return res.status(400).json({ error: 'Owner cannot be empty' });
+        if (ragStatus && !OUTLOOK_RAG_STATUSES.includes(ragStatus)) return res.status(400).json({ error: 'Invalid RAG status' });
+        if (status && !OUTLOOK_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+        items[idx] = {
+            ...items[idx],
+            title: title !== undefined ? title.trim() : items[idx].title,
+            owner: owner !== undefined ? owner.trim() : items[idx].owner,
+            ragStatus: ragStatus || items[idx].ragStatus,
+            status: status || items[idx].status,
+            implementationDate: implementationDate !== undefined ? (implementationDate || null) : items[idx].implementationDate,
+            description: description !== undefined ? description.trim() : items[idx].description,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(OUTLOOK_FILE, items);
+        res.json(items[idx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating outlook item' });
+    }
+});
+
+app.delete('/api/outlook/:id', strictLimiter, async (req, res) => {
+    try {
+        const items = await readJson(OUTLOOK_FILE);
+        const idx = items.findIndex(i => i.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Outlook item not found' });
+        items.splice(idx, 1);
+        await writeJson(OUTLOOK_FILE, items);
+        res.json({ message: 'Outlook item deleted' });
+    } catch {
+        res.status(500).json({ error: 'Error deleting outlook item' });
+    }
+});
+
+// ─── Outlook Tasks API ────────────────────────────────────────────────────────
+
+app.post('/api/outlook/:id/tasks', strictLimiter, async (req, res) => {
+    try {
+        const { title, description, assignee, dueDate, status } = req.body;
+        if (!title || !title.trim()) return res.status(400).json({ error: 'Task title is required' });
+        const items = await readJson(OUTLOOK_FILE);
+        const idx = items.findIndex(i => i.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Outlook item not found' });
+        const newTask = {
+            id: generateId(),
+            title: title.trim(),
+            description: description ? description.trim() : '',
+            assignee: assignee ? assignee.trim() : '',
+            dueDate: dueDate || null,
+            status: status || 'To Do',
+            createdAt: new Date().toISOString()
+        };
+        if (!Array.isArray(items[idx].tasks)) items[idx].tasks = [];
+        items[idx].tasks.push(newTask);
+        items[idx].updatedAt = new Date().toISOString();
+        await writeJson(OUTLOOK_FILE, items);
+        res.status(201).json(newTask);
+    } catch {
+        res.status(500).json({ error: 'Error creating task' });
+    }
+});
+
+app.put('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => {
+    try {
+        const { title, description, assignee, dueDate, status } = req.body;
+        const items = await readJson(OUTLOOK_FILE);
+        const iIdx = items.findIndex(i => i.id === req.params.id);
+        if (iIdx === -1) return res.status(404).json({ error: 'Outlook item not found' });
+        if (!Array.isArray(items[iIdx].tasks)) items[iIdx].tasks = [];
+        const tIdx = items[iIdx].tasks.findIndex(t => t.id === req.params.taskId);
+        if (tIdx === -1) return res.status(404).json({ error: 'Task not found' });
+        if (title !== undefined && !title.trim()) return res.status(400).json({ error: 'Task title cannot be empty' });
+        if (status && !OUTLOOK_TASK_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid task status' });
+        items[iIdx].tasks[tIdx] = {
+            ...items[iIdx].tasks[tIdx],
+            title: title !== undefined ? title.trim() : items[iIdx].tasks[tIdx].title,
+            description: description !== undefined ? description.trim() : items[iIdx].tasks[tIdx].description,
+            assignee: assignee !== undefined ? assignee.trim() : items[iIdx].tasks[tIdx].assignee,
+            dueDate: dueDate !== undefined ? (dueDate || null) : items[iIdx].tasks[tIdx].dueDate,
+            status: status || items[iIdx].tasks[tIdx].status
+        };
+        items[iIdx].updatedAt = new Date().toISOString();
+        await writeJson(OUTLOOK_FILE, items);
+        res.json(items[iIdx].tasks[tIdx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating task' });
+    }
+});
+
+app.delete('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => {
+    try {
+        const items = await readJson(OUTLOOK_FILE);
+        const iIdx = items.findIndex(i => i.id === req.params.id);
+        if (iIdx === -1) return res.status(404).json({ error: 'Outlook item not found' });
+        if (!Array.isArray(items[iIdx].tasks)) items[iIdx].tasks = [];
+        const tIdx = items[iIdx].tasks.findIndex(t => t.id === req.params.taskId);
+        if (tIdx === -1) return res.status(404).json({ error: 'Task not found' });
+        items[iIdx].tasks.splice(tIdx, 1);
+        items[iIdx].updatedAt = new Date().toISOString();
+        await writeJson(OUTLOOK_FILE, items);
+        res.json({ message: 'Task deleted' });
+    } catch {
+        res.status(500).json({ error: 'Error deleting task' });
     }
 });
 

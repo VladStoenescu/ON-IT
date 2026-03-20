@@ -19,7 +19,8 @@ const PAGE_TITLES = {
     partnerships: 'Partnerships',
     meetings: 'Meetings',
     evaluations: 'Evaluations',
-    'open-positions': 'Open Positions'
+    'open-positions': 'Open Positions',
+    outlook: 'Outlook'
 };
 
 // Store all ideas for filtering
@@ -49,6 +50,9 @@ let allEvaluations = [];
 
 // Store all open positions for filtering
 let allOpenPositions = [];
+
+// Store all outlook items for filtering
+let allOutlook = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -113,6 +117,9 @@ function showTab(tabName) {
     }
     if (tabName === 'open-positions') {
         loadOpenPositions();
+    }
+    if (tabName === 'outlook') {
+        loadOutlook();
     }
 
     // Close sidebar on mobile after navigating
@@ -5475,6 +5482,486 @@ async function deletePosition(positionId) {
         allOpenPositions = allOpenPositions.filter(p => p.id !== positionId);
         renderOpenPositions();
         renderOpenPositionsDashboard();
+    } catch {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Outlook (Assessment of Outlook) ─────────────────────────────────────────
+
+const OUTLOOK_RAG_COLORS = {
+    'Red':   { bg: '#fdecea', color: '#c62828' },
+    'Amber': { bg: '#fff8e1', color: '#f57f17' },
+    'Green': { bg: '#e8f5e9', color: '#2e7d32' }
+};
+
+const OUTLOOK_STATUS_COLORS = {
+    'Draft':       { bg: '#fff8e1', color: '#f57f17' },
+    'In Progress': { bg: '#e3f2fd', color: '#1565c0' },
+    'Completed':   { bg: '#e8f5e9', color: '#2e7d32' }
+};
+
+const OUTLOOK_TASK_STATUS_COLORS = {
+    'To Do':       { bg: '#f5f5f5', color: '#616161' },
+    'In Progress': { bg: '#e3f2fd', color: '#1565c0' },
+    'Done':        { bg: '#e8f5e9', color: '#2e7d32' }
+};
+
+function showOutlookSection(sectionId, btn) {
+    document.querySelectorAll('#outlook-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#outlook-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (sectionId === 'outlook-tasks') renderAllOutlookTasks();
+}
+
+async function loadOutlook() {
+    try {
+        const res = await fetch(`${API_URL}/outlook`);
+        if (!res.ok) throw new Error('Failed to load outlook items');
+        allOutlook = await res.json();
+        renderOutlook();
+        renderOutlookDashboard();
+        renderAllOutlookTasks();
+    } catch {
+        const c = document.getElementById('outlook-table-container');
+        if (c) c.innerHTML = '<p class="error-state">Failed to load outlook items.</p>';
+    }
+}
+
+function renderOutlookDashboard() {
+    const total = allOutlook.length;
+    const red = allOutlook.filter(i => i.ragStatus === 'Red').length;
+    const amber = allOutlook.filter(i => i.ragStatus === 'Amber').length;
+    const green = allOutlook.filter(i => i.ragStatus === 'Green').length;
+    const allTasks = allOutlook.flatMap(i => i.tasks || []);
+    const openTasks = allTasks.filter(t => t.status !== 'Done').length;
+
+    const kpiEl = document.getElementById('outlook-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total Points</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#c62828">${red}</div><div class="kpi-label">Red</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#f57f17">${amber}</div><div class="kpi-label">Amber</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${green}</div><div class="kpi-label">Green</div></div>
+            <div class="kpi-card${openTasks > 0 ? ' kpi-card-warn' : ''}"><div class="kpi-value" style="color:#e65100">${openTasks}</div><div class="kpi-label">Open Tasks</div></div>
+        `;
+    }
+
+    // By RAG chart
+    const byRag = {};
+    allOutlook.forEach(i => { byRag[i.ragStatus] = (byRag[i.ragStatus] || 0) + 1; });
+    const byRagEl = document.getElementById('outlook-by-rag');
+    if (byRagEl) {
+        if (Object.keys(byRag).length === 0) {
+            byRagEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No points yet.</p>';
+        } else {
+            byRagEl.innerHTML = Object.entries(byRag).sort((a, b) => b[1] - a[1]).map(([rag, count]) => {
+                const pct = Math.round((count / Math.max(1, total)) * 100);
+                const col = (OUTLOOK_RAG_COLORS[rag] || { color: '#9e9e9e' }).color;
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(rag)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // By status chart
+    const byStatus = {};
+    allOutlook.forEach(i => { byStatus[i.status] = (byStatus[i.status] || 0) + 1; });
+    const byStatusEl = document.getElementById('outlook-by-status');
+    if (byStatusEl) {
+        if (Object.keys(byStatus).length === 0) {
+            byStatusEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No data yet.</p>';
+        } else {
+            const maxCount = Math.max(...Object.values(byStatus));
+            byStatusEl.innerHTML = Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([st, count]) => {
+                const pct = Math.round((count / maxCount) * 100);
+                const col = (OUTLOOK_STATUS_COLORS[st] || { color: '#9e9e9e' }).color;
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(st)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Recent points list
+    const recentEl = document.getElementById('outlook-recent');
+    if (recentEl) {
+        const recentList = [...allOutlook]
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+            .slice(0, 5);
+        if (recentList.length === 0) {
+            recentEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No points yet.</p>';
+        } else {
+            recentEl.innerHTML = recentList.map(i => {
+                const rc = OUTLOOK_RAG_COLORS[i.ragStatus] || { bg: '#f5f5f5', color: '#616161' };
+                const sc = OUTLOOK_STATUS_COLORS[i.status] || { bg: '#f5f5f5', color: '#616161' };
+                return `<div class="recent-item">
+                    <div class="recent-item-main">
+                        <span class="recent-item-name">${escapeHtml(i.title)}</span>
+                        <span class="outlook-rag-badge" style="background:${rc.bg};color:${rc.color}">${escapeHtml(i.ragStatus)}</span>
+                    </div>
+                    <div class="recent-item-sub">${escapeHtml(i.owner)} · <span class="outlook-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(i.status)}</span></div>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function renderOutlook() {
+    const search = (document.getElementById('outlook-search')?.value || '').toLowerCase();
+    const rag = document.getElementById('outlook-filter-rag')?.value || '';
+    const status = document.getElementById('outlook-filter-status')?.value || '';
+
+    let items = allOutlook.filter(i => {
+        if (rag && i.ragStatus !== rag) return false;
+        if (status && i.status !== status) return false;
+        if (search) {
+            const hay = [i.title, i.owner, i.description].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    items = [...items].sort((a, b) => {
+        const ragOrder = { Red: 0, Amber: 1, Green: 2 };
+        const rd = (ragOrder[a.ragStatus] ?? 99) - (ragOrder[b.ragStatus] ?? 99);
+        if (rd !== 0) return rd;
+        return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+    });
+
+    const container = document.getElementById('outlook-table-container');
+    if (!container) return;
+
+    if (items.length === 0) {
+        container.innerHTML = '<p class="empty-state">No improvement points found. Click "+ Add Point" to get started.</p>';
+        return;
+    }
+
+    const rows = items.map(i => {
+        const rc = OUTLOOK_RAG_COLORS[i.ragStatus] || { bg: '#f5f5f5', color: '#616161' };
+        const sc = OUTLOOK_STATUS_COLORS[i.status] || { bg: '#f5f5f5', color: '#616161' };
+        const tasks = i.tasks || [];
+        const openTasks = tasks.filter(t => t.status !== 'Done').length;
+        return `<tr>
+            <td><strong>${escapeHtml(i.title)}</strong>${i.description ? `<br><span class="text-muted-sm">${escapeHtml(i.description.length > 80 ? i.description.substring(0, 80) + '\u2026' : i.description)}</span>` : ''}</td>
+            <td>${escapeHtml(i.owner)}</td>
+            <td><span class="outlook-rag-badge" style="background:${rc.bg};color:${rc.color}">${escapeHtml(i.ragStatus)}</span></td>
+            <td><span class="outlook-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(i.status)}</span></td>
+            <td>${i.implementationDate ? escapeHtml(i.implementationDate) : '—'}</td>
+            <td><span class="outlook-task-count${openTasks > 0 ? ' outlook-task-open' : ''}">${tasks.length} total / ${openTasks} open</span></td>
+            <td class="action-cell">
+                <button class="btn-icon" title="Manage Tasks" onclick="openOutlookTasks('${escapeHtml(i.id)}')">📋</button>
+                <button class="btn-icon" title="Edit" onclick="openOutlookModal('${escapeHtml(i.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deleteOutlook('${escapeHtml(i.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Improvement Point</th>
+            <th>Owner</th>
+            <th>RAG</th>
+            <th>Status</th>
+            <th>Implementation Date</th>
+            <th>Tasks</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function renderAllOutlookTasks() {
+    const search = (document.getElementById('outlook-tasks-search')?.value || '').toLowerCase();
+    const status = document.getElementById('outlook-tasks-filter-status')?.value || '';
+
+    const container = document.getElementById('outlook-tasks-table-container');
+    if (!container) return;
+
+    let tasks = [];
+    allOutlook.forEach(i => {
+        (i.tasks || []).forEach(t => {
+            tasks.push({ ...t, outlookId: i.id, pointTitle: i.title, owner: i.owner });
+        });
+    });
+
+    tasks = tasks.filter(t => {
+        if (status && t.status !== status) return false;
+        if (search) {
+            const hay = [t.title, t.description, t.assignee, t.pointTitle].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    tasks.sort((a, b) => {
+        const order = { 'To Do': 0, 'In Progress': 1, 'Done': 2 };
+        return (order[a.status] ?? 99) - (order[b.status] ?? 99);
+    });
+
+    if (tasks.length === 0) {
+        container.innerHTML = '<p class="empty-state">No tasks found. Click 📋 on a point to add tasks.</p>';
+        return;
+    }
+
+    const rows = tasks.map(t => {
+        const sc = OUTLOOK_TASK_STATUS_COLORS[t.status] || { bg: '#f5f5f5', color: '#616161' };
+        const preview = t.description ? (t.description.length > 80 ? escapeHtml(t.description.substring(0, 80)) + '\u2026' : escapeHtml(t.description)) : '—';
+        return `<tr>
+            <td><strong>${escapeHtml(t.title)}</strong></td>
+            <td>${escapeHtml(t.pointTitle)}<br><span class="text-muted-sm">${escapeHtml(t.owner)}</span></td>
+            <td>${preview}</td>
+            <td>${t.assignee ? escapeHtml(t.assignee) : '—'}</td>
+            <td>${t.dueDate ? escapeHtml(t.dueDate) : '—'}</td>
+            <td><span class="outlook-task-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(t.status)}</span></td>
+            <td class="action-cell">
+                <button class="btn-icon" title="Edit" onclick="openOutlookTaskModal('${escapeHtml(t.outlookId)}','${escapeHtml(t.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deleteOutlookTask('${escapeHtml(t.outlookId)}','${escapeHtml(t.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Task</th>
+            <th>Point / Owner</th>
+            <th>Description</th>
+            <th>Assignee</th>
+            <th>Due Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function openOutlookModal(id) {
+    const modal = document.getElementById('outlook-modal');
+    const titleEl = document.getElementById('outlook-modal-title');
+    const submitBtn = document.getElementById('outlook-submit-btn');
+    if (!modal) return;
+
+    document.getElementById('outlook-form').reset();
+    document.getElementById('outlook-id').value = '';
+    document.getElementById('outlook-success').classList.add('hidden');
+    document.getElementById('outlook-error').classList.add('hidden');
+
+    if (id) {
+        const i = allOutlook.find(x => x.id === id);
+        if (!i) return;
+        titleEl.textContent = 'Edit Improvement Point';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('outlook-id').value = i.id;
+        document.getElementById('outlook-title').value = i.title || '';
+        document.getElementById('outlook-owner').value = i.owner || '';
+        document.getElementById('outlook-rag-status').value = i.ragStatus || 'Amber';
+        document.getElementById('outlook-status').value = i.status || 'Draft';
+        document.getElementById('outlook-implementation-date').value = i.implementationDate || '';
+        document.getElementById('outlook-description').value = i.description || '';
+    } else {
+        titleEl.textContent = 'Add Improvement Point';
+        submitBtn.textContent = 'Add Point';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeOutlookModal() {
+    const modal = document.getElementById('outlook-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function closeOutlookModalOnBg(event) {
+    if (event.target === document.getElementById('outlook-modal')) closeOutlookModal();
+}
+
+async function submitOutlook(event) {
+    event.preventDefault();
+    const id = document.getElementById('outlook-id').value;
+    const successEl = document.getElementById('outlook-success');
+    const errorEl = document.getElementById('outlook-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        title: document.getElementById('outlook-title').value.trim(),
+        owner: document.getElementById('outlook-owner').value.trim(),
+        ragStatus: document.getElementById('outlook-rag-status').value,
+        status: document.getElementById('outlook-status').value,
+        implementationDate: document.getElementById('outlook-implementation-date').value || null,
+        description: document.getElementById('outlook-description').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/outlook/${id}` : `${API_URL}/outlook`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving improvement point';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Point updated!' : 'Point added!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allOutlook.findIndex(i => i.id === id);
+            if (idx !== -1) allOutlook[idx] = { ...allOutlook[idx], ...data };
+        } else {
+            allOutlook.push(data);
+        }
+        renderOutlook();
+        renderOutlookDashboard();
+        renderAllOutlookTasks();
+        setTimeout(() => closeOutlookModal(), 1200);
+    } catch {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteOutlook(id) {
+    if (!confirm('Are you sure you want to delete this improvement point and all its tasks?')) return;
+    try {
+        const res = await fetch(`${API_URL}/outlook/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting point'); return; }
+        allOutlook = allOutlook.filter(i => i.id !== id);
+        renderOutlook();
+        renderOutlookDashboard();
+        renderAllOutlookTasks();
+    } catch {
+        alert('Network error. Please try again.');
+    }
+}
+
+function openOutlookTasks(outlookId) {
+    const btn = document.querySelector('#outlook-tab .sub-tab-btn:nth-child(3)');
+    showOutlookSection('outlook-tasks', btn);
+    openOutlookTaskModal(outlookId, null);
+}
+
+// ─── Outlook Task CRUD ────────────────────────────────────────────────────────
+
+function openOutlookTaskModal(outlookId, taskId) {
+    const modal = document.getElementById('outlook-task-modal');
+    const titleEl = document.getElementById('outlook-task-modal-title');
+    const submitBtn = document.getElementById('outlook-task-submit-btn');
+    if (!modal) return;
+
+    document.getElementById('outlook-task-form').reset();
+    document.getElementById('outlook-task-outlook-id').value = outlookId;
+    document.getElementById('outlook-task-id').value = '';
+    document.getElementById('outlook-task-success').classList.add('hidden');
+    document.getElementById('outlook-task-error').classList.add('hidden');
+
+    if (taskId) {
+        const item = allOutlook.find(i => i.id === outlookId);
+        const task = item && (item.tasks || []).find(t => t.id === taskId);
+        if (!task) return;
+        titleEl.textContent = 'Edit Task';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('outlook-task-id').value = task.id;
+        document.getElementById('outlook-task-title').value = task.title || '';
+        document.getElementById('outlook-task-description').value = task.description || '';
+        document.getElementById('outlook-task-assignee').value = task.assignee || '';
+        document.getElementById('outlook-task-due-date').value = task.dueDate || '';
+        document.getElementById('outlook-task-status').value = task.status || 'To Do';
+    } else {
+        titleEl.textContent = 'Add Task';
+        submitBtn.textContent = 'Add Task';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeOutlookTaskModal() {
+    const modal = document.getElementById('outlook-task-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function closeOutlookTaskModalOnBg(event) {
+    if (event.target === document.getElementById('outlook-task-modal')) closeOutlookTaskModal();
+}
+
+async function submitOutlookTask(event) {
+    event.preventDefault();
+    const outlookId = document.getElementById('outlook-task-outlook-id').value;
+    const taskId = document.getElementById('outlook-task-id').value;
+    const successEl = document.getElementById('outlook-task-success');
+    const errorEl = document.getElementById('outlook-task-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        title: document.getElementById('outlook-task-title').value.trim(),
+        description: document.getElementById('outlook-task-description').value.trim(),
+        assignee: document.getElementById('outlook-task-assignee').value.trim(),
+        dueDate: document.getElementById('outlook-task-due-date').value || null,
+        status: document.getElementById('outlook-task-status').value
+    };
+
+    try {
+        const url = taskId
+            ? `${API_URL}/outlook/${outlookId}/tasks/${taskId}`
+            : `${API_URL}/outlook/${outlookId}/tasks`;
+        const method = taskId ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving task';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = taskId ? 'Task updated!' : 'Task added!';
+        successEl.classList.remove('hidden');
+
+        const iIdx = allOutlook.findIndex(i => i.id === outlookId);
+        if (iIdx !== -1) {
+            if (!Array.isArray(allOutlook[iIdx].tasks)) allOutlook[iIdx].tasks = [];
+            if (taskId) {
+                const tIdx = allOutlook[iIdx].tasks.findIndex(t => t.id === taskId);
+                if (tIdx !== -1) allOutlook[iIdx].tasks[tIdx] = { ...allOutlook[iIdx].tasks[tIdx], ...data };
+            } else {
+                allOutlook[iIdx].tasks.push(data);
+            }
+        }
+        renderOutlook();
+        renderOutlookDashboard();
+        renderAllOutlookTasks();
+        setTimeout(() => closeOutlookTaskModal(), 1200);
+    } catch {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteOutlookTask(outlookId, taskId) {
+    if (!confirm('Delete this task?')) return;
+    try {
+        const res = await fetch(`${API_URL}/outlook/${outlookId}/tasks/${taskId}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting task'); return; }
+        const iIdx = allOutlook.findIndex(i => i.id === outlookId);
+        if (iIdx !== -1 && Array.isArray(allOutlook[iIdx].tasks)) {
+            allOutlook[iIdx].tasks = allOutlook[iIdx].tasks.filter(t => t.id !== taskId);
+        }
+        renderOutlook();
+        renderOutlookDashboard();
+        renderAllOutlookTasks();
     } catch {
         alert('Network error. Please try again.');
     }
