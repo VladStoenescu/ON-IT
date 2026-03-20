@@ -15,7 +15,8 @@ const PAGE_TITLES = {
     skills: 'Skills & Talent',
     crm: 'CRM Contacts',
     pipeline: 'Sales Pipeline',
-    processes: 'Process Ownership Map'
+    processes: 'Process Ownership Map',
+    partnerships: 'Partnerships'
 };
 
 // Store all ideas for filtering
@@ -33,6 +34,9 @@ let allCRMDeals = [];
 
 // Store all process ownership entries for filtering
 let allProcessOwnership = [];
+
+// Store all partnerships for filtering
+let allPartnerships = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -85,6 +89,9 @@ function showTab(tabName) {
     }
     if (tabName === 'processes') {
         loadProcessOwnership();
+    }
+    if (tabName === 'partnerships') {
+        loadPartnerships();
     }
 
     // Close sidebar on mobile after navigating
@@ -3617,6 +3624,320 @@ async function deleteProcess(id) {
         allProcessOwnership = allProcessOwnership.filter(p => p.id !== id);
         renderProcessMap();
         renderProcessDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Partnerships ─────────────────────────────────────────────────────────────
+
+const PARTNERSHIP_TYPE_COLORS = {
+    'Innovation': { bg: '#e3f2fd', color: '#1565c0' },
+    'Consulting':  { bg: '#fce4ec', color: '#c62828' },
+    'Expert':      { bg: '#f3e5f5', color: '#6a1b9a' },
+    'Software':    { bg: '#e8f5e9', color: '#2e7d32' }
+};
+
+function showPartnershipsSection(sectionId, btn) {
+    document.querySelectorAll('#partnerships-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#partnerships-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+async function loadPartnerships() {
+    try {
+        const res = await fetch(`${API_URL}/partnerships`);
+        if (!res.ok) throw new Error('Failed to load partnerships');
+        allPartnerships = await res.json();
+        renderPartnerships();
+        renderPartnershipsDashboard();
+    } catch (err) {
+        const c = document.getElementById('partnerships-table-container');
+        if (c) c.innerHTML = '<p class="error-state">Failed to load partnerships.</p>';
+    }
+}
+
+function renderPartnershipsDashboard() {
+    const total = allPartnerships.length;
+    const active = allPartnerships.filter(p => p.status === 'Active').length;
+    const pending = allPartnerships.filter(p => p.status === 'Pending').length;
+    const companies = allPartnerships.filter(p => p.partnerType === 'Company').length;
+
+    const kpiEl = document.getElementById('partnerships-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total Partnerships</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${active}</div><div class="kpi-label">Active</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#f57f17">${pending}</div><div class="kpi-label">Pending</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#1565c0">${companies}</div><div class="kpi-label">Company Partners</div></div>
+        `;
+    }
+
+    // By type chart
+    const byType = {};
+    allPartnerships.forEach(p => { byType[p.type] = (byType[p.type] || 0) + 1; });
+    const byTypeEl = document.getElementById('partnerships-by-type');
+    if (byTypeEl) {
+        if (Object.keys(byType).length === 0) {
+            byTypeEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No partnerships yet.</p>';
+        } else {
+            byTypeEl.innerHTML = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+                const pct = Math.round((count / total) * 100);
+                const col = (PARTNERSHIP_TYPE_COLORS[type] || { bg: '#f5f5f5', color: '#616161' }).color;
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(type)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // By partner type
+    const byPartnerType = {};
+    allPartnerships.forEach(p => { byPartnerType[p.partnerType] = (byPartnerType[p.partnerType] || 0) + 1; });
+    const byPTEl = document.getElementById('partnerships-by-partnertype');
+    if (byPTEl) {
+        if (Object.keys(byPartnerType).length === 0) {
+            byPTEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No data yet.</p>';
+        } else {
+            const maxPT = Math.max(...Object.values(byPartnerType));
+            byPTEl.innerHTML = Object.entries(byPartnerType).sort((a, b) => b[1] - a[1]).map(([pt, count]) => {
+                const pct = Math.round((count / maxPT) * 100);
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(pt)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:#C8312B"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Recent partnerships
+    const recentEl = document.getElementById('partnerships-recent');
+    if (recentEl) {
+        const recent = [...allPartnerships].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+        if (recent.length === 0) {
+            recentEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No partnerships yet.</p>';
+        } else {
+            recentEl.innerHTML = recent.map(p => {
+                const typeColors = PARTNERSHIP_TYPE_COLORS[p.type] || { bg: '#f5f5f5', color: '#616161' };
+                const partnerLabel = p.partnerType === 'Person'
+                    ? escapeHtml(`${p.firstName} ${p.lastName}`.trim() || p.name)
+                    : escapeHtml(p.company || p.name);
+                return `<div class="recent-item">
+                    <div class="recent-item-main">
+                        <span class="recent-item-name">${escapeHtml(p.name)}</span>
+                        <span class="pship-type-badge" style="background:${typeColors.bg};color:${typeColors.color}">${escapeHtml(p.type)}</span>
+                    </div>
+                    <div class="recent-item-sub">${partnerLabel}</div>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function renderPartnerships() {
+    const search = (document.getElementById('partnerships-search')?.value || '').toLowerCase();
+    const type = document.getElementById('partnerships-filter-type')?.value || '';
+    const status = document.getElementById('partnerships-filter-status')?.value || '';
+
+    let partnerships = allPartnerships.filter(p => {
+        if (type && p.type !== type) return false;
+        if (status && p.status !== status) return false;
+        if (search) {
+            const hay = [p.name, p.company, p.firstName, p.lastName, p.email, p.description].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    const container = document.getElementById('partnerships-table-container');
+    if (!container) return;
+
+    if (partnerships.length === 0) {
+        container.innerHTML = '<p class="empty-state">No partnerships found. Click "+ Add Partnership" to get started.</p>';
+        return;
+    }
+
+    const rows = partnerships.map(p => {
+        const typeColors = PARTNERSHIP_TYPE_COLORS[p.type] || { bg: '#f5f5f5', color: '#616161' };
+        const partnerDisplay = p.partnerType === 'Person'
+            ? escapeHtml(`${p.firstName} ${p.lastName}`.trim() || '—')
+            : escapeHtml(p.company || '—');
+        const contactOrg = p.partnerType === 'Person' && p.company ? `<span class="po-desc-sub">${escapeHtml(p.company)}</span>` : '';
+        const statusClass = p.status === 'Active' ? 'pship-status-active' : p.status === 'Pending' ? 'pship-status-pending' : 'pship-status-inactive';
+        return `<tr>
+            <td><strong>${escapeHtml(p.name)}</strong></td>
+            <td><span class="pship-type-badge" style="background:${typeColors.bg};color:${typeColors.color}">${escapeHtml(p.type)}</span></td>
+            <td>${partnerDisplay}${contactOrg ? '<br>' + contactOrg : ''}</td>
+            <td>${escapeHtml(p.partnerType)}</td>
+            <td>${p.email ? `<a href="mailto:${escapeHtml(p.email)}">${escapeHtml(p.email)}</a>` : '—'}</td>
+            <td>${p.startDate ? escapeHtml(p.startDate) : '—'}</td>
+            <td><span class="pship-status-badge ${statusClass}">${escapeHtml(p.status)}</span></td>
+            <td class="action-cell">
+                <button class="btn-icon" title="Edit" onclick="openPartnershipModal('${escapeHtml(p.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deletePartnership('${escapeHtml(p.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Partner</th>
+            <th>Partner Is</th>
+            <th>Email</th>
+            <th>Start Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function togglePartnershipPartnerFields() {
+    const pt = document.getElementById('partnership-partnertype')?.value;
+    const companyFields = document.getElementById('partnership-company-fields');
+    const personFields = document.getElementById('partnership-person-fields');
+    if (!companyFields || !personFields) return;
+    if (pt === 'Person') {
+        companyFields.style.display = 'none';
+        personFields.style.display = '';
+    } else {
+        companyFields.style.display = '';
+        personFields.style.display = 'none';
+    }
+}
+
+function openPartnershipModal(id) {
+    const modal = document.getElementById('partnership-modal');
+    const titleEl = document.getElementById('partnership-modal-title');
+    const submitBtn = document.getElementById('partnership-submit-btn');
+    if (!modal) return;
+
+    // Reset form
+    document.getElementById('partnership-form').reset();
+    document.getElementById('partnership-id').value = '';
+    document.getElementById('partnership-success').classList.add('hidden');
+    document.getElementById('partnership-error').classList.add('hidden');
+    document.getElementById('partnership-company-fields').style.display = '';
+    document.getElementById('partnership-person-fields').style.display = 'none';
+
+    if (id) {
+        const p = allPartnerships.find(x => x.id === id);
+        if (!p) return;
+        titleEl.textContent = 'Edit Partnership';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('partnership-id').value = p.id;
+        document.getElementById('partnership-name').value = p.name || '';
+        document.getElementById('partnership-type').value = p.type || '';
+        document.getElementById('partnership-partnertype').value = p.partnerType || '';
+        document.getElementById('partnership-status').value = p.status || 'Active';
+        document.getElementById('partnership-email').value = p.email || '';
+        document.getElementById('partnership-phone').value = p.phone || '';
+        document.getElementById('partnership-website').value = p.website || '';
+        document.getElementById('partnership-startdate').value = p.startDate || '';
+        document.getElementById('partnership-description').value = p.description || '';
+        document.getElementById('partnership-notes').value = p.notes || '';
+        if (p.partnerType === 'Person') {
+            document.getElementById('partnership-company-fields').style.display = 'none';
+            document.getElementById('partnership-person-fields').style.display = '';
+            document.getElementById('partnership-firstname').value = p.firstName || '';
+            document.getElementById('partnership-lastname').value = p.lastName || '';
+            document.getElementById('partnership-person-company').value = p.company || '';
+        } else {
+            document.getElementById('partnership-company').value = p.company || '';
+        }
+    } else {
+        titleEl.textContent = 'Add Partnership';
+        submitBtn.textContent = 'Add Partnership';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closePartnershipModal() {
+    const modal = document.getElementById('partnership-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function closePartnershipModalOnBg(event) {
+    if (event.target === document.getElementById('partnership-modal')) closePartnershipModal();
+}
+
+async function submitPartnership(event) {
+    event.preventDefault();
+    const id = document.getElementById('partnership-id').value;
+    const successEl = document.getElementById('partnership-success');
+    const errorEl = document.getElementById('partnership-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const partnerType = document.getElementById('partnership-partnertype').value;
+    const isCompany = partnerType === 'Company';
+    const company = isCompany
+        ? document.getElementById('partnership-company').value.trim()
+        : document.getElementById('partnership-person-company').value.trim();
+
+    const payload = {
+        name: document.getElementById('partnership-name').value.trim(),
+        type: document.getElementById('partnership-type').value,
+        partnerType,
+        company,
+        firstName: isCompany ? '' : document.getElementById('partnership-firstname').value.trim(),
+        lastName: isCompany ? '' : document.getElementById('partnership-lastname').value.trim(),
+        email: document.getElementById('partnership-email').value.trim(),
+        phone: document.getElementById('partnership-phone').value.trim(),
+        website: document.getElementById('partnership-website').value.trim(),
+        description: document.getElementById('partnership-description').value.trim(),
+        status: document.getElementById('partnership-status').value,
+        startDate: document.getElementById('partnership-startdate').value,
+        notes: document.getElementById('partnership-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/partnerships/${id}` : `${API_URL}/partnerships`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving partnership';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Partnership updated!' : 'Partnership added!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allPartnerships.findIndex(p => p.id === id);
+            if (idx !== -1) allPartnerships[idx] = data;
+        } else {
+            allPartnerships.push(data);
+        }
+        renderPartnerships();
+        renderPartnershipsDashboard();
+        setTimeout(() => closePartnershipModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deletePartnership(id) {
+    if (!confirm('Are you sure you want to delete this partnership?')) return;
+    try {
+        const res = await fetch(`${API_URL}/partnerships/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting partnership'); return; }
+        allPartnerships = allPartnerships.filter(p => p.id !== id);
+        renderPartnerships();
+        renderPartnershipsDashboard();
     } catch (err) {
         alert('Network error. Please try again.');
     }

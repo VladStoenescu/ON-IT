@@ -22,6 +22,7 @@ const SKILL_CATEGORIES_FILE = path.join(__dirname, 'data', 'skill-categories.jso
 const CRM_CONTACTS_FILE = path.join(__dirname, 'data', 'crm-contacts.json');
 const CRM_DEALS_FILE = path.join(__dirname, 'data', 'crm-deals.json');
 const PROCESS_OWNERSHIP_FILE = path.join(__dirname, 'data', 'process-ownership.json');
+const PARTNERSHIPS_FILE = path.join(__dirname, 'data', 'partnerships.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -81,6 +82,9 @@ if (!fsSync.existsSync(CRM_DEALS_FILE)) {
 }
 if (!fsSync.existsSync(PROCESS_OWNERSHIP_FILE)) {
     fsSync.writeFileSync(PROCESS_OWNERSHIP_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(PARTNERSHIPS_FILE)) {
+    fsSync.writeFileSync(PARTNERSHIPS_FILE, JSON.stringify([], null, 2));
 }
 if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     const defaultCategories = [
@@ -1802,6 +1806,107 @@ app.delete('/api/process-ownership/:id', strictLimiter, async (req, res) => {
         res.json({ message: 'Process deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting process' });
+    }
+});
+
+// ─── Partnerships API ────────────────────────────────────────────────────────
+
+app.get('/api/partnerships', async (req, res) => {
+    try {
+        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        res.json(partnerships);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading partnerships' });
+    }
+});
+
+app.post('/api/partnerships', strictLimiter, async (req, res) => {
+    try {
+        const { name, type, partnerType, company, firstName, lastName, email, phone, website, description, status, startDate, notes } = req.body;
+        if (!name || !type || !partnerType) {
+            return res.status(400).json({ error: 'Name, type and partner type are required' });
+        }
+        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const newPartnership = {
+            id: generateId(),
+            name: name.trim(),
+            type,
+            partnerType,
+            company: company ? company.trim() : '',
+            firstName: firstName ? firstName.trim() : '',
+            lastName: lastName ? lastName.trim() : '',
+            email: email ? email.trim() : '',
+            phone: phone ? phone.trim() : '',
+            website: website ? website.trim() : '',
+            description: description ? description.trim() : '',
+            status: status || 'Active',
+            startDate: startDate || '',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        partnerships.push(newPartnership);
+        await writeJson(PARTNERSHIPS_FILE, partnerships);
+        res.status(201).json(newPartnership);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating partnership' });
+    }
+});
+
+app.get('/api/partnerships/:id', async (req, res) => {
+    try {
+        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const partnership = partnerships.find(p => p.id === req.params.id);
+        if (!partnership) return res.status(404).json({ error: 'Partnership not found' });
+        res.json(partnership);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading partnership' });
+    }
+});
+
+app.put('/api/partnerships/:id', strictLimiter, async (req, res) => {
+    try {
+        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const idx = partnerships.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Partnership not found' });
+        const { name, type, partnerType, company, firstName, lastName, email, phone, website, description, status, startDate, notes } = req.body;
+        if (!name || !type || !partnerType) {
+            return res.status(400).json({ error: 'Name, type and partner type are required' });
+        }
+        partnerships[idx] = {
+            ...partnerships[idx],
+            name: name.trim(),
+            type,
+            partnerType,
+            company: company !== undefined ? company.trim() : partnerships[idx].company,
+            firstName: firstName !== undefined ? firstName.trim() : partnerships[idx].firstName,
+            lastName: lastName !== undefined ? lastName.trim() : partnerships[idx].lastName,
+            email: email !== undefined ? email.trim() : partnerships[idx].email,
+            phone: phone !== undefined ? phone.trim() : partnerships[idx].phone,
+            website: website !== undefined ? website.trim() : partnerships[idx].website,
+            description: description !== undefined ? description.trim() : partnerships[idx].description,
+            status: status || partnerships[idx].status,
+            startDate: startDate !== undefined ? startDate : partnerships[idx].startDate,
+            notes: notes !== undefined ? notes.trim() : partnerships[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(PARTNERSHIPS_FILE, partnerships);
+        res.json(partnerships[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating partnership' });
+    }
+});
+
+app.delete('/api/partnerships/:id', strictLimiter, async (req, res) => {
+    try {
+        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const idx = partnerships.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Partnership not found' });
+        partnerships.splice(idx, 1);
+        await writeJson(PARTNERSHIPS_FILE, partnerships);
+        res.json({ message: 'Partnership deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting partnership' });
     }
 });
 
