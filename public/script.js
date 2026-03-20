@@ -16,7 +16,8 @@ const PAGE_TITLES = {
     crm: 'CRM Contacts',
     pipeline: 'Sales Pipeline',
     processes: 'Process Ownership Map',
-    partnerships: 'Partnerships'
+    partnerships: 'Partnerships',
+    meetings: 'Meetings'
 };
 
 // Store all ideas for filtering
@@ -37,6 +38,9 @@ let allProcessOwnership = [];
 
 // Store all partnerships for filtering
 let allPartnerships = [];
+
+// Store all meetings for filtering
+let allMeetings = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -92,6 +96,9 @@ function showTab(tabName) {
     }
     if (tabName === 'partnerships') {
         loadPartnerships();
+    }
+    if (tabName === 'meetings') {
+        loadMeetings();
     }
 
     // Close sidebar on mobile after navigating
@@ -3938,6 +3945,526 @@ async function deletePartnership(id) {
         allPartnerships = allPartnerships.filter(p => p.id !== id);
         renderPartnerships();
         renderPartnershipsDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Meetings & Todos ─────────────────────────────────────────────────────────
+
+const MEETING_TYPE_COLORS = {
+    'Management': { bg: '#e3f2fd', color: '#1565c0' },
+    'Strategy':   { bg: '#f3e5f5', color: '#6a1b9a' },
+    'Review':     { bg: '#e8f5e9', color: '#2e7d32' },
+    'Planning':   { bg: '#fff3e0', color: '#e65100' },
+    'Other':      { bg: '#f5f5f5', color: '#616161' }
+};
+
+const TODO_PRIORITY_COLORS = {
+    'High':   { bg: '#fdecea', color: '#c62828' },
+    'Medium': { bg: '#fff8e1', color: '#f57f17' },
+    'Low':    { bg: '#e8f5e9', color: '#2e7d32' }
+};
+
+function showMeetingsSection(sectionId, btn) {
+    document.querySelectorAll('#meetings-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#meetings-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (sectionId === 'meetings-todos') renderAllTodos();
+}
+
+async function loadMeetings() {
+    try {
+        const res = await fetch(`${API_URL}/meetings`);
+        if (!res.ok) throw new Error('Failed to load meetings');
+        allMeetings = await res.json();
+        renderMeetings();
+        renderMeetingsDashboard();
+        renderAllTodos();
+    } catch (err) {
+        const c = document.getElementById('meetings-table-container');
+        if (c) c.innerHTML = '<p class="error-state">Failed to load meetings.</p>';
+    }
+}
+
+function renderMeetingsDashboard() {
+    const total = allMeetings.length;
+    const upcoming = allMeetings.filter(m => m.status === 'Upcoming').length;
+    const completed = allMeetings.filter(m => m.status === 'Completed').length;
+    const allTodos = allMeetings.flatMap(m => m.todos || []);
+    const openTodos = allTodos.filter(t => t.status !== 'Done').length;
+
+    const kpiEl = document.getElementById('meetings-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total Meetings</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#1565c0">${upcoming}</div><div class="kpi-label">Upcoming</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${completed}</div><div class="kpi-label">Completed</div></div>
+            <div class="kpi-card${openTodos > 0 ? ' kpi-card-warn' : ''}"><div class="kpi-value" style="color:#e65100">${openTodos}</div><div class="kpi-label">Open Action Items</div></div>
+        `;
+    }
+
+    // By type chart
+    const byType = {};
+    allMeetings.forEach(m => { byType[m.type] = (byType[m.type] || 0) + 1; });
+    const byTypeEl = document.getElementById('meetings-by-type');
+    if (byTypeEl) {
+        if (Object.keys(byType).length === 0) {
+            byTypeEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No meetings yet.</p>';
+        } else {
+            byTypeEl.innerHTML = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+                const pct = Math.round((count / total) * 100);
+                const col = (MEETING_TYPE_COLORS[type] || { color: '#616161' }).color;
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(type)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // By status chart
+    const byStatus = {};
+    allMeetings.forEach(m => { byStatus[m.status] = (byStatus[m.status] || 0) + 1; });
+    const byStatusEl = document.getElementById('meetings-by-status');
+    if (byStatusEl) {
+        if (Object.keys(byStatus).length === 0) {
+            byStatusEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No data yet.</p>';
+        } else {
+            const maxS = Math.max(...Object.values(byStatus));
+            const statusColors = { Upcoming: '#1565c0', Completed: '#2e7d32', Cancelled: '#757575' };
+            byStatusEl.innerHTML = Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([st, count]) => {
+                const pct = Math.round((count / maxS) * 100);
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(st)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${statusColors[st] || '#9e9e9e'}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Upcoming meetings list
+    const upcomingEl = document.getElementById('meetings-upcoming');
+    if (upcomingEl) {
+        const upcomingList = allMeetings
+            .filter(m => m.status === 'Upcoming')
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
+            .slice(0, 5);
+        if (upcomingList.length === 0) {
+            upcomingEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No upcoming meetings.</p>';
+        } else {
+            upcomingEl.innerHTML = upcomingList.map(m => {
+                const typeColors = MEETING_TYPE_COLORS[m.type] || { bg: '#f5f5f5', color: '#616161' };
+                const todos = m.todos || [];
+                const openCount = todos.filter(t => t.status !== 'Done').length;
+                return `<div class="recent-item">
+                    <div class="recent-item-main">
+                        <span class="recent-item-name">${escapeHtml(m.title)}</span>
+                        <span class="mtg-type-badge" style="background:${typeColors.bg};color:${typeColors.color}">${escapeHtml(m.type)}</span>
+                    </div>
+                    <div class="recent-item-sub">${escapeHtml(m.date)}${m.time ? ' ' + escapeHtml(m.time) : ''}${openCount > 0 ? ` · <span class="mtg-todo-open">${openCount} open todo${openCount > 1 ? 's' : ''}</span>` : ''}</div>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function renderMeetings() {
+    const search = (document.getElementById('meetings-search')?.value || '').toLowerCase();
+    const type = document.getElementById('meetings-filter-type')?.value || '';
+    const status = document.getElementById('meetings-filter-status')?.value || '';
+
+    let meetings = allMeetings.filter(m => {
+        if (type && m.type !== type) return false;
+        if (status && m.status !== status) return false;
+        if (search) {
+            const hay = [m.title, m.location, m.attendees, m.agenda, m.notes].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    meetings = [...meetings].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const container = document.getElementById('meetings-table-container');
+    if (!container) return;
+
+    if (meetings.length === 0) {
+        container.innerHTML = '<p class="empty-state">No meetings found. Click "+ Add Meeting" to get started.</p>';
+        return;
+    }
+
+    const rows = meetings.map(m => {
+        const typeColors = MEETING_TYPE_COLORS[m.type] || { bg: '#f5f5f5', color: '#616161' };
+        const todos = m.todos || [];
+        const openTodos = todos.filter(t => t.status !== 'Done').length;
+        const statusClass = m.status === 'Upcoming' ? 'mtg-status-upcoming' : m.status === 'Completed' ? 'mtg-status-completed' : 'mtg-status-cancelled';
+        return `<tr>
+            <td><strong>${escapeHtml(m.title)}</strong></td>
+            <td><span class="mtg-type-badge" style="background:${typeColors.bg};color:${typeColors.color}">${escapeHtml(m.type)}</span></td>
+            <td>${escapeHtml(m.date)}${m.time ? '<br><span class="text-muted-sm">' + escapeHtml(m.time) + '</span>' : ''}</td>
+            <td>${m.location ? escapeHtml(m.location) : '—'}</td>
+            <td>${m.attendees ? escapeHtml(m.attendees) : '—'}</td>
+            <td><span class="mtg-status-badge ${statusClass}">${escapeHtml(m.status)}</span></td>
+            <td>
+                <span class="mtg-todo-count${openTodos > 0 ? ' mtg-todo-open' : ''}">${todos.length} total / ${openTodos} open</span>
+            </td>
+            <td class="action-cell">
+                <button class="btn-icon" title="View Todos" onclick="openMeetingTodos('${escapeHtml(m.id)}')">📋</button>
+                <button class="btn-icon" title="Edit" onclick="openMeetingModal('${escapeHtml(m.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deleteMeeting('${escapeHtml(m.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Attendees</th>
+            <th>Status</th>
+            <th>Action Items</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function renderAllTodos() {
+    const search = (document.getElementById('todos-search')?.value || '').toLowerCase();
+    const priority = document.getElementById('todos-filter-priority')?.value || '';
+    const status = document.getElementById('todos-filter-status')?.value || '';
+
+    const container = document.getElementById('todos-table-container');
+    if (!container) return;
+
+    // Flatten all todos with their meeting context
+    let todos = [];
+    allMeetings.forEach(m => {
+        (m.todos || []).forEach(t => {
+            todos.push({ ...t, meetingId: m.id, meetingTitle: m.title, meetingDate: m.date });
+        });
+    });
+
+    todos = todos.filter(t => {
+        if (priority && t.priority !== priority) return false;
+        if (status && t.status !== status) return false;
+        if (search) {
+            const hay = [t.task, t.assignee, t.meetingTitle].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    // Sort: open/in-progress first, then by due date
+    todos.sort((a, b) => {
+        const order = { 'Open': 0, 'In Progress': 1, 'Done': 2 };
+        if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+        if (a.dueDate && b.dueDate) return new Date(a.dueDate) - new Date(b.dueDate);
+        if (a.dueDate) return -1;
+        if (b.dueDate) return 1;
+        return 0;
+    });
+
+    if (todos.length === 0) {
+        container.innerHTML = '<p class="empty-state">No action items found.</p>';
+        return;
+    }
+
+    const rows = todos.map(t => {
+        const prioColors = TODO_PRIORITY_COLORS[t.priority] || { bg: '#f5f5f5', color: '#616161' };
+        const statusClass = t.status === 'Done' ? 'todo-status-done' : t.status === 'In Progress' ? 'todo-status-inprogress' : 'todo-status-open';
+        const today = new Date().toISOString().split('T')[0];
+        const isOverdue = t.dueDate && t.status !== 'Done' && t.dueDate < today;
+        return `<tr${t.status === 'Done' ? ' class="todo-row-done"' : ''}>
+            <td>${escapeHtml(t.task)}</td>
+            <td><a href="#" class="mtg-link" onclick="openMeetingModal('${escapeHtml(t.meetingId)}');return false">${escapeHtml(t.meetingTitle)}</a><br><span class="text-muted-sm">${escapeHtml(t.meetingDate)}</span></td>
+            <td>${t.assignee ? escapeHtml(t.assignee) : '—'}</td>
+            <td>${t.dueDate ? `<span${isOverdue ? ' class="todo-overdue"' : ''}>${escapeHtml(t.dueDate)}</span>` : '—'}</td>
+            <td><span class="todo-priority-badge" style="background:${prioColors.bg};color:${prioColors.color}">${escapeHtml(t.priority)}</span></td>
+            <td><span class="todo-status-badge ${statusClass}">${escapeHtml(t.status)}</span></td>
+            <td class="action-cell">
+                ${t.status !== 'Done' ? `<button class="btn-icon" title="Mark Done" onclick="quickMarkTodoDone('${escapeHtml(t.meetingId)}','${escapeHtml(t.id)}')">✅</button>` : ''}
+                <button class="btn-icon" title="Edit" onclick="openTodoModal('${escapeHtml(t.meetingId)}','${escapeHtml(t.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deleteTodo('${escapeHtml(t.meetingId)}','${escapeHtml(t.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Task</th>
+            <th>Meeting</th>
+            <th>Assignee</th>
+            <th>Due Date</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function openMeetingModal(id) {
+    const modal = document.getElementById('meeting-modal');
+    const titleEl = document.getElementById('meeting-modal-title');
+    const submitBtn = document.getElementById('meeting-submit-btn');
+    if (!modal) return;
+
+    document.getElementById('meeting-form').reset();
+    document.getElementById('meeting-id').value = '';
+    document.getElementById('meeting-success').classList.add('hidden');
+    document.getElementById('meeting-error').classList.add('hidden');
+
+    if (id) {
+        const m = allMeetings.find(x => x.id === id);
+        if (!m) return;
+        titleEl.textContent = 'Edit Meeting';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('meeting-id').value = m.id;
+        document.getElementById('meeting-title').value = m.title || '';
+        document.getElementById('meeting-type').value = m.type || 'Management';
+        document.getElementById('meeting-date').value = m.date || '';
+        document.getElementById('meeting-time').value = m.time || '';
+        document.getElementById('meeting-status').value = m.status || 'Upcoming';
+        document.getElementById('meeting-location').value = m.location || '';
+        document.getElementById('meeting-attendees').value = m.attendees || '';
+        document.getElementById('meeting-agenda').value = m.agenda || '';
+        document.getElementById('meeting-notes').value = m.notes || '';
+    } else {
+        titleEl.textContent = 'Add Meeting';
+        submitBtn.textContent = 'Add Meeting';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeMeetingModal() {
+    const modal = document.getElementById('meeting-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function closeMeetingModalOnBg(event) {
+    if (event.target === document.getElementById('meeting-modal')) closeMeetingModal();
+}
+
+async function submitMeeting(event) {
+    event.preventDefault();
+    const id = document.getElementById('meeting-id').value;
+    const successEl = document.getElementById('meeting-success');
+    const errorEl = document.getElementById('meeting-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        title: document.getElementById('meeting-title').value.trim(),
+        type: document.getElementById('meeting-type').value,
+        date: document.getElementById('meeting-date').value,
+        time: document.getElementById('meeting-time').value,
+        status: document.getElementById('meeting-status').value,
+        location: document.getElementById('meeting-location').value.trim(),
+        attendees: document.getElementById('meeting-attendees').value.trim(),
+        agenda: document.getElementById('meeting-agenda').value.trim(),
+        notes: document.getElementById('meeting-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/meetings/${id}` : `${API_URL}/meetings`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving meeting';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Meeting updated!' : 'Meeting added!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allMeetings.findIndex(m => m.id === id);
+            if (idx !== -1) allMeetings[idx] = { ...allMeetings[idx], ...data };
+        } else {
+            allMeetings.push(data);
+        }
+        renderMeetings();
+        renderMeetingsDashboard();
+        renderAllTodos();
+        setTimeout(() => closeMeetingModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteMeeting(id) {
+    if (!confirm('Are you sure you want to delete this meeting and all its action items?')) return;
+    try {
+        const res = await fetch(`${API_URL}/meetings/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting meeting'); return; }
+        allMeetings = allMeetings.filter(m => m.id !== id);
+        renderMeetings();
+        renderMeetingsDashboard();
+        renderAllTodos();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+function openMeetingTodos(meetingId) {
+    const meeting = allMeetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+    // Switch to todos tab and pre-filter
+    showMeetingsSection('meetings-todos', null);
+    document.querySelectorAll('#meetings-tab .sub-tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', i === 2);
+    });
+    renderAllTodos();
+}
+
+// ─── Todo CRUD ────────────────────────────────────────────────────────────────
+
+function openTodoModal(meetingId, todoId) {
+    const modal = document.getElementById('todo-modal');
+    const titleEl = document.getElementById('todo-modal-title');
+    const submitBtn = document.getElementById('todo-submit-btn');
+    if (!modal) return;
+
+    document.getElementById('todo-form').reset();
+    document.getElementById('todo-meeting-id').value = meetingId;
+    document.getElementById('todo-id').value = '';
+    document.getElementById('todo-success').classList.add('hidden');
+    document.getElementById('todo-error').classList.add('hidden');
+    document.getElementById('todo-priority').value = 'Medium';
+    document.getElementById('todo-status').value = 'Open';
+
+    if (todoId) {
+        const meeting = allMeetings.find(m => m.id === meetingId);
+        const todo = meeting && (meeting.todos || []).find(t => t.id === todoId);
+        if (!todo) return;
+        titleEl.textContent = 'Edit Action Item';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('todo-id').value = todo.id;
+        document.getElementById('todo-task').value = todo.task || '';
+        document.getElementById('todo-assignee').value = todo.assignee || '';
+        document.getElementById('todo-duedate').value = todo.dueDate || '';
+        document.getElementById('todo-priority').value = todo.priority || 'Medium';
+        document.getElementById('todo-status').value = todo.status || 'Open';
+    } else {
+        titleEl.textContent = 'Add Action Item';
+        submitBtn.textContent = 'Add Action Item';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeTodoModal() {
+    const modal = document.getElementById('todo-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function closeTodoModalOnBg(event) {
+    if (event.target === document.getElementById('todo-modal')) closeTodoModal();
+}
+
+async function submitTodo(event) {
+    event.preventDefault();
+    const meetingId = document.getElementById('todo-meeting-id').value;
+    const todoId = document.getElementById('todo-id').value;
+    const successEl = document.getElementById('todo-success');
+    const errorEl = document.getElementById('todo-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        task: document.getElementById('todo-task').value.trim(),
+        assignee: document.getElementById('todo-assignee').value.trim(),
+        dueDate: document.getElementById('todo-duedate').value,
+        priority: document.getElementById('todo-priority').value,
+        status: document.getElementById('todo-status').value
+    };
+
+    try {
+        const url = todoId
+            ? `${API_URL}/meetings/${meetingId}/todos/${todoId}`
+            : `${API_URL}/meetings/${meetingId}/todos`;
+        const method = todoId ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving action item';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = todoId ? 'Action item updated!' : 'Action item added!';
+        successEl.classList.remove('hidden');
+        // Update local state
+        const mIdx = allMeetings.findIndex(m => m.id === meetingId);
+        if (mIdx !== -1) {
+            if (!Array.isArray(allMeetings[mIdx].todos)) allMeetings[mIdx].todos = [];
+            if (todoId) {
+                const tIdx = allMeetings[mIdx].todos.findIndex(t => t.id === todoId);
+                if (tIdx !== -1) allMeetings[mIdx].todos[tIdx] = data;
+            } else {
+                allMeetings[mIdx].todos.push(data);
+            }
+        }
+        renderMeetings();
+        renderMeetingsDashboard();
+        renderAllTodos();
+        setTimeout(() => closeTodoModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteTodo(meetingId, todoId) {
+    if (!confirm('Delete this action item?')) return;
+    try {
+        const res = await fetch(`${API_URL}/meetings/${meetingId}/todos/${todoId}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting action item'); return; }
+        const mIdx = allMeetings.findIndex(m => m.id === meetingId);
+        if (mIdx !== -1) {
+            allMeetings[mIdx].todos = (allMeetings[mIdx].todos || []).filter(t => t.id !== todoId);
+        }
+        renderMeetings();
+        renderMeetingsDashboard();
+        renderAllTodos();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+async function quickMarkTodoDone(meetingId, todoId) {
+    try {
+        const res = await fetch(`${API_URL}/meetings/${meetingId}/todos/${todoId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'Done' })
+        });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error updating action item'); return; }
+        const mIdx = allMeetings.findIndex(m => m.id === meetingId);
+        if (mIdx !== -1) {
+            const tIdx = (allMeetings[mIdx].todos || []).findIndex(t => t.id === todoId);
+            if (tIdx !== -1) allMeetings[mIdx].todos[tIdx].status = 'Done';
+        }
+        renderMeetings();
+        renderMeetingsDashboard();
+        renderAllTodos();
     } catch (err) {
         alert('Network error. Please try again.');
     }

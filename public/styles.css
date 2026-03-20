@@ -2188,3 +2188,93 @@ body {
 .pship-status-active  { background: #e8f5e9; color: #2e7d32; }
 .pship-status-pending { background: #fff3e0; color: #e65100; }
 .pship-status-inactive { background: #f5f5f5; color: #757575; }
+
+/* ─── Meetings & Todos ──────────────────────────────────────────────────────── */
+
+.mtg-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.mtg-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+}
+
+.mtg-status-upcoming   { background: #e3f2fd; color: #1565c0; }
+.mtg-status-completed  { background: #e8f5e9; color: #2e7d32; }
+.mtg-status-cancelled  { background: #f5f5f5; color: #757575; }
+
+.mtg-todo-count {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.mtg-todo-open {
+    color: #e65100;
+    font-weight: 600;
+}
+
+.todo-priority-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.todo-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+}
+
+.todo-status-open       { background: #fdecea; color: #c62828; }
+.todo-status-inprogress { background: #fff3e0; color: #e65100; }
+.todo-status-done       { background: #e8f5e9; color: #2e7d32; }
+
+.todo-row-done td {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+.todo-row-done .action-cell,
+.todo-row-done .todo-status-badge,
+.todo-row-done .todo-priority-badge {
+    text-decoration: none;
+}
+
+.todo-overdue {
+    color: #c62828;
+    font-weight: 600;
+}
+
+.mtg-link {
+    color: var(--brand-red, #C8312B);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.mtg-link:hover {
+    text-decoration: underline;
+}
+
+.modal-lg {
+    max-width: 680px;
+    width: 95%;
+}
+
+.text-muted-sm {
+    color: var(--text-muted);
+    font-size: var(--fs-xs);
+}

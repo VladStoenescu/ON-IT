@@ -106,6 +106,13 @@
                     <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l2 2 4-4"/><circle cx="10" cy="10" r="8"/><path d="M3.5 5.5C5 3.5 7.3 2 10 2s5 1.5 6.5 3.5"/><path d="M16.5 14.5C15 16.5 12.7 18 10 18s-5-1.5-6.5-3.5"/></svg>
                     <span>Partnerships</span>
                 </button>
+
+                <p class="nav-group-label">Management</p>
+
+                <button class="nav-item" data-section="meetings" onclick="showTab('meetings', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="14" rx="2"/><line x1="2" y1="8" x2="18" y2="8"/><line x1="6" y1="2" x2="6" y2="6"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="6" y1="12" x2="8" y2="12"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+                    <span>Meetings</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -242,6 +249,16 @@
                             <div class="hmc-body">
                                 <div class="hmc-title">Partnerships</div>
                                 <div class="hmc-desc">Manage Innovation, Consulting, Expert and Software partnerships</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </div>
+                        <div class="home-module-card" onclick="showTab('meetings', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">Meetings</div>
+                                <div class="hmc-desc">Schedule management meetings and track action items &amp; todos</div>
                             </div>
                             <span class="hmc-arrow">→</span>
                         </div>
@@ -964,7 +981,217 @@
                     </div>
                 </div>
 
+                <!-- ─── Meetings Tab ──────────────────────────────────────── -->
+                <div id="meetings-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showMeetingsSection('meetings-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showMeetingsSection('meetings-list', this)">All Meetings</button>
+                        <button class="sub-tab-btn" onclick="showMeetingsSection('meetings-todos', this)">All Todos</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="meetings-dashboard" class="ob-section active">
+                        <h2 class="section-title">Meetings Dashboard</h2>
+                        <div id="meetings-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>By Meeting Type</h3>
+                                <div id="meetings-by-type"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>By Status</h3>
+                                <div id="meetings-by-status"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Upcoming Meetings</h3>
+                                <div id="meetings-upcoming"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Meetings Section -->
+                    <div id="meetings-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Meetings</h2>
+                            <button class="btn-primary" onclick="openMeetingModal()">+ Add Meeting</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="meetings-search" placeholder="Search by title, attendees, location…" oninput="renderMeetings()" class="ls-filter-input">
+                            <select id="meetings-filter-type" onchange="renderMeetings()" class="ls-filter-select">
+                                <option value="">All Types</option>
+                                <option value="Management">Management</option>
+                                <option value="Strategy">Strategy</option>
+                                <option value="Review">Review</option>
+                                <option value="Planning">Planning</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <select id="meetings-filter-status" onchange="renderMeetings()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="Upcoming">Upcoming</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div id="meetings-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading meetings…</p>
+                        </div>
+                    </div>
+
+                    <!-- All Todos Section -->
+                    <div id="meetings-todos" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">All Action Items &amp; Todos</h2>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="todos-search" placeholder="Search by task, assignee…" oninput="renderAllTodos()" class="ls-filter-input">
+                            <select id="todos-filter-priority" onchange="renderAllTodos()" class="ls-filter-select">
+                                <option value="">All Priorities</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                            <select id="todos-filter-status" onchange="renderAllTodos()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="Open">Open</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Done">Done</option>
+                            </select>
+                        </div>
+                        <div id="todos-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading todos…</p>
+                        </div>
+                    </div>
+                </div>
+
             </main>
+        </div>
+    </div>
+
+    <!-- Meeting Modal -->
+    <div id="meeting-modal" class="modal-overlay hidden" onclick="closeMeetingModalOnBg(event)">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3 id="meeting-modal-title">Add Meeting</h3>
+                <button class="modal-close" onclick="closeMeetingModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="meeting-form" onsubmit="submitMeeting(event)">
+                    <input type="hidden" id="meeting-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Title *</label>
+                            <input type="text" id="meeting-title" required placeholder="e.g. Weekly Management Meeting">
+                        </div>
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="meeting-type">
+                                <option value="Management">Management</option>
+                                <option value="Strategy">Strategy</option>
+                                <option value="Review">Review</option>
+                                <option value="Planning">Planning</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Date *</label>
+                            <input type="date" id="meeting-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Time</label>
+                            <input type="time" id="meeting-time">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="meeting-status">
+                                <option value="Upcoming">Upcoming</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <input type="text" id="meeting-location" placeholder="e.g. Conference Room A, Zoom">
+                    </div>
+                    <div class="form-group">
+                        <label>Attendees</label>
+                        <input type="text" id="meeting-attendees" placeholder="e.g. John Doe, Jane Smith">
+                    </div>
+                    <div class="form-group">
+                        <label>Agenda</label>
+                        <textarea id="meeting-agenda" rows="3" placeholder="Meeting agenda…"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="meeting-notes" rows="3" placeholder="Meeting notes…"></textarea>
+                    </div>
+                    <p id="meeting-success" class="form-success hidden"></p>
+                    <p id="meeting-error" class="form-error hidden"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeMeetingModal()">Cancel</button>
+                        <button type="submit" id="meeting-submit-btn" class="btn-primary">Add Meeting</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Todo Modal -->
+    <div id="todo-modal" class="modal-overlay hidden" onclick="closeTodoModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="todo-modal-title">Add Action Item</h3>
+                <button class="modal-close" onclick="closeTodoModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="todo-form" onsubmit="submitTodo(event)">
+                    <input type="hidden" id="todo-meeting-id">
+                    <input type="hidden" id="todo-id">
+                    <div class="form-group">
+                        <label>Task *</label>
+                        <input type="text" id="todo-task" required placeholder="e.g. Prepare Q1 report">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Assignee</label>
+                            <input type="text" id="todo-assignee" placeholder="e.g. John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label>Due Date</label>
+                            <input type="date" id="todo-duedate">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Priority</label>
+                            <select id="todo-priority">
+                                <option value="High">High</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="todo-status">
+                                <option value="Open">Open</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Done">Done</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p id="todo-success" class="form-success hidden"></p>
+                    <p id="todo-error" class="form-error hidden"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeTodoModal()">Cancel</button>
+                        <button type="submit" id="todo-submit-btn" class="btn-primary">Add Action Item</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
