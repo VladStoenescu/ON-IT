@@ -99,6 +99,13 @@
                     <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="2"/><circle cx="15" cy="5" r="2"/><circle cx="5" cy="15" r="2"/><circle cx="15" cy="15" r="2"/><line x1="7" y1="5" x2="13" y2="5"/><line x1="5" y1="7" x2="5" y2="13"/><line x1="15" y1="7" x2="15" y2="13"/><line x1="7" y1="15" x2="13" y2="15"/></svg>
                     <span>Process Map</span>
                 </button>
+
+                <p class="nav-group-label">Partnerships</p>
+
+                <button class="nav-item" data-section="partnerships" onclick="showTab('partnerships', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l2 2 4-4"/><circle cx="10" cy="10" r="8"/><path d="M3.5 5.5C5 3.5 7.3 2 10 2s5 1.5 6.5 3.5"/><path d="M16.5 14.5C15 16.5 12.7 18 10 18s-5-1.5-6.5-3.5"/></svg>
+                    <span>Partnerships</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -225,6 +232,16 @@
                             <div class="hmc-body">
                                 <div class="hmc-title">Sales Pipeline</div>
                                 <div class="hmc-desc">Track deals and forecast consulting revenue</div>
+                            </div>
+                            <span class="hmc-arrow">→</span>
+                        </div>
+                        <div class="home-module-card" onclick="showTab('partnerships', null)">
+                            <div class="hmc-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M8 11l3 3 5-5"/><circle cx="12" cy="12" r="9"/></svg>
+                            </div>
+                            <div class="hmc-body">
+                                <div class="hmc-title">Partnerships</div>
+                                <div class="hmc-desc">Manage Innovation, Consulting, Expert and Software partnerships</div>
                             </div>
                             <span class="hmc-arrow">→</span>
                         </div>
@@ -885,6 +902,64 @@
                         </div>
                         <div id="processes-table-container" class="asset-table-wrapper">
                             <p class="loading">Loading processes…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Partnerships Tab ──────────────────────────────────── -->
+                <div id="partnerships-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showPartnershipsSection('partnerships-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showPartnershipsSection('partnerships-list', this)">All Partnerships</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="partnerships-dashboard" class="ob-section active">
+                        <h2 class="section-title">Partnerships Dashboard</h2>
+                        <div id="partnerships-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>By Partnership Type</h3>
+                                <div id="partnerships-by-type"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>By Partner Type</h3>
+                                <div id="partnerships-by-partnertype"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Recent Partnerships</h3>
+                                <div id="partnerships-recent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Partnerships Section -->
+                    <div id="partnerships-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Partnerships</h2>
+                            <button class="btn-primary" onclick="openPartnershipModal()">+ Add Partnership</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="partnerships-search" placeholder="Search by name, company, contact…" oninput="renderPartnerships()" class="ls-filter-input">
+                            <select id="partnerships-filter-type" onchange="renderPartnerships()" class="ls-filter-select">
+                                <option value="">All Types</option>
+                                <option value="Innovation">Innovation</option>
+                                <option value="Consulting">Consulting</option>
+                                <option value="Expert">Expert</option>
+                                <option value="Software">Software</option>
+                            </select>
+                            <select id="partnerships-filter-status" onchange="renderPartnerships()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                                <option value="Pending">Pending</option>
+                            </select>
+                        </div>
+                        <div id="partnerships-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading partnerships…</p>
                         </div>
                     </div>
                 </div>
@@ -1694,6 +1769,113 @@
                     </div>
                     <div id="po-success" class="message success hidden"></div>
                     <div id="po-error" class="message error hidden"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Partnership Modal -->
+    <div id="partnership-modal" class="modal-overlay hidden" onclick="closePartnershipModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="partnership-modal-title">Add Partnership</h3>
+                <button class="modal-close" onclick="closePartnershipModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="partnership-form" onsubmit="submitPartnership(event)">
+                    <input type="hidden" id="partnership-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Partnership Name *</label>
+                            <input type="text" id="partnership-name" required placeholder="e.g. AI Innovation Lab">
+                        </div>
+                        <div class="form-group">
+                            <label>Partnership Type *</label>
+                            <select id="partnership-type" required>
+                                <option value="">Select type</option>
+                                <option value="Innovation">Innovation</option>
+                                <option value="Consulting">Consulting</option>
+                                <option value="Expert">Expert</option>
+                                <option value="Software">Software</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Partner Is *</label>
+                            <select id="partnership-partnertype" required onchange="togglePartnershipPartnerFields()">
+                                <option value="">Select partner type</option>
+                                <option value="Company">Company</option>
+                                <option value="Person">Person</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="partnership-status">
+                                <option value="Active">Active</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Company-specific fields -->
+                    <div id="partnership-company-fields">
+                        <div class="form-group">
+                            <label>Company Name</label>
+                            <input type="text" id="partnership-company" placeholder="e.g. TechVentures GmbH">
+                        </div>
+                    </div>
+                    <!-- Person-specific fields -->
+                    <div id="partnership-person-fields" style="display:none">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>First Name</label>
+                                <input type="text" id="partnership-firstname" placeholder="e.g. Sophie">
+                            </div>
+                            <div class="form-group">
+                                <label>Last Name</label>
+                                <input type="text" id="partnership-lastname" placeholder="e.g. Müller">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Company / Organisation</label>
+                            <input type="text" id="partnership-person-company" placeholder="e.g. FinanzBank AG">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="partnership-email" placeholder="e.g. contact@partner.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="text" id="partnership-phone" placeholder="e.g. +49 30 1234 5678">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Website</label>
+                            <input type="text" id="partnership-website" placeholder="e.g. https://partner.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Start Date</label>
+                            <input type="date" id="partnership-startdate">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="partnership-description" rows="2" placeholder="Brief description of the partnership scope"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="partnership-notes" rows="2" placeholder="Additional notes"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closePartnershipModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="partnership-submit-btn">Add Partnership</button>
+                    </div>
+                    <div id="partnership-success" class="message success hidden"></div>
+                    <div id="partnership-error" class="message error hidden"></div>
                 </form>
             </div>
         </div>

@@ -2165,3 +2165,26 @@ body {
     font-size: var(--fs-sm);
     flex-shrink: 0;
 }
+
+/* ─── Partnerships ─────────────────────────────────────────────────────────── */
+
+.pship-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.pship-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+}
+
+.pship-status-active  { background: #e8f5e9; color: #2e7d32; }
+.pship-status-pending { background: #fff3e0; color: #e65100; }
+.pship-status-inactive { background: #f5f5f5; color: #757575; }
