@@ -12,7 +12,9 @@ const PAGE_TITLES = {
     trainings: 'Trainings',
     landscape: 'IT Landscape',
     assets: 'IT Asset Inventory',
-    skills: 'Skills & Talent'
+    skills: 'Skills & Talent',
+    crm: 'CRM Contacts',
+    pipeline: 'Sales Pipeline'
 };
 
 // Store all ideas for filtering
@@ -23,6 +25,10 @@ let allITTools = [];
 
 // Store all IT assets for filtering
 let allITAssets = [];
+
+// Store all CRM contacts and deals for filtering
+let allCRMContacts = [];
+let allCRMDeals = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -66,6 +72,12 @@ function showTab(tabName) {
     if (tabName === 'skills') {
         loadSkillProfiles();
         loadSkillCategoriesForFilter();
+    }
+    if (tabName === 'crm') {
+        loadCRMContacts();
+    }
+    if (tabName === 'pipeline') {
+        loadSalesPipeline();
     }
 
     // Close sidebar on mobile after navigating
@@ -2685,6 +2697,590 @@ async function deleteSkillCategory(id) {
         if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting category'); return; }
         allSkillCategories = allSkillCategories.filter(c => c.id !== id);
         renderSkillCategories();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── CRM Contacts ─────────────────────────────────────────────────────────────
+
+const CRM_TYPE_COLORS = {
+    Lead:     { bg: '#e3f2fd', color: '#1565c0' },
+    Prospect: { bg: '#fff8e1', color: '#f57f17' },
+    Client:   { bg: '#e8f5e9', color: '#2e7d32' },
+    Partner:  { bg: '#f3e5f5', color: '#6a1b9a' }
+};
+
+function showCRMSection(sectionId, btn) {
+    document.querySelectorAll('#crm-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#crm-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+async function loadCRMContacts() {
+    try {
+        const res = await fetch(`${API_URL}/crm/contacts`);
+        if (!res.ok) throw new Error('Failed to load contacts');
+        allCRMContacts = await res.json();
+        renderCRMContacts();
+        renderCRMDashboard();
+    } catch (err) {
+        const c = document.getElementById('crm-table-container');
+        if (c) c.innerHTML = '<p class="error-state">Failed to load contacts.</p>';
+    }
+}
+
+function renderCRMDashboard() {
+    const total = allCRMContacts.length;
+    const clients = allCRMContacts.filter(c => c.type === 'Client').length;
+    const prospects = allCRMContacts.filter(c => c.type === 'Prospect').length;
+    const leads = allCRMContacts.filter(c => c.type === 'Lead').length;
+
+    const kpiEl = document.getElementById('crm-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total Contacts</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${clients}</div><div class="kpi-label">Clients</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#f57f17">${prospects}</div><div class="kpi-label">Prospects</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#1565c0">${leads}</div><div class="kpi-label">Leads</div></div>
+        `;
+    }
+
+    // By Type chart
+    const byType = {};
+    allCRMContacts.forEach(c => { byType[c.type] = (byType[c.type] || 0) + 1; });
+    const byTypeEl = document.getElementById('crm-by-type');
+    if (byTypeEl) {
+        if (Object.keys(byType).length === 0) {
+            byTypeEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No contacts yet.</p>';
+        } else {
+            byTypeEl.innerHTML = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+                const pct = Math.round((count / total) * 100);
+                const col = (CRM_TYPE_COLORS[type] || { bg: '#f5f5f5', color: '#616161' }).color;
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(type)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // By Company
+    const byCompany = {};
+    allCRMContacts.filter(c => c.company).forEach(c => { byCompany[c.company] = (byCompany[c.company] || 0) + 1; });
+    const byCompanyEl = document.getElementById('crm-by-company');
+    if (byCompanyEl) {
+        const entries = Object.entries(byCompany).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        if (entries.length === 0) {
+            byCompanyEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No data yet.</p>';
+        } else {
+            const max = entries[0][1];
+            byCompanyEl.innerHTML = entries.map(([co, count]) => {
+                const pct = Math.round((count / max) * 100);
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(co)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:#C8312B"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Recent contacts
+    const recentEl = document.getElementById('crm-recent');
+    if (recentEl) {
+        const recent = [...allCRMContacts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+        if (recent.length === 0) {
+            recentEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No contacts yet.</p>';
+        } else {
+            recentEl.innerHTML = recent.map(c => {
+                const typeColors = CRM_TYPE_COLORS[c.type] || { bg: '#f5f5f5', color: '#616161' };
+                return `<div class="recent-item">
+                    <div class="recent-item-main">
+                        <span class="recent-item-name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}</span>
+                        <span class="crm-type-badge" style="background:${typeColors.bg};color:${typeColors.color}">${escapeHtml(c.type)}</span>
+                    </div>
+                    <div class="recent-item-sub">${c.company ? escapeHtml(c.company) : '—'}</div>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function renderCRMContacts() {
+    const search = (document.getElementById('crm-search')?.value || '').toLowerCase();
+    const type = document.getElementById('crm-filter-type')?.value || '';
+    const status = document.getElementById('crm-filter-status')?.value || '';
+
+    let contacts = allCRMContacts.filter(c => {
+        if (type && c.type !== type) return false;
+        if (status && c.status !== status) return false;
+        if (search) {
+            const hay = [c.firstName, c.lastName, c.company, c.email, c.jobTitle].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    const container = document.getElementById('crm-table-container');
+    if (!container) return;
+
+    if (contacts.length === 0) {
+        container.innerHTML = '<p class="empty-state">No contacts found. Click "+ Add Contact" to get started.</p>';
+        return;
+    }
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Company</th>
+                <th>Job Title</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${contacts.map(c => {
+                const typeColors = CRM_TYPE_COLORS[c.type] || { bg: '#f5f5f5', color: '#616161' };
+                const statusBg = c.status === 'Active' ? '#e8f5e9' : '#f5f5f5';
+                const statusColor = c.status === 'Active' ? '#2e7d32' : '#616161';
+                return `<tr>
+                    <td>
+                        <div class="asset-name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}</div>
+                    </td>
+                    <td>${c.company ? escapeHtml(c.company) : '—'}</td>
+                    <td>${c.jobTitle ? escapeHtml(c.jobTitle) : '—'}</td>
+                    <td>${c.email ? `<a href="mailto:${escapeHtml(c.email)}" class="crm-email-link">${escapeHtml(c.email)}</a>` : '—'}</td>
+                    <td>${c.phone ? escapeHtml(c.phone) : '—'}</td>
+                    <td><span class="crm-type-badge" style="background:${typeColors.bg};color:${typeColors.color}">${escapeHtml(c.type)}</span></td>
+                    <td><span class="asset-status-badge" style="background:${statusBg};color:${statusColor}">${escapeHtml(c.status)}</span></td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="btn-icon" title="Edit" onclick="openContactModal('${escapeHtml(c.id)}')">✏️</button>
+                            <button class="btn-icon btn-icon-danger" title="Delete" onclick="deleteContact('${escapeHtml(c.id)}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+function openContactModal(contactId) {
+    const modal = document.getElementById('contact-modal');
+    const titleEl = document.getElementById('contact-modal-title');
+    const submitBtn = document.getElementById('contact-submit-btn');
+    document.getElementById('contact-id').value = '';
+    document.getElementById('contact-firstname').value = '';
+    document.getElementById('contact-lastname').value = '';
+    document.getElementById('contact-company').value = '';
+    document.getElementById('contact-jobtitle').value = '';
+    document.getElementById('contact-email').value = '';
+    document.getElementById('contact-phone').value = '';
+    document.getElementById('contact-type').value = '';
+    document.getElementById('contact-status').value = 'Active';
+    document.getElementById('contact-notes').value = '';
+    document.getElementById('contact-success').classList.add('hidden');
+    document.getElementById('contact-error').classList.add('hidden');
+
+    if (contactId) {
+        const contact = allCRMContacts.find(c => c.id === contactId);
+        if (contact) {
+            titleEl.textContent = 'Edit Contact';
+            submitBtn.textContent = 'Save Changes';
+            document.getElementById('contact-id').value = contact.id;
+            document.getElementById('contact-firstname').value = contact.firstName;
+            document.getElementById('contact-lastname').value = contact.lastName;
+            document.getElementById('contact-company').value = contact.company || '';
+            document.getElementById('contact-jobtitle').value = contact.jobTitle || '';
+            document.getElementById('contact-email').value = contact.email || '';
+            document.getElementById('contact-phone').value = contact.phone || '';
+            document.getElementById('contact-type').value = contact.type;
+            document.getElementById('contact-status').value = contact.status;
+            document.getElementById('contact-notes').value = contact.notes || '';
+        }
+    } else {
+        titleEl.textContent = 'Add Contact';
+        submitBtn.textContent = 'Add Contact';
+    }
+    modal.classList.remove('hidden');
+}
+
+function closeContactModal() {
+    document.getElementById('contact-modal').classList.add('hidden');
+}
+
+function closeContactModalOnBg(event) {
+    if (event.target === document.getElementById('contact-modal')) closeContactModal();
+}
+
+async function submitContact(event) {
+    event.preventDefault();
+    const id = document.getElementById('contact-id').value;
+    const successEl = document.getElementById('contact-success');
+    const errorEl = document.getElementById('contact-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        firstName: document.getElementById('contact-firstname').value.trim(),
+        lastName: document.getElementById('contact-lastname').value.trim(),
+        company: document.getElementById('contact-company').value.trim(),
+        jobTitle: document.getElementById('contact-jobtitle').value.trim(),
+        email: document.getElementById('contact-email').value.trim(),
+        phone: document.getElementById('contact-phone').value.trim(),
+        type: document.getElementById('contact-type').value,
+        status: document.getElementById('contact-status').value,
+        notes: document.getElementById('contact-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/crm/contacts/${id}` : `${API_URL}/crm/contacts`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving contact';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Contact updated!' : 'Contact added!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allCRMContacts.findIndex(c => c.id === id);
+            if (idx !== -1) allCRMContacts[idx] = data;
+        } else {
+            allCRMContacts.push(data);
+        }
+        renderCRMContacts();
+        renderCRMDashboard();
+        setTimeout(() => closeContactModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteContact(id) {
+    if (!confirm('Are you sure you want to delete this contact?')) return;
+    try {
+        const res = await fetch(`${API_URL}/crm/contacts/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting contact'); return; }
+        allCRMContacts = allCRMContacts.filter(c => c.id !== id);
+        renderCRMContacts();
+        renderCRMDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Sales Pipeline ───────────────────────────────────────────────────────────
+
+const PIPELINE_STAGES = ['Lead', 'Qualified', 'Proposal', 'Negotiation', 'Won', 'Lost'];
+
+const STAGE_COLORS = {
+    Lead:        { bg: '#e3f2fd', color: '#1565c0', header: '#1565c0' },
+    Qualified:   { bg: '#fff3e0', color: '#e65100', header: '#e65100' },
+    Proposal:    { bg: '#fff8e1', color: '#f9a825', header: '#f9a825' },
+    Negotiation: { bg: '#fce4ec', color: '#880e4f', header: '#880e4f' },
+    Won:         { bg: '#e8f5e9', color: '#2e7d32', header: '#2e7d32' },
+    Lost:        { bg: '#f5f5f5', color: '#616161', header: '#616161' }
+};
+
+const STAGE_DEFAULT_PROBABILITY = {
+    Lead: 10, Qualified: 30, Proposal: 50, Negotiation: 75, Won: 100, Lost: 0
+};
+
+const CURRENCY_SYMBOLS = { EUR: '€', GBP: '£', USD: '$', CHF: 'CHF ' };
+
+function showPipelineSection(sectionId, btn) {
+    document.querySelectorAll('#pipeline-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#pipeline-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+function autoFillProbability() {
+    const stage = document.getElementById('deal-stage').value;
+    if (stage && STAGE_DEFAULT_PROBABILITY[stage] !== undefined) {
+        document.getElementById('deal-probability').value = STAGE_DEFAULT_PROBABILITY[stage];
+    }
+}
+
+async function loadSalesPipeline() {
+    try {
+        const [dealsRes, contactsRes] = await Promise.all([
+            fetch(`${API_URL}/crm/deals`),
+            fetch(`${API_URL}/crm/contacts`)
+        ]);
+        if (!dealsRes.ok) throw new Error('Failed to load deals');
+        allCRMDeals = await dealsRes.json();
+        if (contactsRes.ok) allCRMContacts = await contactsRes.json();
+        renderPipelineKPIs();
+        renderPipelineBoard();
+        renderDealsList();
+    } catch (err) {
+        const k = document.getElementById('pipeline-kanban');
+        if (k) k.innerHTML = '<p class="error-state">Failed to load pipeline.</p>';
+    }
+}
+
+function formatCurrency(value, currency) {
+    const sym = CURRENCY_SYMBOLS[currency] || currency + ' ';
+    if (value >= 1000000) return sym + (value / 1000000).toFixed(1) + 'M';
+    if (value >= 1000) return sym + (value / 1000).toFixed(0) + 'k';
+    return sym + value.toLocaleString();
+}
+
+function renderPipelineKPIs() {
+    const active = allCRMDeals.filter(d => d.stage !== 'Won' && d.stage !== 'Lost');
+    const won = allCRMDeals.filter(d => d.stage === 'Won');
+    const lost = allCRMDeals.filter(d => d.stage === 'Lost');
+    const pipelineValue = active.reduce((s, d) => s + (parseFloat(d.value) || 0), 0);
+    const weightedValue = active.reduce((s, d) => s + (parseFloat(d.value) || 0) * ((parseFloat(d.probability) || 0) / 100), 0);
+    const closedTotal = won.length + lost.length;
+    const winRate = closedTotal > 0 ? Math.round((won.length / closedTotal) * 100) : 0;
+
+    const kpiEl = document.getElementById('pipeline-kpi-row');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${active.length}</div><div class="kpi-label">Active Deals</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#1565c0">${formatCurrency(pipelineValue, 'EUR')}</div><div class="kpi-label">Pipeline Value</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#f57f17">${formatCurrency(weightedValue, 'EUR')}</div><div class="kpi-label">Weighted Value</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${won.length}</div><div class="kpi-label">Deals Won</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${winRate}%</div><div class="kpi-label">Win Rate</div></div>
+        `;
+    }
+}
+
+function renderPipelineBoard() {
+    const kanban = document.getElementById('pipeline-kanban');
+    if (!kanban) return;
+
+    kanban.innerHTML = PIPELINE_STAGES.map(stage => {
+        const deals = allCRMDeals.filter(d => d.stage === stage);
+        const stageValue = deals.reduce((s, d) => s + (parseFloat(d.value) || 0), 0);
+        const sc = STAGE_COLORS[stage];
+
+        const dealCards = deals.length === 0
+            ? `<div class="pipeline-empty-col">No deals</div>`
+            : deals.map(deal => {
+                const contact = allCRMContacts.find(c => c.id === deal.contactId);
+                const contactName = contact ? `${contact.firstName} ${contact.lastName}` : '';
+                const sym = CURRENCY_SYMBOLS[deal.currency] || deal.currency + ' ';
+                return `<div class="pipeline-deal-card" onclick="openDealModal('${escapeHtml(deal.id)}')">
+                    <div class="deal-card-title">${escapeHtml(deal.title)}</div>
+                    ${deal.company ? `<div class="deal-card-company">${escapeHtml(deal.company)}</div>` : ''}
+                    ${contactName ? `<div class="deal-card-contact">👤 ${escapeHtml(contactName)}</div>` : ''}
+                    <div class="deal-card-footer">
+                        <span class="deal-card-value">${sym}${(parseFloat(deal.value) || 0).toLocaleString()}</span>
+                        <span class="deal-card-prob">${deal.probability}%</span>
+                    </div>
+                    ${deal.expectedCloseDate ? `<div class="deal-card-date">📅 ${deal.expectedCloseDate}</div>` : ''}
+                </div>`;
+            }).join('');
+
+        return `<div class="pipeline-column">
+            <div class="pipeline-col-header" style="background:${sc.header}">
+                <span class="pipeline-col-title">${stage}</span>
+                <span class="pipeline-col-count">${deals.length}</span>
+            </div>
+            ${stageValue > 0 ? `<div class="pipeline-col-value">${formatCurrency(stageValue, 'EUR')}</div>` : ''}
+            <div class="pipeline-col-cards">${dealCards}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderDealsList() {
+    const search = (document.getElementById('pipeline-search')?.value || '').toLowerCase();
+    const stage = document.getElementById('pipeline-filter-stage')?.value || '';
+
+    let deals = allCRMDeals.filter(d => {
+        if (stage && d.stage !== stage) return false;
+        if (search) {
+            const hay = [d.title, d.company, d.owner].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    const container = document.getElementById('pipeline-table-container');
+    if (!container) return;
+
+    if (deals.length === 0) {
+        container.innerHTML = '<p class="empty-state">No deals found. Click "+ Add Deal" to get started.</p>';
+        return;
+    }
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead>
+            <tr>
+                <th>Deal</th>
+                <th>Company</th>
+                <th>Value</th>
+                <th>Stage</th>
+                <th>Prob.</th>
+                <th>Close Date</th>
+                <th>Owner</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${deals.map(d => {
+                const sc = STAGE_COLORS[d.stage] || { bg: '#f5f5f5', color: '#616161' };
+                const sym = CURRENCY_SYMBOLS[d.currency] || d.currency + ' ';
+                return `<tr>
+                    <td><div class="asset-name">${escapeHtml(d.title)}</div></td>
+                    <td>${d.company ? escapeHtml(d.company) : '—'}</td>
+                    <td><strong>${sym}${(parseFloat(d.value) || 0).toLocaleString()}</strong></td>
+                    <td><span class="crm-type-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(d.stage)}</span></td>
+                    <td>${d.probability}%</td>
+                    <td>${d.expectedCloseDate || '—'}</td>
+                    <td>${d.owner ? escapeHtml(d.owner) : '—'}</td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="btn-icon" title="Edit" onclick="openDealModal('${escapeHtml(d.id)}')">✏️</button>
+                            <button class="btn-icon btn-icon-danger" title="Delete" onclick="deleteDeal('${escapeHtml(d.id)}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+function populateContactDropdown(selectedId) {
+    const sel = document.getElementById('deal-contact');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— None —</option>' +
+        allCRMContacts.map(c => `<option value="${escapeHtml(c.id)}"${c.id === selectedId ? ' selected' : ''}>${escapeHtml(c.firstName + ' ' + c.lastName)}${c.company ? ' (' + escapeHtml(c.company) + ')' : ''}</option>`).join('');
+}
+
+function openDealModal(dealId) {
+    const modal = document.getElementById('deal-modal');
+    const titleEl = document.getElementById('deal-modal-title');
+    const submitBtn = document.getElementById('deal-submit-btn');
+    document.getElementById('deal-id').value = '';
+    document.getElementById('deal-title').value = '';
+    document.getElementById('deal-company').value = '';
+    document.getElementById('deal-value').value = '';
+    document.getElementById('deal-currency').value = 'EUR';
+    document.getElementById('deal-stage').value = '';
+    document.getElementById('deal-probability').value = '';
+    document.getElementById('deal-close-date').value = '';
+    document.getElementById('deal-owner').value = '';
+    document.getElementById('deal-notes').value = '';
+    document.getElementById('deal-success').classList.add('hidden');
+    document.getElementById('deal-error').classList.add('hidden');
+
+    populateContactDropdown('');
+
+    if (dealId) {
+        const deal = allCRMDeals.find(d => d.id === dealId);
+        if (deal) {
+            titleEl.textContent = 'Edit Deal';
+            submitBtn.textContent = 'Save Changes';
+            document.getElementById('deal-id').value = deal.id;
+            document.getElementById('deal-title').value = deal.title;
+            document.getElementById('deal-company').value = deal.company || '';
+            document.getElementById('deal-value').value = deal.value || '';
+            document.getElementById('deal-currency').value = deal.currency || 'EUR';
+            document.getElementById('deal-stage').value = deal.stage;
+            document.getElementById('deal-probability').value = deal.probability !== undefined ? deal.probability : '';
+            document.getElementById('deal-close-date').value = deal.expectedCloseDate || '';
+            document.getElementById('deal-owner').value = deal.owner || '';
+            document.getElementById('deal-notes').value = deal.notes || '';
+            populateContactDropdown(deal.contactId);
+        }
+    } else {
+        titleEl.textContent = 'Add Deal';
+        submitBtn.textContent = 'Add Deal';
+    }
+    modal.classList.remove('hidden');
+}
+
+function closeDealModal() {
+    document.getElementById('deal-modal').classList.add('hidden');
+}
+
+function closeDealModalOnBg(event) {
+    if (event.target === document.getElementById('deal-modal')) closeDealModal();
+}
+
+async function submitDeal(event) {
+    event.preventDefault();
+    const id = document.getElementById('deal-id').value;
+    const successEl = document.getElementById('deal-success');
+    const errorEl = document.getElementById('deal-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        title: document.getElementById('deal-title').value.trim(),
+        contactId: document.getElementById('deal-contact').value,
+        company: document.getElementById('deal-company').value.trim(),
+        value: parseFloat(document.getElementById('deal-value').value) || 0,
+        currency: document.getElementById('deal-currency').value,
+        stage: document.getElementById('deal-stage').value,
+        probability: parseInt(document.getElementById('deal-probability').value, 10) || 0,
+        expectedCloseDate: document.getElementById('deal-close-date').value,
+        owner: document.getElementById('deal-owner').value.trim(),
+        notes: document.getElementById('deal-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/crm/deals/${id}` : `${API_URL}/crm/deals`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving deal';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Deal updated!' : 'Deal added!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allCRMDeals.findIndex(d => d.id === id);
+            if (idx !== -1) allCRMDeals[idx] = data;
+        } else {
+            allCRMDeals.push(data);
+        }
+        renderPipelineKPIs();
+        renderPipelineBoard();
+        renderDealsList();
+        setTimeout(() => closeDealModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteDeal(id) {
+    if (!confirm('Are you sure you want to delete this deal?')) return;
+    try {
+        const res = await fetch(`${API_URL}/crm/deals/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting deal'); return; }
+        allCRMDeals = allCRMDeals.filter(d => d.id !== id);
+        renderPipelineKPIs();
+        renderPipelineBoard();
+        renderDealsList();
     } catch (err) {
         alert('Network error. Please try again.');
     }
