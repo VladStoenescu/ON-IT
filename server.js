@@ -21,6 +21,7 @@ const EMPLOYEE_SKILLS_FILE = path.join(__dirname, 'data', 'employee-skills.json'
 const SKILL_CATEGORIES_FILE = path.join(__dirname, 'data', 'skill-categories.json');
 const CRM_CONTACTS_FILE = path.join(__dirname, 'data', 'crm-contacts.json');
 const CRM_DEALS_FILE = path.join(__dirname, 'data', 'crm-deals.json');
+const PROCESS_OWNERSHIP_FILE = path.join(__dirname, 'data', 'process-ownership.json');
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -77,6 +78,9 @@ if (!fsSync.existsSync(CRM_CONTACTS_FILE)) {
 }
 if (!fsSync.existsSync(CRM_DEALS_FILE)) {
     fsSync.writeFileSync(CRM_DEALS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(PROCESS_OWNERSHIP_FILE)) {
+    fsSync.writeFileSync(PROCESS_OWNERSHIP_FILE, JSON.stringify([], null, 2));
 }
 if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     const defaultCategories = [
@@ -1625,6 +1629,179 @@ app.delete('/api/crm/deals/:id', strictLimiter, async (req, res) => {
         res.json({ message: 'Deal deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting deal' });
+    }
+});
+
+// ─── Process Ownership Map ───────────────────────────────────────────────────
+
+const PROCESS_CATEGORIES = ['HR', 'Finance', 'IT', 'Operations', 'Sales', 'Legal & Compliance', 'Marketing', 'Executive', 'Other'];
+const PROCESS_STATUSES = ['active', 'inactive', 'under_review'];
+const PROCESS_CRITICALITIES = ['low', 'medium', 'high', 'critical'];
+const REVIEW_FREQUENCIES = ['monthly', 'quarterly', 'bi-annually', 'annually', 'as-needed'];
+
+app.get('/api/process-ownership/kpis', async (req, res) => {
+    try {
+        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const total = processes.length;
+        const active = processes.filter(p => p.status === 'active').length;
+        const uniqueOwners = new Set(processes.map(p => p.primaryOwner).filter(Boolean)).size;
+        const critical = processes.filter(p => p.criticality === 'critical').length;
+
+        const byCategory = {};
+        processes.forEach(p => {
+            const cat = p.category || 'Other';
+            byCategory[cat] = (byCategory[cat] || 0) + 1;
+        });
+
+        const byDepartment = {};
+        processes.forEach(p => {
+            const dept = p.department || 'Unknown';
+            byDepartment[dept] = (byDepartment[dept] || 0) + 1;
+        });
+
+        const ownerLoadMap = {};
+        processes.forEach(p => {
+            if (p.primaryOwner) {
+                if (!ownerLoadMap[p.primaryOwner]) {
+                    ownerLoadMap[p.primaryOwner] = { name: p.primaryOwner, count: 0 };
+                }
+                ownerLoadMap[p.primaryOwner].count++;
+            }
+        });
+        const topOwners = Object.values(ownerLoadMap)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        res.json({ total, active, uniqueOwners, critical, byCategory, byDepartment, topOwners });
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching process KPIs' });
+    }
+});
+
+app.get('/api/process-ownership', async (req, res) => {
+    try {
+        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        res.json(processes);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching processes' });
+    }
+});
+
+app.post('/api/process-ownership', strictLimiter, async (req, res) => {
+    try {
+        const {
+            processName, description, category, department,
+            primaryOwner, primaryOwnerEmail, backupOwner, backupOwnerEmail,
+            status, criticality, reviewFrequency, lastReviewDate, nextReviewDate, notes
+        } = req.body;
+
+        if (!processName || typeof processName !== 'string' || !processName.trim()) {
+            return res.status(400).json({ error: 'Process name is required' });
+        }
+        if (category && !PROCESS_CATEGORIES.includes(category)) {
+            return res.status(400).json({ error: 'Invalid category' });
+        }
+        if (status && !PROCESS_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        if (criticality && !PROCESS_CRITICALITIES.includes(criticality)) {
+            return res.status(400).json({ error: 'Invalid criticality' });
+        }
+        if (reviewFrequency && !REVIEW_FREQUENCIES.includes(reviewFrequency)) {
+            return res.status(400).json({ error: 'Invalid review frequency' });
+        }
+
+        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const newProcess = {
+            id: generateId(),
+            processName: processName.trim(),
+            description: (description || '').trim(),
+            category: category || 'Other',
+            department: (department || '').trim(),
+            primaryOwner: (primaryOwner || '').trim(),
+            primaryOwnerEmail: (primaryOwnerEmail || '').trim(),
+            backupOwner: (backupOwner || '').trim(),
+            backupOwnerEmail: (backupOwnerEmail || '').trim(),
+            status: status || 'active',
+            criticality: criticality || 'medium',
+            reviewFrequency: reviewFrequency || 'quarterly',
+            lastReviewDate: lastReviewDate || null,
+            nextReviewDate: nextReviewDate || null,
+            notes: (notes || '').trim(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        processes.push(newProcess);
+        await writeJson(PROCESS_OWNERSHIP_FILE, processes);
+        res.status(201).json(newProcess);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating process' });
+    }
+});
+
+app.put('/api/process-ownership/:id', strictLimiter, async (req, res) => {
+    try {
+        const {
+            processName, description, category, department,
+            primaryOwner, primaryOwnerEmail, backupOwner, backupOwnerEmail,
+            status, criticality, reviewFrequency, lastReviewDate, nextReviewDate, notes
+        } = req.body;
+
+        if (!processName || typeof processName !== 'string' || !processName.trim()) {
+            return res.status(400).json({ error: 'Process name is required' });
+        }
+        if (category && !PROCESS_CATEGORIES.includes(category)) {
+            return res.status(400).json({ error: 'Invalid category' });
+        }
+        if (status && !PROCESS_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        if (criticality && !PROCESS_CRITICALITIES.includes(criticality)) {
+            return res.status(400).json({ error: 'Invalid criticality' });
+        }
+        if (reviewFrequency && !REVIEW_FREQUENCIES.includes(reviewFrequency)) {
+            return res.status(400).json({ error: 'Invalid review frequency' });
+        }
+
+        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const idx = processes.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Process not found' });
+
+        processes[idx] = {
+            ...processes[idx],
+            processName: processName.trim(),
+            description: (description || '').trim(),
+            category: category || processes[idx].category,
+            department: (department || '').trim(),
+            primaryOwner: (primaryOwner || '').trim(),
+            primaryOwnerEmail: (primaryOwnerEmail || '').trim(),
+            backupOwner: (backupOwner || '').trim(),
+            backupOwnerEmail: (backupOwnerEmail || '').trim(),
+            status: status || processes[idx].status,
+            criticality: criticality || processes[idx].criticality,
+            reviewFrequency: reviewFrequency || processes[idx].reviewFrequency,
+            lastReviewDate: lastReviewDate !== undefined ? lastReviewDate : processes[idx].lastReviewDate,
+            nextReviewDate: nextReviewDate !== undefined ? nextReviewDate : processes[idx].nextReviewDate,
+            notes: (notes || '').trim(),
+            updatedAt: new Date().toISOString()
+        };
+        await writeJson(PROCESS_OWNERSHIP_FILE, processes);
+        res.json(processes[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating process' });
+    }
+});
+
+app.delete('/api/process-ownership/:id', strictLimiter, async (req, res) => {
+    try {
+        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const idx = processes.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Process not found' });
+        processes.splice(idx, 1);
+        await writeJson(PROCESS_OWNERSHIP_FILE, processes);
+        res.json({ message: 'Process deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting process' });
     }
 });
 

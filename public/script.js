@@ -14,7 +14,8 @@ const PAGE_TITLES = {
     assets: 'IT Asset Inventory',
     skills: 'Skills & Talent',
     crm: 'CRM Contacts',
-    pipeline: 'Sales Pipeline'
+    pipeline: 'Sales Pipeline',
+    processes: 'Process Ownership Map'
 };
 
 // Store all ideas for filtering
@@ -29,6 +30,9 @@ let allITAssets = [];
 // Store all CRM contacts and deals for filtering
 let allCRMContacts = [];
 let allCRMDeals = [];
+
+// Store all process ownership entries for filtering
+let allProcessOwnership = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -78,6 +82,9 @@ function showTab(tabName) {
     }
     if (tabName === 'pipeline') {
         loadSalesPipeline();
+    }
+    if (tabName === 'processes') {
+        loadProcessOwnership();
     }
 
     // Close sidebar on mobile after navigating
@@ -3281,6 +3288,335 @@ async function deleteDeal(id) {
         renderPipelineKPIs();
         renderPipelineBoard();
         renderDealsList();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Process Ownership Map ─────────────────────────────────────────────────
+
+const PROCESS_CRITICALITY_COLORS = {
+    critical: '#dc2626',
+    high:     '#ea580c',
+    medium:   '#ca8a04',
+    low:      '#16a34a'
+};
+
+const PROCESS_STATUS_LABELS = {
+    active:       'Active',
+    inactive:     'Inactive',
+    under_review: 'Under Review'
+};
+
+const PROCESS_CATEGORY_COLORS = {
+    'HR':                 '#6366f1',
+    'Finance':            '#0ea5e9',
+    'IT':                 '#8b5cf6',
+    'Operations':         '#f59e0b',
+    'Sales':              '#10b981',
+    'Legal & Compliance': '#ef4444',
+    'Marketing':          '#ec4899',
+    'Executive':          '#64748b',
+    'Other':              '#94a3b8'
+};
+
+function showProcessesSection(sectionId, btn) {
+    document.querySelectorAll('#processes-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#processes-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const section = document.getElementById(sectionId);
+    if (section) section.classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (sectionId === 'processes-list') renderProcessMap();
+}
+
+async function loadProcessOwnership() {
+    try {
+        const res = await fetch(`${API_URL}/process-ownership`);
+        if (!res.ok) {
+            console.error('Error loading processes: HTTP', res.status, res.statusText);
+            allProcessOwnership = [];
+            return;
+        }
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+            console.error('Unexpected process ownership payload shape; expected an array.', data);
+            allProcessOwnership = [];
+            return;
+        }
+        allProcessOwnership = data;
+        renderProcessMap();
+        renderProcessDashboard();
+    } catch (err) {
+        console.error('Error loading processes', err);
+        allProcessOwnership = [];
+    }
+}
+
+function renderProcessDashboard() {
+    // KPI cards
+    const kpiContainer = document.getElementById('processes-kpi-cards');
+    if (!kpiContainer) return;
+
+    const total = allProcessOwnership.length;
+    const active = allProcessOwnership.filter(p => p.status === 'active').length;
+    const uniqueOwners = new Set(allProcessOwnership.map(p => p.primaryOwner).filter(Boolean)).size;
+    const critical = allProcessOwnership.filter(p => p.criticality === 'critical').length;
+
+    kpiContainer.innerHTML = `
+        <div class="kpi-card">
+            <div class="kpi-label">Total Processes</div>
+            <div class="kpi-value">${total}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Active Processes</div>
+            <div class="kpi-value">${active}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Unique Owners</div>
+            <div class="kpi-value">${uniqueOwners}</div>
+        </div>
+        <div class="kpi-card kpi-card-warn">
+            <div class="kpi-label">Critical Processes</div>
+            <div class="kpi-value">${critical}</div>
+        </div>
+    `;
+
+    // By Category chart
+    const byCatEl = document.getElementById('processes-by-category');
+    if (byCatEl) {
+        const byCat = {};
+        allProcessOwnership.forEach(p => { const c = p.category || 'Other'; byCat[c] = (byCat[c] || 0) + 1; });
+        const maxCat = Math.max(...Object.values(byCat), 1);
+        const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([cat, cnt]) => `
+            <div class="chart-bar-row">
+                <span class="chart-bar-label">${escapeHtml(cat)}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width:${Math.round(cnt / maxCat * 100)}%;background:${PROCESS_CATEGORY_COLORS[cat] || '#94a3b8'}"></div>
+                </div>
+                <span class="chart-bar-count">${cnt}</span>
+            </div>`).join('');
+        byCatEl.innerHTML = `<div class="dashboard-card"><h3 class="dashboard-card-title">By Category</h3>${catRows || '<p class="empty-state-text">No data yet.</p>'}</div>`;
+    }
+
+    // By Department chart
+    const byDeptEl = document.getElementById('processes-by-dept');
+    if (byDeptEl) {
+        const byDept = {};
+        allProcessOwnership.forEach(p => { const d = p.department || 'Unknown'; byDept[d] = (byDept[d] || 0) + 1; });
+        const maxDept = Math.max(...Object.values(byDept), 1);
+        const deptRows = Object.entries(byDept).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([dept, cnt]) => `
+            <div class="chart-bar-row">
+                <span class="chart-bar-label">${escapeHtml(dept)}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width:${Math.round(cnt / maxDept * 100)}%;background:#6366f1"></div>
+                </div>
+                <span class="chart-bar-count">${cnt}</span>
+            </div>`).join('');
+        byDeptEl.innerHTML = `<div class="dashboard-card"><h3 class="dashboard-card-title">By Department</h3>${deptRows || '<p class="empty-state-text">No data yet.</p>'}</div>`;
+    }
+
+    // Top owners
+    const topOwnersEl = document.getElementById('processes-top-owners');
+    if (topOwnersEl) {
+        const ownerMap = {};
+        allProcessOwnership.forEach(p => {
+            if (p.primaryOwner) { ownerMap[p.primaryOwner] = (ownerMap[p.primaryOwner] || 0) + 1; }
+        });
+        const topOwners = Object.entries(ownerMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        const ownerRows = topOwners.map(([name, cnt]) => `
+            <div class="recent-item">
+                <div class="recent-item-main">
+                    <span class="po-owner-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</span>
+                    <div>
+                        <div class="recent-item-name">${escapeHtml(name)}</div>
+                        <div class="recent-item-sub">${cnt} process${cnt !== 1 ? 'es' : ''} owned</div>
+                    </div>
+                </div>
+            </div>`).join('');
+        topOwnersEl.innerHTML = `<div class="dashboard-card"><h3 class="dashboard-card-title">Top Process Owners</h3>${ownerRows || '<p class="empty-state-text">No owners yet.</p>'}</div>`;
+    }
+}
+
+function renderProcessMap() {
+    const container = document.getElementById('processes-table-container');
+    if (!container) return;
+
+    const search = (document.getElementById('processes-search')?.value || '').toLowerCase();
+    const filterCat = document.getElementById('processes-filter-category')?.value || '';
+    const filterStatus = document.getElementById('processes-filter-status')?.value || '';
+    const filterCrit = document.getElementById('processes-filter-criticality')?.value || '';
+
+    let filtered = allProcessOwnership.filter(p => {
+        const matchSearch = !search ||
+            (p.processName || '').toLowerCase().includes(search) ||
+            (p.primaryOwner || '').toLowerCase().includes(search) ||
+            (p.department || '').toLowerCase().includes(search) ||
+            (p.description || '').toLowerCase().includes(search);
+        const matchCat = !filterCat || p.category === filterCat;
+        const matchStatus = !filterStatus || p.status === filterStatus;
+        const matchCrit = !filterCrit || p.criticality === filterCrit;
+        return matchSearch && matchCat && matchStatus && matchCrit;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="empty-state"><p>${allProcessOwnership.length === 0 ? 'No processes yet. Click <b>+ Add Process</b> to get started.' : 'No processes match the current filters.'}</p></div>`;
+        return;
+    }
+
+    const rows = filtered.map(p => {
+        const critColor = PROCESS_CRITICALITY_COLORS[p.criticality] || '#94a3b8';
+        const catColor = PROCESS_CATEGORY_COLORS[p.category] || '#94a3b8';
+        const statusLabel = PROCESS_STATUS_LABELS[p.status] || p.status;
+        const statusClass = p.status === 'active' ? 'po-status-active' : p.status === 'under_review' ? 'po-status-review' : 'po-status-inactive';
+        return `
+        <tr>
+            <td><strong>${escapeHtml(p.processName)}</strong>${p.description ? `<br><span class="po-desc-sub">${escapeHtml(p.description)}</span>` : ''}</td>
+            <td><span class="po-category-badge" style="background:${catColor}20;color:${catColor};border:1px solid ${catColor}40">${escapeHtml(p.category || 'Other')}</span></td>
+            <td>${escapeHtml(p.department || '—')}</td>
+            <td>
+                ${p.primaryOwner ? `<span class="po-owner-chip">${escapeHtml(p.primaryOwner)}</span>` : '—'}
+                ${p.backupOwner ? `<br><span class="po-backup-chip">↳ ${escapeHtml(p.backupOwner)}</span>` : ''}
+            </td>
+            <td><span class="po-criticality-dot" style="background:${critColor}"></span> ${p.criticality ? p.criticality.charAt(0).toUpperCase() + p.criticality.slice(1) : '—'}</td>
+            <td><span class="po-status-badge ${statusClass}">${statusLabel}</span></td>
+            <td>${p.nextReviewDate ? new Date(p.nextReviewDate).toLocaleDateString() : '—'}</td>
+            <td class="table-actions">
+                <button class="btn-icon" onclick="openProcessOwnershipModal('${escapeHtml(p.id)}')" title="Edit">✏️</button>
+                <button class="btn-icon btn-danger" onclick="deleteProcess('${escapeHtml(p.id)}')" title="Delete">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="asset-table-scroll">
+            <table class="asset-table">
+                <thead>
+                    <tr>
+                        <th>Process</th>
+                        <th>Category</th>
+                        <th>Department</th>
+                        <th>Owner(s)</th>
+                        <th>Criticality</th>
+                        <th>Status</th>
+                        <th>Next Review</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+}
+
+function openProcessOwnershipModal(id) {
+    const modal = document.getElementById('process-ownership-modal');
+    const titleEl = document.getElementById('po-modal-title');
+    const submitBtn = document.getElementById('po-submit-btn');
+    const form = document.getElementById('process-ownership-form');
+    form.reset();
+    document.getElementById('po-success').classList.add('hidden');
+    document.getElementById('po-error').classList.add('hidden');
+
+    if (id) {
+        const p = allProcessOwnership.find(x => x.id === id);
+        if (!p) return;
+        titleEl.textContent = 'Edit Process';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('po-id').value = p.id;
+        document.getElementById('po-name').value = p.processName || '';
+        document.getElementById('po-category').value = p.category || 'Other';
+        document.getElementById('po-department').value = p.department || '';
+        document.getElementById('po-status').value = p.status || 'active';
+        document.getElementById('po-criticality').value = p.criticality || 'medium';
+        document.getElementById('po-review-frequency').value = p.reviewFrequency || 'quarterly';
+        document.getElementById('po-primary-owner').value = p.primaryOwner || '';
+        document.getElementById('po-primary-owner-email').value = p.primaryOwnerEmail || '';
+        document.getElementById('po-backup-owner').value = p.backupOwner || '';
+        document.getElementById('po-backup-owner-email').value = p.backupOwnerEmail || '';
+        document.getElementById('po-last-review').value = p.lastReviewDate || '';
+        document.getElementById('po-next-review').value = p.nextReviewDate || '';
+        document.getElementById('po-description').value = p.description || '';
+        document.getElementById('po-notes').value = p.notes || '';
+    } else {
+        titleEl.textContent = 'Add Process';
+        submitBtn.textContent = 'Add Process';
+        document.getElementById('po-id').value = '';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeProcessOwnershipModal() {
+    document.getElementById('process-ownership-modal').classList.add('hidden');
+}
+
+function closeProcessOwnershipModalOnBg(e) {
+    if (e.target === document.getElementById('process-ownership-modal')) closeProcessOwnershipModal();
+}
+
+async function submitProcessOwnership(event) {
+    event.preventDefault();
+    const id = document.getElementById('po-id').value;
+    const successEl = document.getElementById('po-success');
+    const errorEl = document.getElementById('po-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        processName: document.getElementById('po-name').value.trim(),
+        category: document.getElementById('po-category').value,
+        department: document.getElementById('po-department').value.trim(),
+        status: document.getElementById('po-status').value,
+        criticality: document.getElementById('po-criticality').value,
+        reviewFrequency: document.getElementById('po-review-frequency').value,
+        primaryOwner: document.getElementById('po-primary-owner').value.trim(),
+        primaryOwnerEmail: document.getElementById('po-primary-owner-email').value.trim(),
+        backupOwner: document.getElementById('po-backup-owner').value.trim(),
+        backupOwnerEmail: document.getElementById('po-backup-owner-email').value.trim(),
+        lastReviewDate: document.getElementById('po-last-review').value || null,
+        nextReviewDate: document.getElementById('po-next-review').value || null,
+        description: document.getElementById('po-description').value.trim(),
+        notes: document.getElementById('po-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/process-ownership/${id}` : `${API_URL}/process-ownership`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving process';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Process updated!' : 'Process added!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allProcessOwnership.findIndex(p => p.id === id);
+            if (idx !== -1) allProcessOwnership[idx] = data;
+        } else {
+            allProcessOwnership.push(data);
+        }
+        renderProcessMap();
+        renderProcessDashboard();
+        setTimeout(() => closeProcessOwnershipModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteProcess(id) {
+    if (!confirm('Are you sure you want to delete this process?')) return;
+    try {
+        const res = await fetch(`${API_URL}/process-ownership/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting process'); return; }
+        allProcessOwnership = allProcessOwnership.filter(p => p.id !== id);
+        renderProcessMap();
+        renderProcessDashboard();
     } catch (err) {
         alert('Network error. Please try again.');
     }
