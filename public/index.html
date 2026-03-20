@@ -988,6 +988,7 @@
                         <button class="sub-tab-btn active" onclick="showMeetingsSection('meetings-dashboard', this)">Dashboard</button>
                         <button class="sub-tab-btn" onclick="showMeetingsSection('meetings-list', this)">All Meetings</button>
                         <button class="sub-tab-btn" onclick="showMeetingsSection('meetings-todos', this)">All Todos</button>
+                        <button id="meetings-protocols-tab-btn" class="sub-tab-btn" onclick="showMeetingsSection('meetings-protocols', this)">All Protocols</button>
                     </div>
 
                     <!-- Dashboard Section -->
@@ -1062,6 +1063,23 @@
                         </div>
                         <div id="todos-table-container" class="asset-table-wrapper">
                             <p class="loading">Loading todos…</p>
+                        </div>
+                    </div>
+                    <!-- All Protocols Section -->
+                    <div id="meetings-protocols" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">All Protocols</h2>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="protocols-search" placeholder="Search by title, author, meeting…" oninput="renderAllProtocols()" class="ls-filter-input">
+                            <select id="protocols-filter-status" onchange="renderAllProtocols()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="Draft">Draft</option>
+                                <option value="Final">Final</option>
+                            </select>
+                        </div>
+                        <div id="protocols-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading protocols…</p>
                         </div>
                     </div>
                 </div>
@@ -1189,6 +1207,49 @@
                     <div class="modal-footer">
                         <button type="button" class="btn-secondary" onclick="closeTodoModal()">Cancel</button>
                         <button type="submit" id="todo-submit-btn" class="btn-primary">Add Action Item</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Protocol Modal -->
+    <div id="protocol-modal" class="modal-overlay hidden" onclick="closeProtocolModalOnBg(event)">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3 id="protocol-modal-title">Add Protocol</h3>
+                <button class="modal-close" onclick="closeProtocolModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="protocol-form" onsubmit="submitProtocol(event)">
+                    <input type="hidden" id="protocol-meeting-id">
+                    <input type="hidden" id="protocol-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Title *</label>
+                            <input type="text" id="protocol-title" required placeholder="e.g. Q1 Management Meeting Protocol">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="protocol-status">
+                                <option value="Draft">Draft</option>
+                                <option value="Final">Final</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Author</label>
+                        <input type="text" id="protocol-author" placeholder="e.g. Jane Smith">
+                    </div>
+                    <div class="form-group">
+                        <label>Content *</label>
+                        <textarea id="protocol-content" rows="10" required placeholder="Write the meeting protocol / minutes here…" class="protocol-content-area"></textarea>
+                    </div>
+                    <p id="protocol-success" class="form-success hidden"></p>
+                    <p id="protocol-error" class="form-error hidden"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeProtocolModal()">Cancel</button>
+                        <button type="submit" id="protocol-submit-btn" class="btn-primary">Add Protocol</button>
                     </div>
                 </form>
             </div>
