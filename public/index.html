@@ -92,6 +92,13 @@
                     <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="3.5" height="12" rx="1"/><rect x="8.25" y="4" width="3.5" height="12" rx="1"/><rect x="14.5" y="4" width="3.5" height="12" rx="1"/></svg>
                     <span>Sales Pipeline</span>
                 </button>
+
+                <p class="nav-group-label">Operations</p>
+
+                <button class="nav-item" data-section="processes" onclick="showTab('processes', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="2"/><circle cx="15" cy="5" r="2"/><circle cx="5" cy="15" r="2"/><circle cx="15" cy="15" r="2"/><line x1="7" y1="5" x2="13" y2="5"/><line x1="5" y1="7" x2="5" y2="13"/><line x1="15" y1="7" x2="15" y2="13"/><line x1="7" y1="15" x2="13" y2="15"/></svg>
+                    <span>Process Map</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -822,6 +829,65 @@
                         </div>
                     </div>
                 </div>
+                <!-- ─── Process Ownership Map Tab ─────────────────────────── -->
+                <div id="processes-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showProcessesSection('processes-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showProcessesSection('processes-list', this)">Process Map</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="processes-dashboard" class="ob-section active">
+                        <div id="processes-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div id="processes-by-category"></div>
+                            <div id="processes-by-dept"></div>
+                            <div id="processes-top-owners"></div>
+                        </div>
+                    </div>
+
+                    <!-- Process Map List Section -->
+                    <div id="processes-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Process Ownership Map</h2>
+                            <button class="btn-primary" onclick="openProcessOwnershipModal()">+ Add Process</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="processes-search" placeholder="Search by name, owner or department…" oninput="renderProcessMap()" class="ls-filter-input">
+                            <select id="processes-filter-category" onchange="renderProcessMap()" class="ls-filter-select">
+                                <option value="">All Categories</option>
+                                <option value="HR">HR</option>
+                                <option value="Finance">Finance</option>
+                                <option value="IT">IT</option>
+                                <option value="Operations">Operations</option>
+                                <option value="Sales">Sales</option>
+                                <option value="Legal &amp; Compliance">Legal &amp; Compliance</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Executive">Executive</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <select id="processes-filter-status" onchange="renderProcessMap()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="under_review">Under Review</option>
+                            </select>
+                            <select id="processes-filter-criticality" onchange="renderProcessMap()" class="ls-filter-select">
+                                <option value="">All Criticalities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div id="processes-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading processes…</p>
+                        </div>
+                    </div>
+                </div>
 
             </main>
         </div>
@@ -1514,6 +1580,120 @@
                     </div>
                     <div id="deal-success" class="message success hidden"></div>
                     <div id="deal-error" class="message error hidden"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Ownership Modal -->
+    <div id="process-ownership-modal" class="modal-overlay hidden" onclick="closeProcessOwnershipModalOnBg(event)">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3 id="po-modal-title">Add Process</h3>
+                <button class="modal-close" onclick="closeProcessOwnershipModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="process-ownership-form" onsubmit="submitProcessOwnership(event)">
+                    <input type="hidden" id="po-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Process Name *</label>
+                            <input type="text" id="po-name" required placeholder="e.g. Employee Onboarding">
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="po-category">
+                                <option value="HR">HR</option>
+                                <option value="Finance">Finance</option>
+                                <option value="IT">IT</option>
+                                <option value="Operations">Operations</option>
+                                <option value="Sales">Sales</option>
+                                <option value="Legal &amp; Compliance">Legal &amp; Compliance</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Executive">Executive</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Department</label>
+                            <input type="text" id="po-department" placeholder="e.g. Human Resources">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="po-status">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="under_review">Under Review</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Criticality</label>
+                            <select id="po-criticality">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Review Frequency</label>
+                            <select id="po-review-frequency">
+                                <option value="monthly">Monthly</option>
+                                <option value="quarterly" selected>Quarterly</option>
+                                <option value="bi-annually">Bi-Annually</option>
+                                <option value="annually">Annually</option>
+                                <option value="as-needed">As Needed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Primary Owner</label>
+                            <input type="text" id="po-primary-owner" placeholder="e.g. Jane Smith">
+                        </div>
+                        <div class="form-group">
+                            <label>Primary Owner Email</label>
+                            <input type="email" id="po-primary-owner-email" placeholder="e.g. jane.smith@company.com">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Backup Owner</label>
+                            <input type="text" id="po-backup-owner" placeholder="e.g. John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label>Backup Owner Email</label>
+                            <input type="email" id="po-backup-owner-email" placeholder="e.g. john.doe@company.com">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Last Review Date</label>
+                            <input type="date" id="po-last-review">
+                        </div>
+                        <div class="form-group">
+                            <label>Next Review Date</label>
+                            <input type="date" id="po-next-review">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="po-description" rows="2" placeholder="Brief description of this process"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="po-notes" rows="2" placeholder="Additional notes"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeProcessOwnershipModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="po-submit-btn">Add Process</button>
+                    </div>
+                    <div id="po-success" class="message success hidden"></div>
+                    <div id="po-error" class="message error hidden"></div>
                 </form>
             </div>
         </div>
