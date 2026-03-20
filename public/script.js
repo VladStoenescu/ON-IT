@@ -17,7 +17,8 @@ const PAGE_TITLES = {
     pipeline: 'Sales Pipeline',
     processes: 'Process Ownership Map',
     partnerships: 'Partnerships',
-    meetings: 'Meetings'
+    meetings: 'Meetings',
+    evaluations: 'Evaluations'
 };
 
 // Store all ideas for filtering
@@ -41,6 +42,9 @@ let allPartnerships = [];
 
 // Store all meetings for filtering
 let allMeetings = [];
+
+// Store all evaluations for filtering
+let allEvaluations = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -99,6 +103,9 @@ function showTab(tabName) {
     }
     if (tabName === 'meetings') {
         loadMeetings();
+    }
+    if (tabName === 'evaluations') {
+        loadEvaluations();
     }
 
     // Close sidebar on mobile after navigating
@@ -4664,6 +4671,498 @@ async function deleteProtocol(meetingId, protocolId) {
         renderAllProtocols();
         renderMeetings();
         renderMeetingsDashboard();
+    } catch {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Employee Evaluations ─────────────────────────────────────────────────────
+
+const EVAL_TYPE_COLORS = {
+    'Annual Review':    { bg: '#e3f2fd', color: '#1565c0' },
+    'Mid-Year Review':  { bg: '#f3e5f5', color: '#6a1b9a' },
+    'Probation Review': { bg: '#fff3e0', color: '#e65100' },
+    '360 Feedback':     { bg: '#e8f5e9', color: '#2e7d32' },
+    'Other':            { bg: '#f5f5f5', color: '#616161' }
+};
+
+const EVAL_STATUS_COLORS = {
+    'Draft':       { bg: '#fff8e1', color: '#f57f17' },
+    'In Progress': { bg: '#e3f2fd', color: '#1565c0' },
+    'Completed':   { bg: '#e8f5e9', color: '#2e7d32' }
+};
+
+const EVAL_GOAL_STATUS_COLORS = {
+    'Not Started':  { bg: '#f5f5f5', color: '#616161' },
+    'In Progress':  { bg: '#e3f2fd', color: '#1565c0' },
+    'Achieved':     { bg: '#e8f5e9', color: '#2e7d32' },
+    'Not Achieved': { bg: '#fdecea', color: '#c62828' }
+};
+
+function showEvaluationsSection(sectionId, btn) {
+    document.querySelectorAll('#evaluations-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#evaluations-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (sectionId === 'evaluations-goals') renderAllEvalGoals();
+}
+
+async function loadEvaluations() {
+    try {
+        const res = await fetch(`${API_URL}/evaluations`);
+        if (!res.ok) throw new Error('Failed to load evaluations');
+        allEvaluations = await res.json();
+        renderEvaluations();
+        renderEvaluationsDashboard();
+        renderAllEvalGoals();
+    } catch (err) {
+        const c = document.getElementById('evaluations-table-container');
+        if (c) c.innerHTML = '<p class="error-state">Failed to load evaluations.</p>';
+    }
+}
+
+function renderEvaluationsDashboard() {
+    const total = allEvaluations.length;
+    const draft = allEvaluations.filter(e => e.status === 'Draft').length;
+    const inProgress = allEvaluations.filter(e => e.status === 'In Progress').length;
+    const completed = allEvaluations.filter(e => e.status === 'Completed').length;
+    const allGoals = allEvaluations.flatMap(e => e.goals || []);
+    const openGoals = allGoals.filter(g => g.status !== 'Achieved' && g.status !== 'Not Achieved').length;
+
+    const kpiEl = document.getElementById('evaluations-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total Evaluations</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#f57f17">${draft}</div><div class="kpi-label">Draft</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#1565c0">${inProgress}</div><div class="kpi-label">In Progress</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${completed}</div><div class="kpi-label">Completed</div></div>
+            <div class="kpi-card${openGoals > 0 ? ' kpi-card-warn' : ''}"><div class="kpi-value" style="color:#e65100">${openGoals}</div><div class="kpi-label">Open Goals</div></div>
+        `;
+    }
+
+    // By type chart
+    const byType = {};
+    allEvaluations.forEach(e => { byType[e.type] = (byType[e.type] || 0) + 1; });
+    const byTypeEl = document.getElementById('evaluations-by-type');
+    if (byTypeEl) {
+        if (Object.keys(byType).length === 0) {
+            byTypeEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No evaluations yet.</p>';
+        } else {
+            byTypeEl.innerHTML = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+                const pct = Math.round((count / total) * 100);
+                const col = (EVAL_TYPE_COLORS[type] || { color: '#616161' }).color;
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(type)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // By status chart
+    const byStatus = {};
+    allEvaluations.forEach(e => { byStatus[e.status] = (byStatus[e.status] || 0) + 1; });
+    const byStatusEl = document.getElementById('evaluations-by-status');
+    if (byStatusEl) {
+        if (Object.keys(byStatus).length === 0) {
+            byStatusEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No data yet.</p>';
+        } else {
+            const maxStatusCount = Math.max(...Object.values(byStatus));
+            byStatusEl.innerHTML = Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([st, count]) => {
+                const pct = Math.round((count / maxStatusCount) * 100);
+                const col = (EVAL_STATUS_COLORS[st] || { color: '#9e9e9e' }).color;
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(st)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Recent evaluations list
+    const recentEl = document.getElementById('evaluations-recent');
+    if (recentEl) {
+        const recentList = [...allEvaluations]
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+            .slice(0, 5);
+        if (recentList.length === 0) {
+            recentEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No evaluations yet.</p>';
+        } else {
+            recentEl.innerHTML = recentList.map(e => {
+                const typeColors = EVAL_TYPE_COLORS[e.type] || { bg: '#f5f5f5', color: '#616161' };
+                const sc = EVAL_STATUS_COLORS[e.status] || { bg: '#f5f5f5', color: '#616161' };
+                return `<div class="recent-item">
+                    <div class="recent-item-main">
+                        <span class="recent-item-name">${escapeHtml(e.employeeName)}</span>
+                        <span class="eval-type-badge" style="background:${typeColors.bg};color:${typeColors.color}">${escapeHtml(e.type)}</span>
+                    </div>
+                    <div class="recent-item-sub">${escapeHtml(e.period)}${e.overallScore ? ' · Score: ' + escapeHtml(String(e.overallScore)) + '/5' : ''} · <span class="eval-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(e.status)}</span></div>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function renderEvaluations() {
+    const search = (document.getElementById('evaluations-search')?.value || '').toLowerCase();
+    const type = document.getElementById('evaluations-filter-type')?.value || '';
+    const status = document.getElementById('evaluations-filter-status')?.value || '';
+
+    let evaluations = allEvaluations.filter(e => {
+        if (type && e.type !== type) return false;
+        if (status && e.status !== status) return false;
+        if (search) {
+            const hay = [e.employeeName, e.evaluatorName, e.period, e.comments].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    evaluations = [...evaluations].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+
+    const container = document.getElementById('evaluations-table-container');
+    if (!container) return;
+
+    if (evaluations.length === 0) {
+        container.innerHTML = '<p class="empty-state">No evaluations found. Click "+ Add Evaluation" to get started.</p>';
+        return;
+    }
+
+    const rows = evaluations.map(e => {
+        const typeColors = EVAL_TYPE_COLORS[e.type] || { bg: '#f5f5f5', color: '#616161' };
+        const sc = EVAL_STATUS_COLORS[e.status] || { bg: '#f5f5f5', color: '#616161' };
+        const goals = e.goals || [];
+        const openGoals = goals.filter(g => g.status !== 'Achieved' && g.status !== 'Not Achieved').length;
+        const scoreLabel = e.overallScore ? `${e.overallScore}/5` : '—';
+        return `<tr>
+            <td><strong>${escapeHtml(e.employeeName)}</strong></td>
+            <td>${e.evaluatorName ? escapeHtml(e.evaluatorName) : '—'}</td>
+            <td>${escapeHtml(e.period)}</td>
+            <td><span class="eval-type-badge" style="background:${typeColors.bg};color:${typeColors.color}">${escapeHtml(e.type)}</span></td>
+            <td><span class="eval-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(e.status)}</span></td>
+            <td>${e.dueDate ? escapeHtml(e.dueDate) : '—'}</td>
+            <td>${scoreLabel !== '—' ? `<strong>${scoreLabel}</strong>` : '—'}</td>
+            <td><span class="eval-goal-count${openGoals > 0 ? ' eval-goal-open' : ''}">${goals.length} total / ${openGoals} open</span></td>
+            <td class="action-cell">
+                <button class="btn-icon" title="Manage Goals" onclick="openEvaluationGoals('${escapeHtml(e.id)}')">🎯</button>
+                <button class="btn-icon" title="Edit" onclick="openEvaluationModal('${escapeHtml(e.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deleteEvaluation('${escapeHtml(e.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Employee</th>
+            <th>Evaluator</th>
+            <th>Period</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Due Date</th>
+            <th>Score</th>
+            <th>Goals</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function renderAllEvalGoals() {
+    const search = (document.getElementById('eval-goals-search')?.value || '').toLowerCase();
+    const status = document.getElementById('eval-goals-filter-status')?.value || '';
+
+    const container = document.getElementById('eval-goals-table-container');
+    if (!container) return;
+
+    let goals = [];
+    allEvaluations.forEach(e => {
+        (e.goals || []).forEach(g => {
+            goals.push({ ...g, evaluationId: e.id, employeeName: e.employeeName, period: e.period });
+        });
+    });
+
+    goals = goals.filter(g => {
+        if (status && g.status !== status) return false;
+        if (search) {
+            const hay = [g.title, g.description, g.employeeName, g.period].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    goals.sort((a, b) => {
+        const order = { 'Not Started': 0, 'In Progress': 1, 'Achieved': 2, 'Not Achieved': 3 };
+        return (order[a.status] ?? 99) - (order[b.status] ?? 99);
+    });
+
+    if (goals.length === 0) {
+        container.innerHTML = '<p class="empty-state">No goals found. Click 🎯 on an evaluation to add goals.</p>';
+        return;
+    }
+
+    const rows = goals.map(g => {
+        const sc = EVAL_GOAL_STATUS_COLORS[g.status] || { bg: '#f5f5f5', color: '#616161' };
+        const scoreLabel = g.score ? `${g.score}/5` : '—';
+        const preview = g.description ? (g.description.length > 100 ? escapeHtml(g.description.substring(0, 100)) + '\u2026' : escapeHtml(g.description)) : '—';
+        return `<tr>
+            <td><strong>${escapeHtml(g.title)}</strong></td>
+            <td>${escapeHtml(g.employeeName)}<br><span class="text-muted-sm">${escapeHtml(g.period)}</span></td>
+            <td>${preview}</td>
+            <td><span class="eval-goal-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(g.status)}</span></td>
+            <td>${scoreLabel !== '—' ? `<strong>${scoreLabel}</strong>` : '—'}</td>
+            <td class="action-cell">
+                <button class="btn-icon" title="Edit" onclick="openEvalGoalModal('${escapeHtml(g.evaluationId)}','${escapeHtml(g.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deleteEvalGoal('${escapeHtml(g.evaluationId)}','${escapeHtml(g.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Goal</th>
+            <th>Employee / Period</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Score</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function openEvaluationModal(id) {
+    const modal = document.getElementById('evaluation-modal');
+    const titleEl = document.getElementById('evaluation-modal-title');
+    const submitBtn = document.getElementById('evaluation-submit-btn');
+    if (!modal) return;
+
+    document.getElementById('evaluation-form').reset();
+    document.getElementById('evaluation-id').value = '';
+    document.getElementById('evaluation-success').classList.add('hidden');
+    document.getElementById('evaluation-error').classList.add('hidden');
+
+    if (id) {
+        const e = allEvaluations.find(x => x.id === id);
+        if (!e) return;
+        titleEl.textContent = 'Edit Evaluation';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('evaluation-id').value = e.id;
+        document.getElementById('evaluation-employee').value = e.employeeName || '';
+        document.getElementById('evaluation-evaluator').value = e.evaluatorName || '';
+        document.getElementById('evaluation-period').value = e.period || '';
+        document.getElementById('evaluation-type').value = e.type || 'Annual Review';
+        document.getElementById('evaluation-status').value = e.status || 'Draft';
+        document.getElementById('evaluation-duedate').value = e.dueDate || '';
+        document.getElementById('evaluation-score').value = e.overallScore !== null && e.overallScore !== undefined ? String(e.overallScore) : '';
+        document.getElementById('evaluation-comments').value = e.comments || '';
+    } else {
+        titleEl.textContent = 'Add Evaluation';
+        submitBtn.textContent = 'Add Evaluation';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeEvaluationModal() {
+    const modal = document.getElementById('evaluation-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function closeEvaluationModalOnBg(event) {
+    if (event.target === document.getElementById('evaluation-modal')) closeEvaluationModal();
+}
+
+async function submitEvaluation(event) {
+    event.preventDefault();
+    const id = document.getElementById('evaluation-id').value;
+    const successEl = document.getElementById('evaluation-success');
+    const errorEl = document.getElementById('evaluation-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        employeeName: document.getElementById('evaluation-employee').value.trim(),
+        evaluatorName: document.getElementById('evaluation-evaluator').value.trim(),
+        period: document.getElementById('evaluation-period').value.trim(),
+        type: document.getElementById('evaluation-type').value,
+        status: document.getElementById('evaluation-status').value,
+        dueDate: document.getElementById('evaluation-duedate').value,
+        overallScore: document.getElementById('evaluation-score').value,
+        comments: document.getElementById('evaluation-comments').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/evaluations/${id}` : `${API_URL}/evaluations`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving evaluation';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Evaluation updated!' : 'Evaluation added!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allEvaluations.findIndex(e => e.id === id);
+            if (idx !== -1) allEvaluations[idx] = { ...allEvaluations[idx], ...data };
+        } else {
+            allEvaluations.push(data);
+        }
+        renderEvaluations();
+        renderEvaluationsDashboard();
+        renderAllEvalGoals();
+        setTimeout(() => closeEvaluationModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteEvaluation(id) {
+    if (!confirm('Are you sure you want to delete this evaluation and all its goals?')) return;
+    try {
+        const res = await fetch(`${API_URL}/evaluations/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting evaluation'); return; }
+        allEvaluations = allEvaluations.filter(e => e.id !== id);
+        renderEvaluations();
+        renderEvaluationsDashboard();
+        renderAllEvalGoals();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+function openEvaluationGoals(evaluationId) {
+    const btn = document.querySelector('#evaluations-tab .sub-tab-btn:nth-child(3)');
+    showEvaluationsSection('evaluations-goals', btn);
+    openEvalGoalModal(evaluationId, null);
+}
+
+// ─── Evaluation Goal CRUD ─────────────────────────────────────────────────────
+
+function openEvalGoalModal(evaluationId, goalId) {
+    const modal = document.getElementById('eval-goal-modal');
+    const titleEl = document.getElementById('eval-goal-modal-title');
+    const submitBtn = document.getElementById('eval-goal-submit-btn');
+    if (!modal) return;
+
+    document.getElementById('eval-goal-form').reset();
+    document.getElementById('eval-goal-evaluation-id').value = evaluationId;
+    document.getElementById('eval-goal-id').value = '';
+    document.getElementById('eval-goal-success').classList.add('hidden');
+    document.getElementById('eval-goal-error').classList.add('hidden');
+    document.getElementById('eval-goal-status').value = 'Not Started';
+    document.getElementById('eval-goal-score').value = '';
+
+    if (goalId) {
+        const evaluation = allEvaluations.find(e => e.id === evaluationId);
+        const goal = evaluation && (evaluation.goals || []).find(g => g.id === goalId);
+        if (!goal) return;
+        titleEl.textContent = 'Edit Goal';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('eval-goal-id').value = goal.id;
+        document.getElementById('eval-goal-title').value = goal.title || '';
+        document.getElementById('eval-goal-description').value = goal.description || '';
+        document.getElementById('eval-goal-score').value = goal.score !== null && goal.score !== undefined ? String(goal.score) : '';
+        document.getElementById('eval-goal-status').value = goal.status || 'Not Started';
+    } else {
+        const evaluation = allEvaluations.find(e => e.id === evaluationId);
+        titleEl.textContent = evaluation ? 'Add Goal — ' + evaluation.employeeName : 'Add Goal';
+        submitBtn.textContent = 'Add Goal';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeEvalGoalModal() {
+    const modal = document.getElementById('eval-goal-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function closeEvalGoalModalOnBg(event) {
+    if (event.target === document.getElementById('eval-goal-modal')) closeEvalGoalModal();
+}
+
+async function submitEvalGoal(event) {
+    event.preventDefault();
+    const evaluationId = document.getElementById('eval-goal-evaluation-id').value;
+    const goalId = document.getElementById('eval-goal-id').value;
+    const successEl = document.getElementById('eval-goal-success');
+    const errorEl = document.getElementById('eval-goal-error');
+    const submitBtn = document.getElementById('eval-goal-submit-btn');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        title: document.getElementById('eval-goal-title').value.trim(),
+        description: document.getElementById('eval-goal-description').value.trim(),
+        score: document.getElementById('eval-goal-score').value,
+        status: document.getElementById('eval-goal-status').value
+    };
+
+    const isEdit = !!goalId;
+    const url = isEdit
+        ? `${API_URL}/evaluations/${evaluationId}/goals/${goalId}`
+        : `${API_URL}/evaluations/${evaluationId}/goals`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    submitBtn.disabled = true;
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving goal';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        const eIdx = allEvaluations.findIndex(e => e.id === evaluationId);
+        if (eIdx !== -1) {
+            if (!Array.isArray(allEvaluations[eIdx].goals)) allEvaluations[eIdx].goals = [];
+            if (isEdit) {
+                const gIdx = allEvaluations[eIdx].goals.findIndex(g => g.id === goalId);
+                if (gIdx !== -1) allEvaluations[eIdx].goals[gIdx] = data;
+            } else {
+                allEvaluations[eIdx].goals.push(data);
+            }
+        }
+        successEl.textContent = isEdit ? 'Goal updated!' : 'Goal added!';
+        successEl.classList.remove('hidden');
+        renderAllEvalGoals();
+        renderEvaluations();
+        renderEvaluationsDashboard();
+        setTimeout(() => closeEvalGoalModal(), 900);
+    } catch {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+    }
+}
+
+async function deleteEvalGoal(evaluationId, goalId) {
+    if (!confirm('Delete this goal? This cannot be undone.')) return;
+    try {
+        const res = await fetch(`${API_URL}/evaluations/${evaluationId}/goals/${goalId}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting goal'); return; }
+        const eIdx = allEvaluations.findIndex(e => e.id === evaluationId);
+        if (eIdx !== -1) {
+            allEvaluations[eIdx].goals = (allEvaluations[eIdx].goals || []).filter(g => g.id !== goalId);
+        }
+        renderAllEvalGoals();
+        renderEvaluations();
+        renderEvaluationsDashboard();
     } catch {
         alert('Network error. Please try again.');
     }
