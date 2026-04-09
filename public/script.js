@@ -475,7 +475,7 @@ document.getElementById('idea-form').addEventListener('submit', async (e) => {
         description: document.getElementById('description').value,
         category: document.getElementById('category').value,
         type: document.getElementById('type').value,
-        submittedBy: currentUser ? (currentUser.name || currentUser.email) : 'Anonymous'
+        submittedBy: currentUser.name || currentUser.email
     };
     try {
         const response = await fetch(`${API_URL}/ideas`, {
