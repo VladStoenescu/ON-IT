@@ -136,7 +136,7 @@ if (!fsSync.existsSync(SESSIONS_FILE)) {
         const users = JSON.parse(fsSync.readFileSync(USERS_FILE, 'utf8'));
         const adminIndex = users.findIndex(u => u.email === ADMIN_EMAIL);
         if (adminIndex === -1) {
-            const passwordHash = bcrypt.hashSync('Admin@2024!', 10);
+            const passwordHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'Admin@2024!', 10);
             users.push({
                 id: `user-${Date.now()}`,
                 email: ADMIN_EMAIL,
@@ -270,13 +270,15 @@ app.post('/api/auth/login', strictLimiter, async (req, res) => {
         }
         const token = crypto.randomBytes(32).toString('hex');
         const sessions = await readJson(SESSIONS_FILE);
-        sessions.push({
+        const now = new Date();
+        const activeSessions = sessions.filter(s => new Date(s.expiresAt) > now);
+        activeSessions.push({
             token,
             userId: user.id,
             createdAt: new Date().toISOString(),
             expiresAt: new Date(Date.now() + SESSION_DURATION_MS).toISOString()
         });
-        await writeJson(SESSIONS_FILE, sessions);
+        await writeJson(SESSIONS_FILE, activeSessions);
         res.json({
             token,
             user: {

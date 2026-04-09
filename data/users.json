@@ -1,0 +1,55 @@
+[
+  {
+    "id": "user-1775714991512",
+    "email": "vlad.stoenescu@on-point.com",
+    "name": "Vlad Stoenescu",
+    "passwordHash": "$2b$10$hhrUedySxXzYZZ7dFaF/heSlEq.3t8pe1skRWlS9tF.2OtQXgEAEW",
+    "role": "admin",
+    "permissions": [
+      "home",
+      "submit",
+      "view",
+      "onboarding",
+      "trainings",
+      "landscape",
+      "assets",
+      "skills",
+      "crm",
+      "pipeline",
+      "processes",
+      "partnerships",
+      "meetings",
+      "evaluations",
+      "open-positions",
+      "outlook",
+      "admin"
+    ],
+    "createdAt": "2026-04-09T06:09:51.512Z"
+  },
+  {
+    "id": "user-1775715119185",
+    "email": "test@on-point.com",
+    "name": "Test User",
+    "passwordHash": "$2b$10$jB2flhF8Sw6GGOuWb9sLPOswr8LYH4aBskTRGIQ3mfX9Kbp8ucCk2",
+    "role": "user",
+    "permissions": [
+      "home",
+      "submit",
+      "view",
+      "onboarding",
+      "trainings",
+      "landscape",
+      "assets",
+      "skills",
+      "crm",
+      "pipeline",
+      "processes",
+      "partnerships",
+      "meetings",
+      "evaluations",
+      "open-positions",
+      "outlook"
+    ],
+    "createdAt": "2026-04-09T06:11:59.185Z"
+  }
+]

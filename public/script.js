@@ -181,9 +181,9 @@ function renderAdminUsers(users) {
     const sectionLabels = { home:'Home', submit:'Submit Idea', view:'View Ideas', onboarding:'Onboarding', trainings:'Trainings', landscape:'IT Landscape', assets:'IT Assets', skills:'Skills & Talent', crm:'CRM Contacts', pipeline:'Sales Pipeline', processes:'Process Map', partnerships:'Partnerships', meetings:'Meetings', evaluations:'Evaluations', 'open-positions':'Open Positions', outlook:'Outlook' };
     let html = `<div class="admin-users-table-wrap"><table class="admin-users-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th>${sections.map(s => `<th class="perm-col" title="${sectionLabels[s]}">${sectionLabels[s]}</th>`).join('')}<th>Actions</th></tr></thead><tbody>`;
     users.forEach(user => {
-        const isAdmin = user.email === 'vlad.stoenescu@on-point.com';
+        const isAdmin = user.role === 'admin';
         const perms = user.permissions || [];
-        html += `<tr data-user-id="${user.id}"><td>${escapeHtml(user.name || '-')}</td><td>${escapeHtml(user.email)}</td><td><span class="role-badge role-${user.role}">${user.role}</span></td>${sections.map(s => `<td class="perm-cell"><input type="checkbox" class="perm-check" data-section="${s}" ${perms.includes(s) ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="updateUserPermission('${user.id}', '${s}', this.checked)"></td>`).join('')}<td>${!isAdmin ? `<button class="btn-danger-sm" onclick="deleteUser('${user.id}', '${escapeHtml(user.email)}')">Delete</button>` : '<span class="text-muted-sm">Protected</span>'}</td></tr>`;
+        html += `<tr data-user-id="${user.id}"><td>${escapeHtml(user.name || '-')}</td><td>${escapeHtml(user.email)}</td><td><span class="role-badge role-${user.role}">${user.role}</span></td>${sections.map(s => `<td class="perm-cell"><input type="checkbox" class="perm-check" data-section="${s}" ${perms.includes(s) ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="handlePermChange(event)"></td>`).join('')}<td>${!isAdmin ? `<button class="btn-danger-sm" data-user-email="${escapeHtml(user.email)}" onclick="handleDeleteUser(event)">Delete</button>` : '<span class="text-muted-sm">Protected</span>'}</td></tr>`;
     });
     html += '</tbody></table></div>';
     container.innerHTML = html;
@@ -211,6 +211,13 @@ async function updateUserPermission(userId, section, enabled) {
     } catch { alert('Network error.'); loadAdminUsers(); }
 }
 
+function handlePermChange(event) {
+    const cb = event.target;
+    const row = cb.closest('tr[data-user-id]');
+    if (!row) return;
+    updateUserPermission(row.dataset.userId, cb.dataset.section, cb.checked);
+}
+
 async function deleteUser(userId, email) {
     if (!confirm(`Delete user ${email}? This cannot be undone.`)) return;
     try {
@@ -221,6 +228,13 @@ async function deleteUser(userId, email) {
         if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting user'); return; }
         loadAdminUsers();
     } catch { alert('Network error.'); }
+}
+
+function handleDeleteUser(event) {
+    const btn = event.currentTarget;
+    const row = btn.closest('tr[data-user-id]');
+    if (!row) return;
+    deleteUser(row.dataset.userId, btn.dataset.userEmail);
 }
 
 // Constants
