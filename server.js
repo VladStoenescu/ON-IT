@@ -136,9 +136,12 @@ if (!fsSync.existsSync(SESSIONS_FILE)) {
         const users = JSON.parse(fsSync.readFileSync(USERS_FILE, 'utf8'));
         const adminIndex = users.findIndex(u => u.email === ADMIN_EMAIL);
         if (adminIndex === -1) {
+            if (!process.env.ADMIN_PASSWORD) {
+                console.warn('Warning: ADMIN_PASSWORD env var not set. Using default password for admin user.');
+            }
             const passwordHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'Admin@2024!', 10);
             users.push({
-                id: `user-${Date.now()}`,
+                id: `user-${crypto.randomBytes(8).toString('hex')}`,
                 email: ADMIN_EMAIL,
                 name: 'Vlad Stoenescu',
                 passwordHash,
@@ -247,7 +250,7 @@ app.post('/api/auth/register', strictLimiter, async (req, res) => {
         }
         const passwordHash = await bcrypt.hash(password, 10);
         const newUser = {
-            id: `user-${Date.now()}`,
+            id: `user-${crypto.randomBytes(8).toString('hex')}`,
             email,
             name: name.trim(),
             passwordHash,
