@@ -413,9 +413,9 @@ app.get('/api/ideas', async (req, res) => {
 });
 
 // Submit a new idea
-app.post('/api/ideas', strictLimiter, async (req, res) => {
+app.post('/api/ideas', requireAuth, strictLimiter, async (req, res) => {
     try {
-        const { title, description, category, type, submittedBy } = req.body;
+        const { title, description, category, type } = req.body;
 
         // Validation
         if (!title || !description || !category || !type) {
@@ -431,7 +431,7 @@ app.post('/api/ideas', strictLimiter, async (req, res) => {
             description,
             category,
             type,
-            submittedBy: submittedBy || 'Anonymous',
+            submittedBy: req.user.name || req.user.email,
             submittedAt: new Date().toISOString(),
             status: 'Pending'
         };
