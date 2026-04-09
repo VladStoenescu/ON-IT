@@ -56,7 +56,9 @@ function applyPermissions(user) {
         item.style.display = permissions.includes(section) ? '' : 'none';
     });
     if (user.role === 'admin') {
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = el.classList.contains('nav-item') ? 'flex' : 'block';
+        });
     } else {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
     }
