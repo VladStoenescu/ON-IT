@@ -5,6 +5,8 @@ const rateLimit = require('express-rate-limit');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -27,6 +29,13 @@ const MEETINGS_FILE = path.join(__dirname, 'data', 'meetings.json');
 const EVALUATIONS_FILE = path.join(__dirname, 'data', 'evaluations.json');
 const OPEN_POSITIONS_FILE = path.join(__dirname, 'data', 'open-positions.json');
 const OUTLOOK_FILE = path.join(__dirname, 'data', 'outlook.json');
+
+const USERS_FILE = path.join(__dirname, 'data', 'users.json');
+const SESSIONS_FILE = path.join(__dirname, 'data', 'sessions.json');
+
+const ALLOWED_SECTIONS = ['home', 'submit', 'view', 'onboarding', 'trainings', 'landscape', 'assets', 'skills', 'crm', 'pipeline', 'processes', 'partnerships', 'meetings', 'evaluations', 'open-positions', 'outlook'];
+const ADMIN_EMAIL = 'vlad.stoenescu@on-point.com';
+const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -114,6 +123,40 @@ if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     ];
     fsSync.writeFileSync(SKILL_CATEGORIES_FILE, JSON.stringify(defaultCategories, null, 2));
 }
+if (!fsSync.existsSync(USERS_FILE)) {
+    fsSync.writeFileSync(USERS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(SESSIONS_FILE)) {
+    fsSync.writeFileSync(SESSIONS_FILE, JSON.stringify([], null, 2));
+}
+
+// Ensure admin user exists
+(async () => {
+    try {
+        const users = JSON.parse(fsSync.readFileSync(USERS_FILE, 'utf8'));
+        const adminIndex = users.findIndex(u => u.email === ADMIN_EMAIL);
+        if (adminIndex === -1) {
+            const passwordHash = bcrypt.hashSync('Admin@2024!', 10);
+            users.push({
+                id: `user-${Date.now()}`,
+                email: ADMIN_EMAIL,
+                name: 'Vlad Stoenescu',
+                passwordHash,
+                role: 'admin',
+                permissions: [...ALLOWED_SECTIONS, 'admin'],
+                createdAt: new Date().toISOString()
+            });
+        } else {
+            users[adminIndex].role = 'admin';
+            if (!users[adminIndex].permissions.includes('admin')) {
+                users[adminIndex].permissions = [...ALLOWED_SECTIONS, 'admin'];
+            }
+        }
+        fsSync.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+    } catch (e) {
+        console.error('Error ensuring admin user:', e);
+    }
+})();
 
 // Helper utilities
 function generateId() {
@@ -144,6 +187,204 @@ function computeOverdueSteps(processes) {
         };
     });
 }
+
+// ─── Auth Middleware ─────────────────────────────────────────────────────────
+
+async function requireAuth(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    const token = authHeader.slice(7);
+    const sessions = await readJson(SESSIONS_FILE);
+    const session = sessions.find(s => s.token === token && new Date(s.expiresAt) > new Date());
+    if (!session) {
+        return res.status(401).json({ error: 'Session expired or invalid' });
+    }
+    const users = await readJson(USERS_FILE);
+    const user = users.find(u => u.id === session.userId);
+    if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+    }
+    req.user = user;
+    next();
+}
+
+function requireAdmin(req, res, next) {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+}
+
+// ─── Auth Routes (no auth required) ─────────────────────────────────────────
+
+app.post('/api/auth/register', strictLimiter, async (req, res) => {
+    try {
+        const { email, password, name } = req.body;
+        if (!email || !email.endsWith('@on-point.com')) {
+            return res.status(400).json({ error: 'Email must be an @on-point.com address' });
+        }
+        if (!password || password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        }
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'Name is required' });
+        }
+        const users = await readJson(USERS_FILE);
+        if (users.find(u => u.email === email)) {
+            return res.status(400).json({ error: 'Email already registered' });
+        }
+        const passwordHash = await bcrypt.hash(password, 10);
+        const newUser = {
+            id: `user-${Date.now()}`,
+            email,
+            name: name.trim(),
+            passwordHash,
+            role: 'user',
+            permissions: [...ALLOWED_SECTIONS],
+            createdAt: new Date().toISOString()
+        };
+        users.push(newUser);
+        await writeJson(USERS_FILE, users);
+        res.json({ message: 'Account created successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating account' });
+    }
+});
+
+app.post('/api/auth/login', strictLimiter, async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password required' });
+        }
+        const users = await readJson(USERS_FILE);
+        const user = users.find(u => u.email === email);
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+        const valid = await bcrypt.compare(password, user.passwordHash);
+        if (!valid) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+        const token = crypto.randomBytes(32).toString('hex');
+        const sessions = await readJson(SESSIONS_FILE);
+        sessions.push({
+            token,
+            userId: user.id,
+            createdAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + SESSION_DURATION_MS).toISOString()
+        });
+        await writeJson(SESSIONS_FILE, sessions);
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                permissions: user.permissions
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Error logging in' });
+    }
+});
+
+app.post('/api/auth/logout', requireAuth, async (req, res) => {
+    try {
+        const token = req.headers['authorization'].slice(7);
+        const sessions = await readJson(SESSIONS_FILE);
+        const filtered = sessions.filter(s => s.token !== token);
+        await writeJson(SESSIONS_FILE, filtered);
+        res.json({ message: 'Logged out' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error logging out' });
+    }
+});
+
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+    const u = req.user;
+    res.json({ id: u.id, email: u.email, name: u.name, role: u.role, permissions: u.permissions });
+});
+
+app.put('/api/auth/change-password', requireAuth, strictLimiter, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current and new password required' });
+        }
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'New password must be at least 8 characters' });
+        }
+        const users = await readJson(USERS_FILE);
+        const userIndex = users.findIndex(u => u.id === req.user.id);
+        if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
+        const valid = await bcrypt.compare(currentPassword, users[userIndex].passwordHash);
+        if (!valid) return res.status(400).json({ error: 'Current password is incorrect' });
+        users[userIndex].passwordHash = await bcrypt.hash(newPassword, 10);
+        await writeJson(USERS_FILE, users);
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error changing password' });
+    }
+});
+
+// ─── Admin Routes ─────────────────────────────────────────────────────────────
+
+app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const users = await readJson(USERS_FILE);
+        res.json(users.map(({ passwordHash, ...u }) => u));
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching users' });
+    }
+});
+
+app.put('/api/admin/users/:id/permissions', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { permissions } = req.body;
+        if (!Array.isArray(permissions)) {
+            return res.status(400).json({ error: 'Permissions must be an array' });
+        }
+        const users = await readJson(USERS_FILE);
+        const userIndex = users.findIndex(u => u.id === req.params.id);
+        if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
+        if (users[userIndex].email === ADMIN_EMAIL) {
+            return res.status(400).json({ error: 'Cannot modify admin permissions' });
+        }
+        const validPerms = permissions.filter(p => ALLOWED_SECTIONS.includes(p));
+        users[userIndex].permissions = validPerms;
+        await writeJson(USERS_FILE, users);
+        const { passwordHash, ...updated } = users[userIndex];
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating permissions' });
+    }
+});
+
+app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const users = await readJson(USERS_FILE);
+        const user = users.find(u => u.id === req.params.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (user.email === ADMIN_EMAIL) return res.status(400).json({ error: 'Cannot delete admin user' });
+        const filtered = users.filter(u => u.id !== req.params.id);
+        await writeJson(USERS_FILE, filtered);
+        const sessions = await readJson(SESSIONS_FILE);
+        await writeJson(SESSIONS_FILE, sessions.filter(s => s.userId !== req.params.id));
+        res.json({ message: 'User deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting user' });
+    }
+});
+
+// ─── Global Auth Middleware for all subsequent API routes ────────────────────
+app.use('/api', (req, res, next) => {
+    if (req.path.startsWith('/auth/')) return next();
+    return requireAuth(req, res, next);
+});
 
 // Get all ideas
 app.get('/api/ideas', async (req, res) => {

@@ -1,6 +1,228 @@
 // API Base URL
 const API_URL = '/api';
 
+// ─── Auth ─────────────────────────────────────────────────────────────────
+
+let currentUser = null;
+
+function getToken() { return localStorage.getItem('auth_token'); }
+function setToken(token) { localStorage.setItem('auth_token', token); }
+function clearToken() { localStorage.removeItem('auth_token'); }
+function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` };
+}
+
+// Patch fetch to always include auth token for API calls
+const _origFetch = window.fetch;
+window.fetch = function(url, opts = {}) {
+    if (typeof url === 'string' && url.startsWith('/api/') && !url.startsWith('/api/auth/')) {
+        opts.headers = Object.assign({}, opts.headers || {}, {
+            'Authorization': `Bearer ${getToken() || ''}`
+        });
+    }
+    return _origFetch.call(this, url, opts);
+};
+
+async function initAuth() {
+    const token = getToken();
+    if (!token) { showAuthOverlay(); return; }
+    try {
+        const res = await _origFetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) { clearToken(); showAuthOverlay(); return; }
+        const user = await res.json();
+        currentUser = user;
+        applyPermissions(user);
+        hideAuthOverlay();
+    } catch { clearToken(); showAuthOverlay(); }
+}
+
+function showAuthOverlay() {
+    document.getElementById('auth-overlay').style.display = 'flex';
+    document.querySelector('.app-shell').style.display = 'none';
+}
+
+function hideAuthOverlay() {
+    document.getElementById('auth-overlay').style.display = 'none';
+    document.querySelector('.app-shell').style.display = 'flex';
+    const usernameEl = document.getElementById('topbar-username');
+    if (usernameEl && currentUser) usernameEl.textContent = currentUser.name || currentUser.email;
+}
+
+function applyPermissions(user) {
+    const permissions = user.permissions || [];
+    document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+        const section = item.getAttribute('data-section');
+        if (section === 'admin') return;
+        item.style.display = permissions.includes(section) ? '' : 'none';
+    });
+    if (user.role === 'admin') {
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+    } else {
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+    }
+    document.querySelectorAll('.nav-group-label:not(.admin-only)').forEach(label => {
+        let el = label.nextElementSibling;
+        let hasVisible = false;
+        while (el && !el.classList.contains('nav-group-label')) {
+            if (el.classList.contains('nav-item') && el.style.display !== 'none') hasVisible = true;
+            el = el.nextElementSibling;
+        }
+        label.style.display = hasVisible ? '' : 'none';
+    });
+}
+
+function showAuthTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`${tab}-tab-btn`).classList.add('active');
+    document.getElementById(`auth-${tab}-panel`).classList.add('active');
+}
+
+async function submitLogin(e) {
+    e.preventDefault();
+    const errorEl = document.getElementById('login-error');
+    errorEl.classList.add('hidden');
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    try {
+        const res = await _origFetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) { errorEl.textContent = data.error || 'Login failed'; errorEl.classList.remove('hidden'); return; }
+        setToken(data.token);
+        currentUser = data.user;
+        applyPermissions(data.user);
+        hideAuthOverlay();
+    } catch { errorEl.textContent = 'Network error. Please try again.'; errorEl.classList.remove('hidden'); }
+}
+
+async function submitRegister(e) {
+    e.preventDefault();
+    const errorEl = document.getElementById('register-error');
+    const successEl = document.getElementById('register-success');
+    errorEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+    const name = document.getElementById('register-name').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password').value;
+    try {
+        const res = await _origFetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) { errorEl.textContent = data.error || 'Registration failed'; errorEl.classList.remove('hidden'); return; }
+        successEl.textContent = 'Account created! You can now sign in.';
+        successEl.classList.remove('hidden');
+        setTimeout(() => showAuthTab('login'), 1500);
+    } catch { errorEl.textContent = 'Network error. Please try again.'; errorEl.classList.remove('hidden'); }
+}
+
+async function logout() {
+    try {
+        await _origFetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}` } });
+    } catch { /* ignore */ }
+    clearToken();
+    currentUser = null;
+    showAuthOverlay();
+}
+
+function showChangePasswordModal() {
+    document.getElementById('change-password-modal').style.display = 'flex';
+    document.getElementById('cp-current').value = '';
+    document.getElementById('cp-new').value = '';
+    document.getElementById('cp-error').classList.add('hidden');
+    document.getElementById('cp-success').classList.add('hidden');
+}
+
+function closeChangePasswordModal() {
+    document.getElementById('change-password-modal').style.display = 'none';
+}
+
+async function submitChangePassword(e) {
+    e.preventDefault();
+    const errorEl = document.getElementById('cp-error');
+    const successEl = document.getElementById('cp-success');
+    errorEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+    const currentPassword = document.getElementById('cp-current').value;
+    const newPassword = document.getElementById('cp-new').value;
+    try {
+        const res = await _origFetch('/api/auth/change-password', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) { errorEl.textContent = data.error || 'Error'; errorEl.classList.remove('hidden'); return; }
+        successEl.textContent = 'Password changed successfully!';
+        successEl.classList.remove('hidden');
+        setTimeout(() => closeChangePasswordModal(), 1500);
+    } catch { errorEl.textContent = 'Network error.'; errorEl.classList.remove('hidden'); }
+}
+
+async function loadAdminUsers() {
+    try {
+        const res = await _origFetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        if (!res.ok) { document.getElementById('admin-users-container').innerHTML = '<p>Error loading users.</p>'; return; }
+        const users = await res.json();
+        renderAdminUsers(users);
+    } catch { document.getElementById('admin-users-container').innerHTML = '<p>Error loading users.</p>'; }
+}
+
+function renderAdminUsers(users) {
+    const container = document.getElementById('admin-users-container');
+    if (!users.length) { container.innerHTML = '<p>No users found.</p>'; return; }
+    const sections = ['home','submit','view','onboarding','trainings','landscape','assets','skills','crm','pipeline','processes','partnerships','meetings','evaluations','open-positions','outlook'];
+    const sectionLabels = { home:'Home', submit:'Submit Idea', view:'View Ideas', onboarding:'Onboarding', trainings:'Trainings', landscape:'IT Landscape', assets:'IT Assets', skills:'Skills & Talent', crm:'CRM Contacts', pipeline:'Sales Pipeline', processes:'Process Map', partnerships:'Partnerships', meetings:'Meetings', evaluations:'Evaluations', 'open-positions':'Open Positions', outlook:'Outlook' };
+    let html = `<div class="admin-users-table-wrap"><table class="admin-users-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th>${sections.map(s => `<th class="perm-col" title="${sectionLabels[s]}">${sectionLabels[s]}</th>`).join('')}<th>Actions</th></tr></thead><tbody>`;
+    users.forEach(user => {
+        const isAdmin = user.email === 'vlad.stoenescu@on-point.com';
+        const perms = user.permissions || [];
+        html += `<tr data-user-id="${user.id}"><td>${escapeHtml(user.name || '-')}</td><td>${escapeHtml(user.email)}</td><td><span class="role-badge role-${user.role}">${user.role}</span></td>${sections.map(s => `<td class="perm-cell"><input type="checkbox" class="perm-check" data-section="${s}" ${perms.includes(s) ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="updateUserPermission('${user.id}', '${s}', this.checked)"></td>`).join('')}<td>${!isAdmin ? `<button class="btn-danger-sm" onclick="deleteUser('${user.id}', '${escapeHtml(user.email)}')">Delete</button>` : '<span class="text-muted-sm">Protected</span>'}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function updateUserPermission(userId, section, enabled) {
+    const row = document.querySelector(`tr[data-user-id="${userId}"]`);
+    if (!row) return;
+    const checks = row.querySelectorAll('.perm-check');
+    const permissions = [];
+    checks.forEach(cb => {
+        if (cb.dataset.section === section ? enabled : cb.checked) permissions.push(cb.dataset.section);
+    });
+    try {
+        const res = await _origFetch(`/api/admin/users/${userId}/permissions`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ permissions })
+        });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error updating permissions'); loadAdminUsers(); }
+    } catch { alert('Network error.'); loadAdminUsers(); }
+}
+
+async function deleteUser(userId, email) {
+    if (!confirm(`Delete user ${email}? This cannot be undone.`)) return;
+    try {
+        const res = await _origFetch(`/api/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting user'); return; }
+        loadAdminUsers();
+    } catch { alert('Network error.'); }
+}
+
 // Constants
 const MESSAGE_DISPLAY_DURATION = 5000; // milliseconds
 const MOBILE_BREAKPOINT = 1024; // matches CSS media query in styles.css
@@ -20,7 +242,8 @@ const PAGE_TITLES = {
     meetings: 'Meetings',
     evaluations: 'Evaluations',
     'open-positions': 'Open Positions',
-    outlook: 'Outlook'
+    outlook: 'Outlook',
+    admin: 'User Management'
 };
 
 // Store all ideas for filtering
@@ -121,6 +344,7 @@ function showTab(tabName) {
     if (tabName === 'outlook') {
         loadOutlook();
     }
+    if (tabName === 'admin') loadAdminUsers();
 
     // Close sidebar on mobile after navigating
     if (window.innerWidth < MOBILE_BREAKPOINT) closeSidebar();
@@ -5966,3 +6190,6 @@ async function deleteOutlookTask(outlookId, taskId) {
         alert('Network error. Please try again.');
     }
 }
+
+// Initialize auth on page load
+initAuth();
