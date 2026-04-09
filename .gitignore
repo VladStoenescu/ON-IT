@@ -7,6 +7,10 @@ yarn-error.log*
 # Data files (optional - you may want to keep this for production)
 # data/ideas.json
 
+# Auth data files (auto-generated at runtime - contain sensitive data)
+data/users.json
+data/sessions.json
+
 # Environment variables
 .env
 .env.local
