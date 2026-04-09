@@ -183,7 +183,8 @@ function renderAdminUsers(users) {
     users.forEach(user => {
         const isAdmin = user.role === 'admin';
         const perms = user.permissions || [];
-        html += `<tr data-user-id="${user.id}"><td>${escapeHtml(user.name || '-')}</td><td>${escapeHtml(user.email)}</td><td><span class="role-badge role-${user.role}">${user.role}</span></td>${sections.map(s => `<td class="perm-cell"><input type="checkbox" class="perm-check" data-section="${s}" ${perms.includes(s) ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="handlePermChange(event)"></td>`).join('')}<td>${!isAdmin ? `<button class="btn-danger-sm" data-user-email="${escapeHtml(user.email)}" onclick="handleDeleteUser(event)">Delete</button>` : '<span class="text-muted-sm">Protected</span>'}</td></tr>`;
+        const safeRole = ['admin', 'user'].includes(user.role) ? user.role : 'user';
+        html += `<tr data-user-id="${user.id}"><td>${escapeHtml(user.name || '-')}</td><td>${escapeHtml(user.email)}</td><td><span class="role-badge role-${safeRole}">${escapeHtml(safeRole)}</span></td>${sections.map(s => `<td class="perm-cell"><input type="checkbox" class="perm-check" data-section="${s}" ${perms.includes(s) ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="handlePermChange(event)"></td>`).join('')}<td>${!isAdmin ? `<button class="btn-danger-sm" data-user-email="${escapeHtml(user.email)}" onclick="handleDeleteUser(event)">Delete</button>` : '<span class="text-muted-sm">Protected</span>'}</td></tr>`;
     });
     html += '</tbody></table></div>';
     container.innerHTML = html;

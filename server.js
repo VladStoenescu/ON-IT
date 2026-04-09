@@ -156,6 +156,16 @@ if (!fsSync.existsSync(SESSIONS_FILE)) {
     } catch (e) {
         console.error('Error ensuring admin user:', e);
     }
+    // Clean up expired sessions on startup
+    try {
+        const sessions = JSON.parse(fsSync.readFileSync(SESSIONS_FILE, 'utf8'));
+        const active = sessions.filter(s => new Date(s.expiresAt) > new Date());
+        if (active.length !== sessions.length) {
+            fsSync.writeFileSync(SESSIONS_FILE, JSON.stringify(active, null, 2));
+        }
+    } catch (e) {
+        console.error('Error cleaning up sessions:', e);
+    }
 })();
 
 // Helper utilities
