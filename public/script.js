@@ -176,34 +176,75 @@ async function loadAdminUsers() {
     } catch { document.getElementById('admin-users-container').innerHTML = '<p>Error loading users.</p>'; }
 }
 
+const ADMIN_FEATURE_GROUPS = [
+    { id: 'core',         label: 'Core',          sections: ['home'] },
+    { id: 'innovation',   label: 'Innovation',     sections: ['submit', 'view'] },
+    { id: 'people',       label: 'People',         sections: ['onboarding', 'skills', 'open-positions'] },
+    { id: 'learning',     label: 'Learning',       sections: ['trainings'] },
+    { id: 'tools',        label: 'Tools & Costs',  sections: ['landscape', 'assets'] },
+    { id: 'crm',          label: 'Sales & CRM',    sections: ['crm', 'pipeline'] },
+    { id: 'operations',   label: 'Operations',     sections: ['processes'] },
+    { id: 'partnerships', label: 'Partnerships',   sections: ['partnerships'] },
+    { id: 'management',   label: 'Management',     sections: ['meetings', 'evaluations', 'outlook'] },
+];
+
+const ADMIN_SECTION_LABELS = {
+    home: 'Home', submit: 'Submit Idea', view: 'View Ideas',
+    onboarding: 'Onboarding', skills: 'Skills & Talent', 'open-positions': 'Open Positions',
+    trainings: 'Trainings', landscape: 'IT Landscape', assets: 'IT Assets',
+    crm: 'CRM Contacts', pipeline: 'Sales Pipeline', processes: 'Process Map',
+    partnerships: 'Partnerships', meetings: 'Meetings', evaluations: 'Evaluations', outlook: 'Outlook'
+};
+
 function renderAdminUsers(users) {
     const container = document.getElementById('admin-users-container');
     if (!users.length) { container.innerHTML = '<p>No users found.</p>'; return; }
-    const sections = ['home','submit','view','onboarding','trainings','landscape','assets','skills','crm','pipeline','processes','partnerships','meetings','evaluations','open-positions','outlook'];
-    const sectionLabels = { home:'Home', submit:'Submit Idea', view:'View Ideas', onboarding:'Onboarding', trainings:'Trainings', landscape:'IT Landscape', assets:'IT Assets', skills:'Skills & Talent', crm:'CRM Contacts', pipeline:'Sales Pipeline', processes:'Process Map', partnerships:'Partnerships', meetings:'Meetings', evaluations:'Evaluations', 'open-positions':'Open Positions', outlook:'Outlook' };
-    let html = `<div class="admin-users-table-wrap"><table class="admin-users-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th>${sections.map(s => `<th class="perm-col" title="${sectionLabels[s]}">${sectionLabels[s]}</th>`).join('')}<th>Actions</th></tr></thead><tbody>`;
+
+    let html = '<div class="user-perm-cards">';
     users.forEach(user => {
         const isAdmin = user.role === 'admin';
         const perms = user.permissions || [];
         const safeRole = ['admin', 'user'].includes(user.role) ? user.role : 'user';
-        html += `<tr data-user-id="${escapeHtml(user.id)}"><td>${escapeHtml(user.name || '-')}</td><td>${escapeHtml(user.email)}</td><td><span class="role-badge role-${safeRole}">${escapeHtml(safeRole)}</span></td>${sections.map(s => `<td class="perm-cell"><input type="checkbox" class="perm-check" data-section="${s}" ${perms.includes(s) ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="handlePermChange(event)"></td>`).join('')}<td>${!isAdmin ? `<button class="btn-danger-sm" data-user-email="${escapeHtml(user.email)}" onclick="handleDeleteUser(event)">Delete</button>` : '<span class="text-muted-sm">Protected</span>'}</td></tr>`;
+
+        html += `<div class="user-perm-card" data-user-id="${escapeHtml(user.id)}">`;
+        html += `<div class="upc-header">`;
+        html += `<div class="upc-info"><div class="upc-name">${escapeHtml(user.name || '—')}</div><div class="upc-email">${escapeHtml(user.email)}</div></div>`;
+        html += `<div class="upc-meta"><span class="role-badge role-${safeRole}">${escapeHtml(safeRole)}</span>`;
+        html += isAdmin ? `<span class="text-muted-sm">Protected</span>` : `<button class="btn-danger-sm" data-user-email="${escapeHtml(user.email)}" onclick="handleDeleteUser(event)">Delete</button>`;
+        html += `</div></div>`;
+
+        html += `<div class="upc-perms">`;
+        ADMIN_FEATURE_GROUPS.forEach(group => {
+            html += `<div class="perm-group">`;
+            html += `<div class="perm-group-header"><label class="perm-group-label">`;
+            if (!isAdmin) {
+                html += `<input type="checkbox" class="perm-group-check" data-group="${group.id}" onchange="handleGroupPermChange(event)">`;
+            }
+            html += `<span>${group.label}</span></label></div>`;
+            html += `<div class="perm-group-items">`;
+            group.sections.forEach(s => {
+                const checked = isAdmin || perms.includes(s);
+                html += `<label class="perm-item"><input type="checkbox" class="perm-check" data-section="${s}" ${checked ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="handlePermChange(event)"><span>${ADMIN_SECTION_LABELS[s]}</span></label>`;
+            });
+            html += `</div></div>`;
+        });
+        html += `</div></div>`;
     });
-    html += '</tbody></table></div>';
+    html += '</div>';
     container.innerHTML = html;
+
+    container.querySelectorAll('.user-perm-card').forEach(card => updateGroupCheckStates(card));
 }
 
 function escapeHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-async function updateUserPermission(userId, section, enabled) {
-    const row = document.querySelector(`tr[data-user-id="${userId}"]`);
-    if (!row) return;
-    const checks = row.querySelectorAll('.perm-check');
+async function updateUserPermissions(userId) {
+    const card = document.querySelector(`.user-perm-card[data-user-id="${userId}"]`);
+    if (!card) return;
     const permissions = [];
-    checks.forEach(cb => {
-        if (cb.dataset.section === section ? enabled : cb.checked) permissions.push(cb.dataset.section);
-    });
+    card.querySelectorAll('.perm-check:checked').forEach(cb => { permissions.push(cb.dataset.section); });
     try {
         const res = await _origFetch(`/api/admin/users/${userId}/permissions`, {
             method: 'PUT',
@@ -211,14 +252,37 @@ async function updateUserPermission(userId, section, enabled) {
             body: JSON.stringify({ permissions })
         });
         if (!res.ok) { const d = await res.json(); alert(d.error || 'Error updating permissions'); loadAdminUsers(); }
+        else { updateGroupCheckStates(card); }
     } catch { alert('Network error.'); loadAdminUsers(); }
+}
+
+function updateGroupCheckStates(card) {
+    card.querySelectorAll('.perm-group').forEach(group => {
+        const allChecks = group.querySelectorAll('.perm-check');
+        const checkedCount = group.querySelectorAll('.perm-check:checked').length;
+        const groupCheck = group.querySelector('.perm-group-check');
+        if (groupCheck) {
+            groupCheck.checked = checkedCount === allChecks.length;
+            groupCheck.indeterminate = checkedCount > 0 && checkedCount < allChecks.length;
+        }
+    });
 }
 
 function handlePermChange(event) {
     const cb = event.target;
-    const row = cb.closest('tr[data-user-id]');
-    if (!row) return;
-    updateUserPermission(row.dataset.userId, cb.dataset.section, cb.checked);
+    const card = cb.closest('.user-perm-card');
+    if (!card) return;
+    updateUserPermissions(card.dataset.userId);
+}
+
+function handleGroupPermChange(event) {
+    const groupCheck = event.target;
+    const groupDiv = groupCheck.closest('.perm-group');
+    if (!groupDiv) return;
+    groupDiv.querySelectorAll('.perm-check').forEach(cb => { cb.checked = groupCheck.checked; });
+    const card = groupCheck.closest('.user-perm-card');
+    if (!card) return;
+    updateUserPermissions(card.dataset.userId);
 }
 
 async function deleteUser(userId, email) {
@@ -235,9 +299,9 @@ async function deleteUser(userId, email) {
 
 function handleDeleteUser(event) {
     const btn = event.currentTarget;
-    const row = btn.closest('tr[data-user-id]');
-    if (!row) return;
-    deleteUser(row.dataset.userId, btn.dataset.userEmail);
+    const card = btn.closest('.user-perm-card');
+    if (!card) return;
+    deleteUser(card.dataset.userId, btn.dataset.userEmail);
 }
 
 // Constants
