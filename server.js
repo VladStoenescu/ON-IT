@@ -328,7 +328,10 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
     const u = req.user;
-    res.json({ id: u.id, email: u.email, name: u.name, role: u.role, permissions: u.permissions, bio: u.bio || '', office: u.office || '', avatarUrl: u.avatarUrl || '' });
+    res.json({
+        id: u.id, email: u.email, name: u.name, role: u.role,
+        permissions: u.permissions, bio: u.bio || '', office: u.office || '', avatarUrl: u.avatarUrl || ''
+    });
 });
 
 app.put('/api/auth/profile', requireAuth, async (req, res) => {

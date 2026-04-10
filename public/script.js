@@ -6280,7 +6280,7 @@ async function deleteOutlookTask(outlookId, taskId) {
 
 function getInitials(name) {
     if (!name) return '?';
-    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    return name.split(' ').filter(w => w.length > 0).map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
 }
 
 function renderAvatarEl(el, user) {
@@ -6359,7 +6359,11 @@ async function submitProfile(e) {
         successEl.textContent = 'Profile saved successfully!';
         successEl.classList.remove('hidden');
         setTimeout(() => successEl.classList.add('hidden'), 3000);
-    } catch { errorEl.textContent = 'Network error. Please try again.'; errorEl.classList.remove('hidden'); }
+    } catch (err) {
+        console.error('Error saving profile:', err);
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
 }
 
 // Initialize auth on page load
