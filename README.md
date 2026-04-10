@@ -150,7 +150,26 @@ The built-in admin account (`vlad.stoenescu@on-point.com`) is created on first b
 
 All data is stored as JSON files in the directory pointed to by the `DATA_DIR` environment variable (defaults to `data/` relative to `server.js` when not set).
 
+> **Important:** The data JSON files are intentionally **not committed to the repository**. This prevents `git pull` from ever overwriting your live data. On first boot the server creates every required file automatically inside `DATA_DIR`.
+
 When deployed to DigitalOcean App Platform the `.do/app.yaml` spec mounts a persistent volume at `/data` and sets `DATA_DIR=/data`, so all data files survive deployments and container restarts.
+
+### PM2 / bare-metal deployments
+
+The `ecosystem.config.js` sets `DATA_DIR=/opt/on-it-data` so that data is stored **outside** the git working tree. Create the directory once on the server before starting the application:
+
+```bash
+sudo mkdir -p /opt/on-it-data
+sudo chown $(whoami) /opt/on-it-data
+```
+
+Then start (or restart) the application with PM2:
+
+```bash
+pm2 start ecosystem.config.js --env production
+```
+
+Because `/opt/on-it-data` is outside the repository, running `git pull` to update the code will never touch the data files.
 
 ### User accounts
 

@@ -4,12 +4,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Data files (optional - you may want to keep this for production)
-# data/ideas.json
-
-# Auth data files (auto-generated at runtime - contain sensitive data)
-data/users.json
-data/sessions.json
+# All runtime data files — never commit user data to the repository.
+# On first boot the server creates these files automatically in DATA_DIR.
+# For DigitalOcean App Platform set DATA_DIR=/data (persistent volume, see .do/app.yaml).
+# For PM2 / bare-metal deployments set DATA_DIR=/opt/on-it-data (outside the git repo).
+data/*.json
 
 # Environment variables
 .env
