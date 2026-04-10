@@ -26,9 +26,25 @@ pg.defaults.ssl = { rejectUnauthorized: false };
 
 // Accept a full DATABASE_URL (e.g. from DigitalOcean's managed-DB binding) or
 // fall back to individual env vars with the project defaults.
+//
+// Newer pg-connection-string versions treat `sslmode=require` (and related
+// modes) as `verify-full`, which causes certificate verification to override
+// our explicit `ssl: { rejectUnauthorized: false }` setting.  Strip the
+// sslmode search-param from the URL before handing it to pg so that our ssl
+// option is the sole authority on certificate checking.
+function buildConnectionString(raw) {
+    try {
+        const u = new URL(raw);
+        u.searchParams.delete('sslmode');
+        return u.toString();
+    } catch (_) {
+        return raw; // Not a parseable URL – pass through unchanged.
+    }
+}
+
 const pool = process.env.DATABASE_URL
     ? new Pool({
-          connectionString: process.env.DATABASE_URL,
+          connectionString: buildConnectionString(process.env.DATABASE_URL),
           ssl: { rejectUnauthorized: false },
       })
     : new Pool({
