@@ -2,37 +2,13 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const fs = require('fs').promises;
-const fsSync = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const db = require('./db');
 
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-const DATA_FILE = path.join(DATA_DIR, 'ideas.json');
-const TEMPLATES_FILE = path.join(DATA_DIR, 'onboarding-templates.json');
-const PROCESSES_FILE = path.join(DATA_DIR, 'onboarding-processes.json');
-const EMPLOYEES_FILE = path.join(DATA_DIR, 'employees.json');
-const TRAINING_TEMPLATES_FILE = path.join(DATA_DIR, 'training-templates.json');
-const TRAINING_ASSIGNMENTS_FILE = path.join(DATA_DIR, 'training-assignments.json');
-const IT_LANDSCAPE_FILE = path.join(DATA_DIR, 'it-landscape.json');
-const IT_ASSETS_FILE = path.join(DATA_DIR, 'it-assets.json');
-const EMPLOYEE_SKILLS_FILE = path.join(DATA_DIR, 'employee-skills.json');
-const SKILL_CATEGORIES_FILE = path.join(DATA_DIR, 'skill-categories.json');
-const CRM_CONTACTS_FILE = path.join(DATA_DIR, 'crm-contacts.json');
-const CRM_DEALS_FILE = path.join(DATA_DIR, 'crm-deals.json');
-const PROCESS_OWNERSHIP_FILE = path.join(DATA_DIR, 'process-ownership.json');
-const PARTNERSHIPS_FILE = path.join(DATA_DIR, 'partnerships.json');
-const MEETINGS_FILE = path.join(DATA_DIR, 'meetings.json');
-const EVALUATIONS_FILE = path.join(DATA_DIR, 'evaluations.json');
-const OPEN_POSITIONS_FILE = path.join(DATA_DIR, 'open-positions.json');
-const OUTLOOK_FILE = path.join(DATA_DIR, 'outlook.json');
-
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
 const ALLOWED_SECTIONS = ['home', 'submit', 'view', 'onboarding', 'trainings', 'landscape', 'assets', 'skills', 'crm', 'pipeline', 'processes', 'partnerships', 'meetings', 'evaluations', 'open-positions', 'outlook'];
 const ADMIN_EMAIL = 'vlad.stoenescu@on-point.com';
@@ -57,88 +33,40 @@ app.use(bodyParser.json());
 app.use(express.static('public'));
 app.use('/api/', limiter); // Apply rate limiting to all API routes
 
-// Ensure data directory and files exist
-console.log(`Data directory: ${DATA_DIR}`);
-if (!fsSync.existsSync(DATA_DIR)) {
-    fsSync.mkdirSync(DATA_DIR, { recursive: true, mode: 0o755 });
-}
-if (!fsSync.existsSync(DATA_FILE)) {
-    fsSync.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(TEMPLATES_FILE)) {
-    fsSync.writeFileSync(TEMPLATES_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(PROCESSES_FILE)) {
-    fsSync.writeFileSync(PROCESSES_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(EMPLOYEES_FILE)) {
-    fsSync.writeFileSync(EMPLOYEES_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(TRAINING_TEMPLATES_FILE)) {
-    fsSync.writeFileSync(TRAINING_TEMPLATES_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(TRAINING_ASSIGNMENTS_FILE)) {
-    fsSync.writeFileSync(TRAINING_ASSIGNMENTS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(IT_LANDSCAPE_FILE)) {
-    fsSync.writeFileSync(IT_LANDSCAPE_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(IT_ASSETS_FILE)) {
-    fsSync.writeFileSync(IT_ASSETS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(EMPLOYEE_SKILLS_FILE)) {
-    fsSync.writeFileSync(EMPLOYEE_SKILLS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(CRM_CONTACTS_FILE)) {
-    fsSync.writeFileSync(CRM_CONTACTS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(CRM_DEALS_FILE)) {
-    fsSync.writeFileSync(CRM_DEALS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(PROCESS_OWNERSHIP_FILE)) {
-    fsSync.writeFileSync(PROCESS_OWNERSHIP_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(PARTNERSHIPS_FILE)) {
-    fsSync.writeFileSync(PARTNERSHIPS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(MEETINGS_FILE)) {
-    fsSync.writeFileSync(MEETINGS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(EVALUATIONS_FILE)) {
-    fsSync.writeFileSync(EVALUATIONS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(OPEN_POSITIONS_FILE)) {
-    fsSync.writeFileSync(OPEN_POSITIONS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(OUTLOOK_FILE)) {
-    fsSync.writeFileSync(OUTLOOK_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
-    const defaultCategories = [
-        { id: 'cat-001', name: 'Project Management', description: 'Planning, scheduling, and delivering projects', isCustom: false },
-        { id: 'cat-002', name: 'Change & Release Management', description: 'Managing system changes, cutover, and release cycles', isCustom: false },
-        { id: 'cat-003', name: 'Regulatory & Compliance', description: 'Regulatory reporting, compliance frameworks, and audit', isCustom: false },
-        { id: 'cat-004', name: 'Integration & Architecture', description: 'System integration, APIs, middleware, and solution architecture', isCustom: false },
-        { id: 'cat-005', name: 'Data & Analytics', description: 'Data modelling, BI, reporting, and analytics', isCustom: false },
-        { id: 'cat-006', name: 'Leadership & Stakeholder Management', description: 'Team leadership, executive communication, and relationship management', isCustom: false },
-        { id: 'cat-007', name: 'Agile & Lean', description: 'Scrum, Kanban, SAFe, and continuous-improvement practices', isCustom: false },
-        { id: 'cat-008', name: 'Cloud & Infrastructure', description: 'Cloud platforms, infrastructure, and DevOps', isCustom: false },
-        { id: 'cat-009', name: 'Business Analysis', description: 'Requirements gathering, process mapping, and gap analysis', isCustom: false },
-        { id: 'cat-010', name: 'Finance & Accounting', description: 'Financial reporting, budgeting, and accounting practices', isCustom: false }
-    ];
-    fsSync.writeFileSync(SKILL_CATEGORIES_FILE, JSON.stringify(defaultCategories, null, 2));
-}
-if (!fsSync.existsSync(USERS_FILE)) {
-    fsSync.writeFileSync(USERS_FILE, JSON.stringify([], null, 2));
-}
-if (!fsSync.existsSync(SESSIONS_FILE)) {
-    fsSync.writeFileSync(SESSIONS_FILE, JSON.stringify([], null, 2));
-}
-
-// Ensure admin user exists
+// Initialise DB tables and seed default data
 (async () => {
     try {
-        const users = JSON.parse(fsSync.readFileSync(USERS_FILE, 'utf8'));
+        await db.initializeDatabase();
+    } catch (e) {
+        console.error('Fatal: could not initialise database:', e);
+        process.exit(1);
+    }
+
+    // Seed default skill categories if none exist yet.
+    try {
+        const existing = await db.getCollection('skill_categories');
+        if (existing.length === 0) {
+            const defaultCategories = [
+                { id: 'cat-001', name: 'Project Management', description: 'Planning, scheduling, and delivering projects', isCustom: false },
+                { id: 'cat-002', name: 'Change & Release Management', description: 'Managing system changes, cutover, and release cycles', isCustom: false },
+                { id: 'cat-003', name: 'Regulatory & Compliance', description: 'Regulatory reporting, compliance frameworks, and audit', isCustom: false },
+                { id: 'cat-004', name: 'Integration & Architecture', description: 'System integration, APIs, middleware, and solution architecture', isCustom: false },
+                { id: 'cat-005', name: 'Data & Analytics', description: 'Data modelling, BI, reporting, and analytics', isCustom: false },
+                { id: 'cat-006', name: 'Leadership & Stakeholder Management', description: 'Team leadership, executive communication, and relationship management', isCustom: false },
+                { id: 'cat-007', name: 'Agile & Lean', description: 'Scrum, Kanban, SAFe, and continuous-improvement practices', isCustom: false },
+                { id: 'cat-008', name: 'Cloud & Infrastructure', description: 'Cloud platforms, infrastructure, and DevOps', isCustom: false },
+                { id: 'cat-009', name: 'Business Analysis', description: 'Requirements gathering, process mapping, and gap analysis', isCustom: false },
+                { id: 'cat-010', name: 'Finance & Accounting', description: 'Financial reporting, budgeting, and accounting practices', isCustom: false }
+            ];
+            await db.setCollection('skill_categories', defaultCategories);
+        }
+    } catch (e) {
+        console.error('Error seeding skill categories:', e);
+    }
+
+    // Ensure admin user exists.
+    try {
+        const users = await db.getCollection('users');
         const adminIndex = users.findIndex(u => u.email === ADMIN_EMAIL);
         if (adminIndex === -1) {
             if (!process.env.ADMIN_PASSWORD) {
@@ -156,20 +84,19 @@ if (!fsSync.existsSync(SESSIONS_FILE)) {
             });
         } else {
             users[adminIndex].role = 'admin';
-            // Always sync admin permissions with the current full section list so
-            // newly deployed features are immediately accessible to the admin.
             users[adminIndex].permissions = [...ALLOWED_SECTIONS, 'admin'];
         }
-        fsSync.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+        await db.setCollection('users', users);
     } catch (e) {
         console.error('Error ensuring admin user:', e);
     }
-    // Clean up expired sessions on startup
+
+    // Clean up expired sessions on startup.
     try {
-        const sessions = JSON.parse(fsSync.readFileSync(SESSIONS_FILE, 'utf8'));
+        const sessions = await db.getCollection('sessions');
         const active = sessions.filter(s => new Date(s.expiresAt) > new Date());
         if (active.length !== sessions.length) {
-            fsSync.writeFileSync(SESSIONS_FILE, JSON.stringify(active, null, 2));
+            await db.setCollection('sessions', active);
         }
     } catch (e) {
         console.error('Error cleaning up sessions:', e);
@@ -179,20 +106,6 @@ if (!fsSync.existsSync(SESSIONS_FILE)) {
 // Helper utilities
 function generateId() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-}
-
-async function readJson(file) {
-    const data = await fs.readFile(file, 'utf8');
-    return JSON.parse(data);
-}
-
-async function writeJson(file, data) {
-    // Write to a temp file first, then atomically rename to the target.
-    // This prevents a corrupt/empty file being left behind if the process
-    // crashes or the container is restarted mid-write.
-    const tmp = file + '.tmp';
-    await fs.writeFile(tmp, JSON.stringify(data, null, 2));
-    await fs.rename(tmp, file);
 }
 
 function computeOverdueSteps(processes) {
@@ -219,12 +132,12 @@ async function requireAuth(req, res, next) {
         return res.status(401).json({ error: 'Authentication required' });
     }
     const token = authHeader.slice(7);
-    const sessions = await readJson(SESSIONS_FILE);
+    const sessions = await db.getCollection('sessions');
     const session = sessions.find(s => s.token === token && new Date(s.expiresAt) > new Date());
     if (!session) {
         return res.status(401).json({ error: 'Session expired or invalid' });
     }
-    const users = await readJson(USERS_FILE);
+    const users = await db.getCollection('users');
     const user = users.find(u => u.id === session.userId);
     if (!user) {
         return res.status(401).json({ error: 'User not found' });
@@ -254,7 +167,7 @@ app.post('/api/auth/register', strictLimiter, async (req, res) => {
         if (!name || !name.trim()) {
             return res.status(400).json({ error: 'Name is required' });
         }
-        const users = await readJson(USERS_FILE);
+        const users = await db.getCollection('users');
         if (users.find(u => u.email === email)) {
             return res.status(400).json({ error: 'Email already registered' });
         }
@@ -269,7 +182,7 @@ app.post('/api/auth/register', strictLimiter, async (req, res) => {
             createdAt: new Date().toISOString()
         };
         users.push(newUser);
-        await writeJson(USERS_FILE, users);
+        await db.setCollection('users', users);
         res.json({ message: 'Account created successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Error creating account' });
@@ -282,7 +195,7 @@ app.post('/api/auth/login', strictLimiter, async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password required' });
         }
-        const users = await readJson(USERS_FILE);
+        const users = await db.getCollection('users');
         const user = users.find(u => u.email === email);
         if (!user) {
             return res.status(401).json({ error: 'Invalid email or password' });
@@ -292,7 +205,7 @@ app.post('/api/auth/login', strictLimiter, async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
         const token = crypto.randomBytes(32).toString('hex');
-        const sessions = await readJson(SESSIONS_FILE);
+        const sessions = await db.getCollection('sessions');
         const now = new Date();
         const activeSessions = sessions.filter(s => new Date(s.expiresAt) > now);
         activeSessions.push({
@@ -301,7 +214,7 @@ app.post('/api/auth/login', strictLimiter, async (req, res) => {
             createdAt: new Date().toISOString(),
             expiresAt: new Date(Date.now() + SESSION_DURATION_MS).toISOString()
         });
-        await writeJson(SESSIONS_FILE, activeSessions);
+        await db.setCollection('sessions', activeSessions);
         res.json({
             token,
             user: {
@@ -323,9 +236,9 @@ app.post('/api/auth/login', strictLimiter, async (req, res) => {
 app.post('/api/auth/logout', requireAuth, async (req, res) => {
     try {
         const token = req.headers['authorization'].slice(7);
-        const sessions = await readJson(SESSIONS_FILE);
+        const sessions = await db.getCollection('sessions');
         const filtered = sessions.filter(s => s.token !== token);
-        await writeJson(SESSIONS_FILE, filtered);
+        await db.setCollection('sessions', filtered);
         res.json({ message: 'Logged out' });
     } catch (error) {
         res.status(500).json({ error: 'Error logging out' });
@@ -343,7 +256,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 app.put('/api/auth/profile', requireAuth, async (req, res) => {
     try {
         const { bio, office, avatarUrl } = req.body;
-        const users = await readJson(USERS_FILE);
+        const users = await db.getCollection('users');
         const userIndex = users.findIndex(u => u.id === req.user.id);
         if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
         if (bio !== undefined) users[userIndex].bio = String(bio).trim().slice(0, 500);
@@ -355,7 +268,7 @@ app.put('/api/auth/profile', requireAuth, async (req, res) => {
             }
             users[userIndex].avatarUrl = urlStr.slice(0, 500);
         }
-        await writeJson(USERS_FILE, users);
+        await db.setCollection('users', users);
         const { passwordHash, ...updated } = users[userIndex];
         res.json(updated);
     } catch (error) {
@@ -372,13 +285,13 @@ app.put('/api/auth/change-password', requireAuth, strictLimiter, async (req, res
         if (newPassword.length < 8) {
             return res.status(400).json({ error: 'New password must be at least 8 characters' });
         }
-        const users = await readJson(USERS_FILE);
+        const users = await db.getCollection('users');
         const userIndex = users.findIndex(u => u.id === req.user.id);
         if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
         const valid = await bcrypt.compare(currentPassword, users[userIndex].passwordHash);
         if (!valid) return res.status(400).json({ error: 'Current password is incorrect' });
         users[userIndex].passwordHash = await bcrypt.hash(newPassword, 10);
-        await writeJson(USERS_FILE, users);
+        await db.setCollection('users', users);
         res.json({ message: 'Password changed successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Error changing password' });
@@ -389,7 +302,7 @@ app.put('/api/auth/change-password', requireAuth, strictLimiter, async (req, res
 
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const users = await readJson(USERS_FILE);
+        const users = await db.getCollection('users');
         res.json(users.map(({ passwordHash, ...u }) => u));
     } catch (error) {
         res.status(500).json({ error: 'Error fetching users' });
@@ -402,7 +315,7 @@ app.put('/api/admin/users/:id/permissions', requireAuth, requireAdmin, async (re
         if (!Array.isArray(permissions)) {
             return res.status(400).json({ error: 'Permissions must be an array' });
         }
-        const users = await readJson(USERS_FILE);
+        const users = await db.getCollection('users');
         const userIndex = users.findIndex(u => u.id === req.params.id);
         if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
         if (users[userIndex].email === ADMIN_EMAIL) {
@@ -410,7 +323,7 @@ app.put('/api/admin/users/:id/permissions', requireAuth, requireAdmin, async (re
         }
         const validPerms = permissions.filter(p => ALLOWED_SECTIONS.includes(p));
         users[userIndex].permissions = validPerms;
-        await writeJson(USERS_FILE, users);
+        await db.setCollection('users', users);
         const { passwordHash, ...updated } = users[userIndex];
         res.json(updated);
     } catch (error) {
@@ -420,14 +333,14 @@ app.put('/api/admin/users/:id/permissions', requireAuth, requireAdmin, async (re
 
 app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const users = await readJson(USERS_FILE);
+        const users = await db.getCollection('users');
         const user = users.find(u => u.id === req.params.id);
         if (!user) return res.status(404).json({ error: 'User not found' });
         if (user.email === ADMIN_EMAIL) return res.status(400).json({ error: 'Cannot delete admin user' });
         const filtered = users.filter(u => u.id !== req.params.id);
-        await writeJson(USERS_FILE, filtered);
-        const sessions = await readJson(SESSIONS_FILE);
-        await writeJson(SESSIONS_FILE, sessions.filter(s => s.userId !== req.params.id));
+        await db.setCollection('users', filtered);
+        const sessions = await db.getCollection('sessions');
+        await db.setCollection('sessions', sessions.filter(s => s.userId !== req.params.id));
         res.json({ message: 'User deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting user' });
@@ -443,8 +356,7 @@ app.use('/api', (req, res, next) => {
 // Get all ideas
 app.get('/api/ideas', async (req, res) => {
     try {
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        const ideas = JSON.parse(data);
+        const ideas = await db.getCollection('ideas');
         res.json(ideas);
     } catch (error) {
         res.status(500).json({ error: 'Error reading ideas' });
@@ -461,8 +373,7 @@ app.post('/api/ideas', requireAuth, strictLimiter, async (req, res) => {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        const ideas = JSON.parse(data);
+        const ideas = await db.getCollection('ideas');
         
         const newIdea = {
             id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -476,7 +387,7 @@ app.post('/api/ideas', requireAuth, strictLimiter, async (req, res) => {
         };
 
         ideas.push(newIdea);
-        await fs.writeFile(DATA_FILE, JSON.stringify(ideas, null, 2));
+        await db.setCollection('ideas', ideas);
 
         res.status(201).json({ message: 'Idea submitted successfully', idea: newIdea });
     } catch (error) {
@@ -487,8 +398,7 @@ app.post('/api/ideas', requireAuth, strictLimiter, async (req, res) => {
 // Get idea by ID
 app.get('/api/ideas/:id', async (req, res) => {
     try {
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        const ideas = JSON.parse(data);
+        const ideas = await db.getCollection('ideas');
         const idea = ideas.find(i => i.id === req.params.id);
         
         if (!idea) {
@@ -504,8 +414,7 @@ app.get('/api/ideas/:id', async (req, res) => {
 // Update idea (admin: status; creator: title/description)
 app.put('/api/ideas/:id', requireAuth, async (req, res) => {
     try {
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        const ideas = JSON.parse(data);
+        const ideas = await db.getCollection('ideas');
         const idx = ideas.findIndex(i => i.id === req.params.id);
 
         if (idx === -1) {
@@ -541,7 +450,7 @@ app.put('/api/ideas/:id', requireAuth, async (req, res) => {
         }
 
         ideas[idx] = idea;
-        await fs.writeFile(DATA_FILE, JSON.stringify(ideas, null, 2));
+        await db.setCollection('ideas', ideas);
         res.json(idea);
     } catch (error) {
         res.status(500).json({ error: 'Error updating idea' });
@@ -556,8 +465,7 @@ app.post('/api/ideas/:id/comments', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'Comment text is required' });
         }
 
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        const ideas = JSON.parse(data);
+        const ideas = await db.getCollection('ideas');
         const idx = ideas.findIndex(i => i.id === req.params.id);
 
         if (idx === -1) {
@@ -580,7 +488,7 @@ app.post('/api/ideas/:id/comments', requireAuth, async (req, res) => {
         idea.comments.push(comment);
 
         ideas[idx] = idea;
-        await fs.writeFile(DATA_FILE, JSON.stringify(ideas, null, 2));
+        await db.setCollection('ideas', ideas);
         res.status(201).json(comment);
     } catch (error) {
         res.status(500).json({ error: 'Error adding comment' });
@@ -590,8 +498,7 @@ app.post('/api/ideas/:id/comments', requireAuth, async (req, res) => {
 // Delete comment from idea (creator only)
 app.delete('/api/ideas/:id/comments/:commentId', requireAuth, async (req, res) => {
     try {
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        const ideas = JSON.parse(data);
+        const ideas = await db.getCollection('ideas');
         const idx = ideas.findIndex(i => i.id === req.params.id);
 
         if (idx === -1) {
@@ -614,7 +521,7 @@ app.delete('/api/ideas/:id/comments/:commentId', requireAuth, async (req, res) =
 
         idea.comments.splice(commentIdx, 1);
         ideas[idx] = idea;
-        await fs.writeFile(DATA_FILE, JSON.stringify(ideas, null, 2));
+        await db.setCollection('ideas', ideas);
         res.json({ message: 'Comment deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting comment' });
@@ -625,7 +532,7 @@ app.delete('/api/ideas/:id/comments/:commentId', requireAuth, async (req, res) =
 
 app.get('/api/onboarding/templates', async (req, res) => {
     try {
-        const templates = await readJson(TEMPLATES_FILE);
+        const templates = await db.getCollection('onboarding_templates');
         res.json(templates);
     } catch (error) {
         res.status(500).json({ error: 'Error reading templates' });
@@ -638,7 +545,7 @@ app.post('/api/onboarding/templates', strictLimiter, async (req, res) => {
         if (!name || !type || !entities || !Array.isArray(steps) || steps.length === 0) {
             return res.status(400).json({ error: 'Name, type, entities and at least one step are required' });
         }
-        const templates = await readJson(TEMPLATES_FILE);
+        const templates = await db.getCollection('onboarding_templates');
         const newTemplate = {
             id: generateId(),
             name,
@@ -658,7 +565,7 @@ app.post('/api/onboarding/templates', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         templates.push(newTemplate);
-        await writeJson(TEMPLATES_FILE, templates);
+        await db.setCollection('onboarding_templates', templates);
         res.status(201).json(newTemplate);
     } catch (error) {
         res.status(500).json({ error: 'Error creating template' });
@@ -667,7 +574,7 @@ app.post('/api/onboarding/templates', strictLimiter, async (req, res) => {
 
 app.get('/api/onboarding/templates/:id', async (req, res) => {
     try {
-        const templates = await readJson(TEMPLATES_FILE);
+        const templates = await db.getCollection('onboarding_templates');
         const template = templates.find(t => t.id === req.params.id);
         if (!template) return res.status(404).json({ error: 'Template not found' });
         res.json(template);
@@ -678,7 +585,7 @@ app.get('/api/onboarding/templates/:id', async (req, res) => {
 
 app.put('/api/onboarding/templates/:id', strictLimiter, async (req, res) => {
     try {
-        const templates = await readJson(TEMPLATES_FILE);
+        const templates = await db.getCollection('onboarding_templates');
         const idx = templates.findIndex(t => t.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Template not found' });
         const { name, type, entities, description, steps } = req.body;
@@ -699,7 +606,7 @@ app.put('/api/onboarding/templates/:id', strictLimiter, async (req, res) => {
             })) : templates[idx].steps,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(TEMPLATES_FILE, templates);
+        await db.setCollection('onboarding_templates', templates);
         res.json(templates[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating template' });
@@ -708,11 +615,11 @@ app.put('/api/onboarding/templates/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/onboarding/templates/:id', strictLimiter, async (req, res) => {
     try {
-        const templates = await readJson(TEMPLATES_FILE);
+        const templates = await db.getCollection('onboarding_templates');
         const idx = templates.findIndex(t => t.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Template not found' });
         templates.splice(idx, 1);
-        await writeJson(TEMPLATES_FILE, templates);
+        await db.setCollection('onboarding_templates', templates);
         res.json({ message: 'Template deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting template' });
@@ -723,7 +630,7 @@ app.delete('/api/onboarding/templates/:id', strictLimiter, async (req, res) => {
 
 app.get('/api/onboarding/processes', async (req, res) => {
     try {
-        const processes = await readJson(PROCESSES_FILE);
+        const processes = await db.getCollection('onboarding_processes');
         res.json(computeOverdueSteps(processes));
     } catch (error) {
         res.status(500).json({ error: 'Error reading processes' });
@@ -736,11 +643,11 @@ app.post('/api/onboarding/processes', strictLimiter, async (req, res) => {
         if (!templateId || !employeeName || !entity || !startDate) {
             return res.status(400).json({ error: 'Template, employee name, entity and start date are required' });
         }
-        const templates = await readJson(TEMPLATES_FILE);
+        const templates = await db.getCollection('onboarding_templates');
         const template = templates.find(t => t.id === templateId);
         if (!template) return res.status(404).json({ error: 'Template not found' });
 
-        const processes = await readJson(PROCESSES_FILE);
+        const processes = await db.getCollection('onboarding_processes');
         const start = new Date(startDate);
 
         const steps = template.steps.map(step => {
@@ -792,7 +699,7 @@ app.post('/api/onboarding/processes', strictLimiter, async (req, res) => {
         };
 
         processes.push(newProcess);
-        await writeJson(PROCESSES_FILE, processes);
+        await db.setCollection('onboarding_processes', processes);
         res.status(201).json(newProcess);
     } catch (error) {
         console.error(error);
@@ -802,7 +709,7 @@ app.post('/api/onboarding/processes', strictLimiter, async (req, res) => {
 
 app.get('/api/onboarding/processes/:id', async (req, res) => {
     try {
-        const processes = await readJson(PROCESSES_FILE);
+        const processes = await db.getCollection('onboarding_processes');
         const proc = processes.find(p => p.id === req.params.id);
         if (!proc) return res.status(404).json({ error: 'Process not found' });
         res.json(proc);
@@ -813,7 +720,7 @@ app.get('/api/onboarding/processes/:id', async (req, res) => {
 
 app.put('/api/onboarding/processes/:id', strictLimiter, async (req, res) => {
     try {
-        const processes = await readJson(PROCESSES_FILE);
+        const processes = await db.getCollection('onboarding_processes');
         const idx = processes.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Process not found' });
         const { status } = req.body;
@@ -823,7 +730,7 @@ app.put('/api/onboarding/processes/:id', strictLimiter, async (req, res) => {
                 processes[idx].completedAt = new Date().toISOString();
             }
         }
-        await writeJson(PROCESSES_FILE, processes);
+        await db.setCollection('onboarding_processes', processes);
         res.json(processes[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating process' });
@@ -832,7 +739,7 @@ app.put('/api/onboarding/processes/:id', strictLimiter, async (req, res) => {
 
 app.put('/api/onboarding/processes/:id/steps/:stepId', strictLimiter, async (req, res) => {
     try {
-        const processes = await readJson(PROCESSES_FILE);
+        const processes = await db.getCollection('onboarding_processes');
         const procIdx = processes.findIndex(p => p.id === req.params.id);
         if (procIdx === -1) return res.status(404).json({ error: 'Process not found' });
         const stepIdx = processes[procIdx].steps.findIndex(s => s.id === req.params.stepId);
@@ -852,7 +759,7 @@ app.put('/api/onboarding/processes/:id/steps/:stepId', strictLimiter, async (req
             processes[procIdx].completedAt = new Date().toISOString();
         }
 
-        await writeJson(PROCESSES_FILE, processes);
+        await db.setCollection('onboarding_processes', processes);
         res.json(processes[procIdx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating step' });
@@ -863,7 +770,7 @@ app.put('/api/onboarding/processes/:id/steps/:stepId', strictLimiter, async (req
 
 app.get('/api/onboarding/kpis', async (req, res) => {
     try {
-        const processes = await readJson(PROCESSES_FILE);
+        const processes = await db.getCollection('onboarding_processes');
         const now = new Date();
 
         const totalProcesses = processes.length;
@@ -935,7 +842,7 @@ app.get('/api/onboarding/kpis', async (req, res) => {
 
 app.get('/api/employees', async (req, res) => {
     try {
-        const employees = await readJson(EMPLOYEES_FILE);
+        const employees = await db.getCollection('employees');
         res.json(employees);
     } catch (error) {
         res.status(500).json({ error: 'Error reading employees' });
@@ -948,7 +855,7 @@ app.post('/api/employees', strictLimiter, async (req, res) => {
         if (!name || !email) {
             return res.status(400).json({ error: 'Name and email are required' });
         }
-        const employees = await readJson(EMPLOYEES_FILE);
+        const employees = await db.getCollection('employees');
         if (employees.some(e => e.email === email)) {
             return res.status(400).json({ error: 'An employee with this email already exists' });
         }
@@ -964,7 +871,7 @@ app.post('/api/employees', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         employees.push(newEmployee);
-        await writeJson(EMPLOYEES_FILE, employees);
+        await db.setCollection('employees', employees);
         res.status(201).json(newEmployee);
     } catch (error) {
         res.status(500).json({ error: 'Error creating employee' });
@@ -973,7 +880,7 @@ app.post('/api/employees', strictLimiter, async (req, res) => {
 
 app.put('/api/employees/:id', strictLimiter, async (req, res) => {
     try {
-        const employees = await readJson(EMPLOYEES_FILE);
+        const employees = await db.getCollection('employees');
         const idx = employees.findIndex(e => e.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Employee not found' });
         const { name, email, role, department, entity, lineManagerEmail } = req.body;
@@ -990,7 +897,7 @@ app.put('/api/employees/:id', strictLimiter, async (req, res) => {
             lineManagerEmail: lineManagerEmail !== undefined ? lineManagerEmail : employees[idx].lineManagerEmail,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(EMPLOYEES_FILE, employees);
+        await db.setCollection('employees', employees);
         res.json(employees[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating employee' });
@@ -999,11 +906,11 @@ app.put('/api/employees/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/employees/:id', strictLimiter, async (req, res) => {
     try {
-        const employees = await readJson(EMPLOYEES_FILE);
+        const employees = await db.getCollection('employees');
         const idx = employees.findIndex(e => e.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Employee not found' });
         employees.splice(idx, 1);
-        await writeJson(EMPLOYEES_FILE, employees);
+        await db.setCollection('employees', employees);
         res.json({ message: 'Employee deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting employee' });
@@ -1014,7 +921,7 @@ app.delete('/api/employees/:id', strictLimiter, async (req, res) => {
 
 app.get('/api/trainings/templates', async (req, res) => {
     try {
-        const templates = await readJson(TRAINING_TEMPLATES_FILE);
+        const templates = await db.getCollection('training_templates');
         res.json(templates);
     } catch (error) {
         res.status(500).json({ error: 'Error reading training templates' });
@@ -1027,7 +934,7 @@ app.post('/api/trainings/templates', strictLimiter, async (req, res) => {
         if (!title || !Array.isArray(sections) || sections.length === 0) {
             return res.status(400).json({ error: 'Title and at least one section are required' });
         }
-        const templates = await readJson(TRAINING_TEMPLATES_FILE);
+        const templates = await db.getCollection('training_templates');
         const newTemplate = {
             id: generateId(),
             title,
@@ -1049,7 +956,7 @@ app.post('/api/trainings/templates', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         templates.push(newTemplate);
-        await writeJson(TRAINING_TEMPLATES_FILE, templates);
+        await db.setCollection('training_templates', templates);
         res.status(201).json(newTemplate);
     } catch (error) {
         res.status(500).json({ error: 'Error creating training template' });
@@ -1058,7 +965,7 @@ app.post('/api/trainings/templates', strictLimiter, async (req, res) => {
 
 app.get('/api/trainings/templates/:id', async (req, res) => {
     try {
-        const templates = await readJson(TRAINING_TEMPLATES_FILE);
+        const templates = await db.getCollection('training_templates');
         const template = templates.find(t => t.id === req.params.id);
         if (!template) return res.status(404).json({ error: 'Training template not found' });
         res.json(template);
@@ -1069,7 +976,7 @@ app.get('/api/trainings/templates/:id', async (req, res) => {
 
 app.put('/api/trainings/templates/:id', strictLimiter, async (req, res) => {
     try {
-        const templates = await readJson(TRAINING_TEMPLATES_FILE);
+        const templates = await db.getCollection('training_templates');
         const idx = templates.findIndex(t => t.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Training template not found' });
         const { title, description, dueDays, reminderDays, sections } = req.body;
@@ -1092,7 +999,7 @@ app.put('/api/trainings/templates/:id', strictLimiter, async (req, res) => {
             })) : templates[idx].sections,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(TRAINING_TEMPLATES_FILE, templates);
+        await db.setCollection('training_templates', templates);
         res.json(templates[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating training template' });
@@ -1101,11 +1008,11 @@ app.put('/api/trainings/templates/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/trainings/templates/:id', strictLimiter, async (req, res) => {
     try {
-        const templates = await readJson(TRAINING_TEMPLATES_FILE);
+        const templates = await db.getCollection('training_templates');
         const idx = templates.findIndex(t => t.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Training template not found' });
         templates.splice(idx, 1);
-        await writeJson(TRAINING_TEMPLATES_FILE, templates);
+        await db.setCollection('training_templates', templates);
         res.json({ message: 'Training template deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting training template' });
@@ -1128,7 +1035,7 @@ function computeOverdueAssignments(assignments) {
 
 app.get('/api/trainings/assignments', async (req, res) => {
     try {
-        const assignments = await readJson(TRAINING_ASSIGNMENTS_FILE);
+        const assignments = await db.getCollection('training_assignments');
         res.json(computeOverdueAssignments(assignments));
     } catch (error) {
         res.status(500).json({ error: 'Error reading assignments' });
@@ -1141,12 +1048,12 @@ app.post('/api/trainings/assignments', strictLimiter, async (req, res) => {
         if (!trainingId || !Array.isArray(employeeIds) || employeeIds.length === 0) {
             return res.status(400).json({ error: 'Training and at least one employee are required' });
         }
-        const templates = await readJson(TRAINING_TEMPLATES_FILE);
+        const templates = await db.getCollection('training_templates');
         const training = templates.find(t => t.id === trainingId);
         if (!training) return res.status(404).json({ error: 'Training template not found' });
 
-        const employees = await readJson(EMPLOYEES_FILE);
-        const assignments = await readJson(TRAINING_ASSIGNMENTS_FILE);
+        const employees = await db.getCollection('employees');
+        const assignments = await db.getCollection('training_assignments');
         const now = new Date();
         const newAssignments = [];
 
@@ -1193,7 +1100,7 @@ app.post('/api/trainings/assignments', strictLimiter, async (req, res) => {
             newAssignments.push(assignment);
         }
 
-        await writeJson(TRAINING_ASSIGNMENTS_FILE, assignments);
+        await db.setCollection('training_assignments', assignments);
         res.status(201).json(newAssignments);
     } catch (error) {
         console.error(error);
@@ -1203,7 +1110,7 @@ app.post('/api/trainings/assignments', strictLimiter, async (req, res) => {
 
 app.get('/api/trainings/assignments/:id', async (req, res) => {
     try {
-        const assignments = await readJson(TRAINING_ASSIGNMENTS_FILE);
+        const assignments = await db.getCollection('training_assignments');
         const assignment = assignments.find(a => a.id === req.params.id);
         if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
         res.json(assignment);
@@ -1214,7 +1121,7 @@ app.get('/api/trainings/assignments/:id', async (req, res) => {
 
 app.put('/api/trainings/assignments/:id', strictLimiter, async (req, res) => {
     try {
-        const assignments = await readJson(TRAINING_ASSIGNMENTS_FILE);
+        const assignments = await db.getCollection('training_assignments');
         const idx = assignments.findIndex(a => a.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Assignment not found' });
 
@@ -1226,7 +1133,7 @@ app.put('/api/trainings/assignments/:id', strictLimiter, async (req, res) => {
         if (quizAnswers !== undefined) {
             assignment.quizAnswers = quizAnswers;
             // Calculate score if quiz answers provided
-            const templates = await readJson(TRAINING_TEMPLATES_FILE);
+            const templates = await db.getCollection('training_templates');
             const training = templates.find(t => t.id === assignment.trainingId);
             if (training) {
                 const quizSections = training.sections.filter(s => s.type === 'quiz');
@@ -1245,7 +1152,7 @@ app.put('/api/trainings/assignments/:id', strictLimiter, async (req, res) => {
             assignment.startedAt = new Date().toISOString();
         }
 
-        await writeJson(TRAINING_ASSIGNMENTS_FILE, assignments);
+        await db.setCollection('training_assignments', assignments);
         res.json(assignments[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating assignment' });
@@ -1256,9 +1163,9 @@ app.put('/api/trainings/assignments/:id', strictLimiter, async (req, res) => {
 
 app.get('/api/trainings/kpis', async (req, res) => {
     try {
-        const assignments = computeOverdueAssignments(await readJson(TRAINING_ASSIGNMENTS_FILE));
-        const employees = await readJson(EMPLOYEES_FILE);
-        const templates = await readJson(TRAINING_TEMPLATES_FILE);
+        const assignments = computeOverdueAssignments(await db.getCollection('training_assignments'));
+        const employees = await db.getCollection('employees');
+        const templates = await db.getCollection('training_templates');
 
         const total = assignments.length;
         const notStarted = assignments.filter(a => a.status === 'not_started').length;
@@ -1330,7 +1237,7 @@ const IT_STATUSES = ['active', 'inactive', 'under-review'];
 
 app.get('/api/it-landscape', async (req, res) => {
     try {
-        const tools = await readJson(IT_LANDSCAPE_FILE);
+        const tools = await db.getCollection('it_landscape');
         res.json(tools);
     } catch (error) {
         res.status(500).json({ error: 'Error reading IT landscape' });
@@ -1362,7 +1269,7 @@ app.post('/api/it-landscape', strictLimiter, async (req, res) => {
         if (costValue !== null && (isNaN(costValue) || costValue < 0)) {
             return res.status(400).json({ error: 'Cost must be a non-negative number' });
         }
-        const tools = await readJson(IT_LANDSCAPE_FILE);
+        const tools = await db.getCollection('it_landscape');
         const newTool = {
             id: generateId(),
             name: name.trim(),
@@ -1381,7 +1288,7 @@ app.post('/api/it-landscape', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         tools.push(newTool);
-        await writeJson(IT_LANDSCAPE_FILE, tools);
+        await db.setCollection('it_landscape', tools);
         res.status(201).json(newTool);
     } catch (error) {
         res.status(500).json({ error: 'Error creating IT tool' });
@@ -1390,7 +1297,7 @@ app.post('/api/it-landscape', strictLimiter, async (req, res) => {
 
 app.put('/api/it-landscape/:id', strictLimiter, async (req, res) => {
     try {
-        const tools = await readJson(IT_LANDSCAPE_FILE);
+        const tools = await db.getCollection('it_landscape');
         const idx = tools.findIndex(t => t.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'IT tool not found' });
         const { name, vendor, description, department, category, cost, currency, billingCycle, contractStart, contractEnd, status, notes } = req.body;
@@ -1429,7 +1336,7 @@ app.put('/api/it-landscape/:id', strictLimiter, async (req, res) => {
             notes: notes !== undefined ? notes.trim() : tools[idx].notes,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(IT_LANDSCAPE_FILE, tools);
+        await db.setCollection('it_landscape', tools);
         res.json(tools[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating IT tool' });
@@ -1438,11 +1345,11 @@ app.put('/api/it-landscape/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/it-landscape/:id', strictLimiter, async (req, res) => {
     try {
-        const tools = await readJson(IT_LANDSCAPE_FILE);
+        const tools = await db.getCollection('it_landscape');
         const idx = tools.findIndex(t => t.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'IT tool not found' });
         tools.splice(idx, 1);
-        await writeJson(IT_LANDSCAPE_FILE, tools);
+        await db.setCollection('it_landscape', tools);
         res.json({ message: 'IT tool deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting IT tool' });
@@ -1459,7 +1366,7 @@ const ASSET_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF'];
 // More-specific route defined first to avoid /:id matching 'kpis'
 app.get('/api/it-assets/kpis', async (req, res) => {
     try {
-        const assets = await readJson(IT_ASSETS_FILE);
+        const assets = await db.getCollection('it_assets');
         const now = new Date();
         const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
@@ -1525,7 +1432,7 @@ app.get('/api/it-assets/kpis', async (req, res) => {
 
 app.get('/api/it-assets', async (req, res) => {
     try {
-        const assets = await readJson(IT_ASSETS_FILE);
+        const assets = await db.getCollection('it_assets');
         res.json(assets);
     } catch (error) {
         res.status(500).json({ error: 'Error reading IT assets' });
@@ -1555,7 +1462,7 @@ app.post('/api/it-assets', strictLimiter, async (req, res) => {
         if (priceValue !== null && (isNaN(priceValue) || priceValue < 0)) {
             return res.status(400).json({ error: 'Purchase price must be a non-negative number' });
         }
-        const assets = await readJson(IT_ASSETS_FILE);
+        const assets = await db.getCollection('it_assets');
         if (assetTag && assetTag.trim() && assets.some(a => a.assetTag && a.assetTag.toLowerCase() === assetTag.trim().toLowerCase())) {
             return res.status(400).json({ error: 'Asset tag already exists' });
         }
@@ -1582,7 +1489,7 @@ app.post('/api/it-assets', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         assets.push(newAsset);
-        await writeJson(IT_ASSETS_FILE, assets);
+        await db.setCollection('it_assets', assets);
         res.status(201).json(newAsset);
     } catch (error) {
         res.status(500).json({ error: 'Error creating IT asset' });
@@ -1591,7 +1498,7 @@ app.post('/api/it-assets', strictLimiter, async (req, res) => {
 
 app.put('/api/it-assets/:id', strictLimiter, async (req, res) => {
     try {
-        const assets = await readJson(IT_ASSETS_FILE);
+        const assets = await db.getCollection('it_assets');
         const idx = assets.findIndex(a => a.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'IT asset not found' });
         const { assetTag, name, type, brand, model, serialNumber, purchaseDate, purchasePrice, currency,
@@ -1638,7 +1545,7 @@ app.put('/api/it-assets/:id', strictLimiter, async (req, res) => {
             notes: notes !== undefined ? notes.trim() : assets[idx].notes,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(IT_ASSETS_FILE, assets);
+        await db.setCollection('it_assets', assets);
         res.json(assets[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating IT asset' });
@@ -1647,11 +1554,11 @@ app.put('/api/it-assets/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/it-assets/:id', strictLimiter, async (req, res) => {
     try {
-        const assets = await readJson(IT_ASSETS_FILE);
+        const assets = await db.getCollection('it_assets');
         const idx = assets.findIndex(a => a.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'IT asset not found' });
         assets.splice(idx, 1);
-        await writeJson(IT_ASSETS_FILE, assets);
+        await db.setCollection('it_assets', assets);
         res.json({ message: 'IT asset deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting IT asset' });
@@ -1672,7 +1579,7 @@ const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
 
 app.get('/api/employee-skills', async (req, res) => {
     try {
-        const profiles = await readJson(EMPLOYEE_SKILLS_FILE);
+        const profiles = await db.getCollection('employee_skills');
         res.json(profiles);
     } catch (error) {
         res.status(500).json({ error: 'Error reading employee skill profiles' });
@@ -1691,7 +1598,7 @@ app.post('/api/employee-skills', strictLimiter, async (req, res) => {
         if (!competenceCentre || !COMPETENCE_CENTRES.includes(competenceCentre)) {
             return res.status(400).json({ error: 'Valid competence centre is required' });
         }
-        const profiles = await readJson(EMPLOYEE_SKILLS_FILE);
+        const profiles = await db.getCollection('employee_skills');
         if (employeeId && profiles.some(p => p.employeeId === employeeId)) {
             return res.status(400).json({ error: 'A skill profile already exists for this employee' });
         }
@@ -1714,7 +1621,7 @@ app.post('/api/employee-skills', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         profiles.push(newProfile);
-        await writeJson(EMPLOYEE_SKILLS_FILE, profiles);
+        await db.setCollection('employee_skills', profiles);
         res.status(201).json(newProfile);
     } catch (error) {
         res.status(500).json({ error: 'Error creating employee skill profile' });
@@ -1723,7 +1630,7 @@ app.post('/api/employee-skills', strictLimiter, async (req, res) => {
 
 app.put('/api/employee-skills/:id', strictLimiter, async (req, res) => {
     try {
-        const profiles = await readJson(EMPLOYEE_SKILLS_FILE);
+        const profiles = await db.getCollection('employee_skills');
         const idx = profiles.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Employee skill profile not found' });
         const { employeeId, employeeName, employmentType, competenceCentre, skills, notes } = req.body;
@@ -1750,7 +1657,7 @@ app.put('/api/employee-skills/:id', strictLimiter, async (req, res) => {
             notes: notes !== undefined ? notes.trim() : profiles[idx].notes,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(EMPLOYEE_SKILLS_FILE, profiles);
+        await db.setCollection('employee_skills', profiles);
         res.json(profiles[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating employee skill profile' });
@@ -1759,11 +1666,11 @@ app.put('/api/employee-skills/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/employee-skills/:id', strictLimiter, async (req, res) => {
     try {
-        const profiles = await readJson(EMPLOYEE_SKILLS_FILE);
+        const profiles = await db.getCollection('employee_skills');
         const idx = profiles.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Employee skill profile not found' });
         profiles.splice(idx, 1);
-        await writeJson(EMPLOYEE_SKILLS_FILE, profiles);
+        await db.setCollection('employee_skills', profiles);
         res.json({ message: 'Employee skill profile deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting employee skill profile' });
@@ -1774,7 +1681,7 @@ app.delete('/api/employee-skills/:id', strictLimiter, async (req, res) => {
 
 app.get('/api/skill-categories', async (req, res) => {
     try {
-        const categories = await readJson(SKILL_CATEGORIES_FILE);
+        const categories = await db.getCollection('skill_categories');
         res.json(categories);
     } catch (error) {
         res.status(500).json({ error: 'Error reading skill categories' });
@@ -1787,7 +1694,7 @@ app.post('/api/skill-categories', strictLimiter, async (req, res) => {
         if (!name || !name.trim()) {
             return res.status(400).json({ error: 'Category name is required' });
         }
-        const categories = await readJson(SKILL_CATEGORIES_FILE);
+        const categories = await db.getCollection('skill_categories');
         if (categories.some(c => c.name.toLowerCase() === name.trim().toLowerCase())) {
             return res.status(400).json({ error: 'A category with this name already exists' });
         }
@@ -1799,7 +1706,7 @@ app.post('/api/skill-categories', strictLimiter, async (req, res) => {
             createdAt: new Date().toISOString()
         };
         categories.push(newCategory);
-        await writeJson(SKILL_CATEGORIES_FILE, categories);
+        await db.setCollection('skill_categories', categories);
         res.status(201).json(newCategory);
     } catch (error) {
         res.status(500).json({ error: 'Error creating skill category' });
@@ -1808,7 +1715,7 @@ app.post('/api/skill-categories', strictLimiter, async (req, res) => {
 
 app.put('/api/skill-categories/:id', strictLimiter, async (req, res) => {
     try {
-        const categories = await readJson(SKILL_CATEGORIES_FILE);
+        const categories = await db.getCollection('skill_categories');
         const idx = categories.findIndex(c => c.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Skill category not found' });
         if (!categories[idx].isCustom) {
@@ -1827,7 +1734,7 @@ app.put('/api/skill-categories/:id', strictLimiter, async (req, res) => {
             description: description !== undefined ? description.trim() : categories[idx].description,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(SKILL_CATEGORIES_FILE, categories);
+        await db.setCollection('skill_categories', categories);
         res.json(categories[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating skill category' });
@@ -1836,14 +1743,14 @@ app.put('/api/skill-categories/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/skill-categories/:id', strictLimiter, async (req, res) => {
     try {
-        const categories = await readJson(SKILL_CATEGORIES_FILE);
+        const categories = await db.getCollection('skill_categories');
         const idx = categories.findIndex(c => c.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Skill category not found' });
         if (!categories[idx].isCustom) {
             return res.status(403).json({ error: 'Built-in categories cannot be deleted' });
         }
         categories.splice(idx, 1);
-        await writeJson(SKILL_CATEGORIES_FILE, categories);
+        await db.setCollection('skill_categories', categories);
         res.json({ message: 'Skill category deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting skill category' });
@@ -1854,7 +1761,7 @@ app.delete('/api/skill-categories/:id', strictLimiter, async (req, res) => {
 
 app.get('/api/crm/contacts', async (req, res) => {
     try {
-        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const contacts = await db.getCollection('crm_contacts');
         res.json(contacts);
     } catch (error) {
         res.status(500).json({ error: 'Error reading CRM contacts' });
@@ -1867,7 +1774,7 @@ app.post('/api/crm/contacts', strictLimiter, async (req, res) => {
         if (!firstName || !lastName || !type) {
             return res.status(400).json({ error: 'First name, last name and type are required' });
         }
-        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const contacts = await db.getCollection('crm_contacts');
         const newContact = {
             id: generateId(),
             firstName: firstName.trim(),
@@ -1883,7 +1790,7 @@ app.post('/api/crm/contacts', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         contacts.push(newContact);
-        await writeJson(CRM_CONTACTS_FILE, contacts);
+        await db.setCollection('crm_contacts', contacts);
         res.status(201).json(newContact);
     } catch (error) {
         res.status(500).json({ error: 'Error creating CRM contact' });
@@ -1892,7 +1799,7 @@ app.post('/api/crm/contacts', strictLimiter, async (req, res) => {
 
 app.get('/api/crm/contacts/:id', async (req, res) => {
     try {
-        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const contacts = await db.getCollection('crm_contacts');
         const contact = contacts.find(c => c.id === req.params.id);
         if (!contact) return res.status(404).json({ error: 'Contact not found' });
         res.json(contact);
@@ -1903,7 +1810,7 @@ app.get('/api/crm/contacts/:id', async (req, res) => {
 
 app.put('/api/crm/contacts/:id', strictLimiter, async (req, res) => {
     try {
-        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const contacts = await db.getCollection('crm_contacts');
         const idx = contacts.findIndex(c => c.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Contact not found' });
         const { firstName, lastName, company, email, phone, jobTitle, type, status, notes } = req.body;
@@ -1923,7 +1830,7 @@ app.put('/api/crm/contacts/:id', strictLimiter, async (req, res) => {
             notes: notes !== undefined ? notes.trim() : contacts[idx].notes,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(CRM_CONTACTS_FILE, contacts);
+        await db.setCollection('crm_contacts', contacts);
         res.json(contacts[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating CRM contact' });
@@ -1932,11 +1839,11 @@ app.put('/api/crm/contacts/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/crm/contacts/:id', strictLimiter, async (req, res) => {
     try {
-        const contacts = await readJson(CRM_CONTACTS_FILE);
+        const contacts = await db.getCollection('crm_contacts');
         const idx = contacts.findIndex(c => c.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Contact not found' });
         contacts.splice(idx, 1);
-        await writeJson(CRM_CONTACTS_FILE, contacts);
+        await db.setCollection('crm_contacts', contacts);
         res.json({ message: 'Contact deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting CRM contact' });
@@ -1947,7 +1854,7 @@ app.delete('/api/crm/contacts/:id', strictLimiter, async (req, res) => {
 
 app.get('/api/crm/deals/kpis', async (req, res) => {
     try {
-        const deals = await readJson(CRM_DEALS_FILE);
+        const deals = await db.getCollection('crm_deals');
         const active = deals.filter(d => d.stage !== 'Won' && d.stage !== 'Lost');
         const won = deals.filter(d => d.stage === 'Won');
         const lost = deals.filter(d => d.stage === 'Lost');
@@ -1965,7 +1872,7 @@ app.get('/api/crm/deals/kpis', async (req, res) => {
 
 app.get('/api/crm/deals', async (req, res) => {
     try {
-        const deals = await readJson(CRM_DEALS_FILE);
+        const deals = await db.getCollection('crm_deals');
         res.json(deals);
     } catch (error) {
         res.status(500).json({ error: 'Error reading CRM deals' });
@@ -1982,7 +1889,7 @@ app.post('/api/crm/deals', strictLimiter, async (req, res) => {
         if (!validStages.includes(stage)) {
             return res.status(400).json({ error: 'Invalid stage value' });
         }
-        const deals = await readJson(CRM_DEALS_FILE);
+        const deals = await db.getCollection('crm_deals');
         const newDeal = {
             id: generateId(),
             title: title.trim(),
@@ -1999,7 +1906,7 @@ app.post('/api/crm/deals', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         deals.push(newDeal);
-        await writeJson(CRM_DEALS_FILE, deals);
+        await db.setCollection('crm_deals', deals);
         res.status(201).json(newDeal);
     } catch (error) {
         res.status(500).json({ error: 'Error creating deal' });
@@ -2008,7 +1915,7 @@ app.post('/api/crm/deals', strictLimiter, async (req, res) => {
 
 app.get('/api/crm/deals/:id', async (req, res) => {
     try {
-        const deals = await readJson(CRM_DEALS_FILE);
+        const deals = await db.getCollection('crm_deals');
         const deal = deals.find(d => d.id === req.params.id);
         if (!deal) return res.status(404).json({ error: 'Deal not found' });
         res.json(deal);
@@ -2019,7 +1926,7 @@ app.get('/api/crm/deals/:id', async (req, res) => {
 
 app.put('/api/crm/deals/:id', strictLimiter, async (req, res) => {
     try {
-        const deals = await readJson(CRM_DEALS_FILE);
+        const deals = await db.getCollection('crm_deals');
         const idx = deals.findIndex(d => d.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Deal not found' });
         const { title, contactId, company, value, currency, stage, probability, expectedCloseDate, owner, notes } = req.body;
@@ -2044,7 +1951,7 @@ app.put('/api/crm/deals/:id', strictLimiter, async (req, res) => {
             notes: notes !== undefined ? notes.trim() : deals[idx].notes,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(CRM_DEALS_FILE, deals);
+        await db.setCollection('crm_deals', deals);
         res.json(deals[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating deal' });
@@ -2053,11 +1960,11 @@ app.put('/api/crm/deals/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/crm/deals/:id', strictLimiter, async (req, res) => {
     try {
-        const deals = await readJson(CRM_DEALS_FILE);
+        const deals = await db.getCollection('crm_deals');
         const idx = deals.findIndex(d => d.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Deal not found' });
         deals.splice(idx, 1);
-        await writeJson(CRM_DEALS_FILE, deals);
+        await db.setCollection('crm_deals', deals);
         res.json({ message: 'Deal deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting deal' });
@@ -2073,7 +1980,7 @@ const REVIEW_FREQUENCIES = ['monthly', 'quarterly', 'bi-annually', 'annually', '
 
 app.get('/api/process-ownership/kpis', async (req, res) => {
     try {
-        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const processes = await db.getCollection('process_ownership');
         const total = processes.length;
         const active = processes.filter(p => p.status === 'active').length;
         const uniqueOwners = new Set(processes.map(p => p.primaryOwner).filter(Boolean)).size;
@@ -2112,7 +2019,7 @@ app.get('/api/process-ownership/kpis', async (req, res) => {
 
 app.get('/api/process-ownership', async (req, res) => {
     try {
-        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const processes = await db.getCollection('process_ownership');
         res.json(processes);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching processes' });
@@ -2143,7 +2050,7 @@ app.post('/api/process-ownership', strictLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Invalid review frequency' });
         }
 
-        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const processes = await db.getCollection('process_ownership');
         const newProcess = {
             id: generateId(),
             processName: processName.trim(),
@@ -2164,7 +2071,7 @@ app.post('/api/process-ownership', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         processes.push(newProcess);
-        await writeJson(PROCESS_OWNERSHIP_FILE, processes);
+        await db.setCollection('process_ownership', processes);
         res.status(201).json(newProcess);
     } catch (error) {
         res.status(500).json({ error: 'Error creating process' });
@@ -2195,7 +2102,7 @@ app.put('/api/process-ownership/:id', strictLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Invalid review frequency' });
         }
 
-        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const processes = await db.getCollection('process_ownership');
         const idx = processes.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Process not found' });
 
@@ -2217,7 +2124,7 @@ app.put('/api/process-ownership/:id', strictLimiter, async (req, res) => {
             notes: (notes || '').trim(),
             updatedAt: new Date().toISOString()
         };
-        await writeJson(PROCESS_OWNERSHIP_FILE, processes);
+        await db.setCollection('process_ownership', processes);
         res.json(processes[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating process' });
@@ -2226,11 +2133,11 @@ app.put('/api/process-ownership/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/process-ownership/:id', strictLimiter, async (req, res) => {
     try {
-        const processes = await readJson(PROCESS_OWNERSHIP_FILE);
+        const processes = await db.getCollection('process_ownership');
         const idx = processes.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Process not found' });
         processes.splice(idx, 1);
-        await writeJson(PROCESS_OWNERSHIP_FILE, processes);
+        await db.setCollection('process_ownership', processes);
         res.json({ message: 'Process deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting process' });
@@ -2241,7 +2148,7 @@ app.delete('/api/process-ownership/:id', strictLimiter, async (req, res) => {
 
 app.get('/api/partnerships', async (req, res) => {
     try {
-        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const partnerships = await db.getCollection('partnerships');
         res.json(partnerships);
     } catch (error) {
         res.status(500).json({ error: 'Error reading partnerships' });
@@ -2254,7 +2161,7 @@ app.post('/api/partnerships', strictLimiter, async (req, res) => {
         if (!name || !type || !partnerType) {
             return res.status(400).json({ error: 'Name, type and partner type are required' });
         }
-        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const partnerships = await db.getCollection('partnerships');
         const newPartnership = {
             id: generateId(),
             name: name.trim(),
@@ -2274,7 +2181,7 @@ app.post('/api/partnerships', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         partnerships.push(newPartnership);
-        await writeJson(PARTNERSHIPS_FILE, partnerships);
+        await db.setCollection('partnerships', partnerships);
         res.status(201).json(newPartnership);
     } catch (error) {
         res.status(500).json({ error: 'Error creating partnership' });
@@ -2283,7 +2190,7 @@ app.post('/api/partnerships', strictLimiter, async (req, res) => {
 
 app.get('/api/partnerships/:id', async (req, res) => {
     try {
-        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const partnerships = await db.getCollection('partnerships');
         const partnership = partnerships.find(p => p.id === req.params.id);
         if (!partnership) return res.status(404).json({ error: 'Partnership not found' });
         res.json(partnership);
@@ -2294,7 +2201,7 @@ app.get('/api/partnerships/:id', async (req, res) => {
 
 app.put('/api/partnerships/:id', strictLimiter, async (req, res) => {
     try {
-        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const partnerships = await db.getCollection('partnerships');
         const idx = partnerships.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Partnership not found' });
         const { name, type, partnerType, company, firstName, lastName, email, phone, website, description, status, startDate, notes } = req.body;
@@ -2318,7 +2225,7 @@ app.put('/api/partnerships/:id', strictLimiter, async (req, res) => {
             notes: notes !== undefined ? notes.trim() : partnerships[idx].notes,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(PARTNERSHIPS_FILE, partnerships);
+        await db.setCollection('partnerships', partnerships);
         res.json(partnerships[idx]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating partnership' });
@@ -2327,11 +2234,11 @@ app.put('/api/partnerships/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/partnerships/:id', strictLimiter, async (req, res) => {
     try {
-        const partnerships = await readJson(PARTNERSHIPS_FILE);
+        const partnerships = await db.getCollection('partnerships');
         const idx = partnerships.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Partnership not found' });
         partnerships.splice(idx, 1);
-        await writeJson(PARTNERSHIPS_FILE, partnerships);
+        await db.setCollection('partnerships', partnerships);
         res.json({ message: 'Partnership deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting partnership' });
@@ -2342,7 +2249,7 @@ app.delete('/api/partnerships/:id', strictLimiter, async (req, res) => {
 
 app.get('/api/meetings', async (req, res) => {
     try {
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         res.json(meetings);
     } catch {
         res.status(500).json({ error: 'Error reading meetings' });
@@ -2354,7 +2261,7 @@ app.post('/api/meetings', strictLimiter, async (req, res) => {
         const { title, date, time, type, status, location, attendees, agenda, notes } = req.body;
         if (!title || !title.trim()) return res.status(400).json({ error: 'Title is required' });
         if (!date) return res.status(400).json({ error: 'Date is required' });
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const newMeeting = {
             id: generateId(),
             title: title.trim(),
@@ -2370,7 +2277,7 @@ app.post('/api/meetings', strictLimiter, async (req, res) => {
             createdAt: new Date().toISOString()
         };
         meetings.push(newMeeting);
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.status(201).json(newMeeting);
     } catch {
         res.status(500).json({ error: 'Error creating meeting' });
@@ -2379,7 +2286,7 @@ app.post('/api/meetings', strictLimiter, async (req, res) => {
 
 app.get('/api/meetings/:id', async (req, res) => {
     try {
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const meeting = meetings.find(m => m.id === req.params.id);
         if (!meeting) return res.status(404).json({ error: 'Meeting not found' });
         res.json(meeting);
@@ -2391,7 +2298,7 @@ app.get('/api/meetings/:id', async (req, res) => {
 app.put('/api/meetings/:id', strictLimiter, async (req, res) => {
     try {
         const { title, date, time, type, status, location, attendees, agenda, notes } = req.body;
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const idx = meetings.findIndex(m => m.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Meeting not found' });
         meetings[idx] = {
@@ -2406,7 +2313,7 @@ app.put('/api/meetings/:id', strictLimiter, async (req, res) => {
             agenda: agenda !== undefined ? agenda.trim() : meetings[idx].agenda,
             notes: notes !== undefined ? notes.trim() : meetings[idx].notes
         };
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.json(meetings[idx]);
     } catch {
         res.status(500).json({ error: 'Error updating meeting' });
@@ -2415,11 +2322,11 @@ app.put('/api/meetings/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/meetings/:id', strictLimiter, async (req, res) => {
     try {
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const idx = meetings.findIndex(m => m.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Meeting not found' });
         meetings.splice(idx, 1);
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.json({ message: 'Meeting deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting meeting' });
@@ -2432,7 +2339,7 @@ app.post('/api/meetings/:id/todos', strictLimiter, async (req, res) => {
     try {
         const { task, assignee, dueDate, priority } = req.body;
         if (!task || !task.trim()) return res.status(400).json({ error: 'Task is required' });
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const idx = meetings.findIndex(m => m.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Meeting not found' });
         const newTodo = {
@@ -2446,7 +2353,7 @@ app.post('/api/meetings/:id/todos', strictLimiter, async (req, res) => {
         };
         if (!Array.isArray(meetings[idx].todos)) meetings[idx].todos = [];
         meetings[idx].todos.push(newTodo);
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.status(201).json(newTodo);
     } catch {
         res.status(500).json({ error: 'Error creating todo' });
@@ -2456,7 +2363,7 @@ app.post('/api/meetings/:id/todos', strictLimiter, async (req, res) => {
 app.put('/api/meetings/:id/todos/:todoId', strictLimiter, async (req, res) => {
     try {
         const { task, assignee, dueDate, priority, status } = req.body;
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const mIdx = meetings.findIndex(m => m.id === req.params.id);
         if (mIdx === -1) return res.status(404).json({ error: 'Meeting not found' });
         if (!Array.isArray(meetings[mIdx].todos)) meetings[mIdx].todos = [];
@@ -2470,7 +2377,7 @@ app.put('/api/meetings/:id/todos/:todoId', strictLimiter, async (req, res) => {
             priority: priority || meetings[mIdx].todos[tIdx].priority,
             status: status || meetings[mIdx].todos[tIdx].status
         };
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.json(meetings[mIdx].todos[tIdx]);
     } catch {
         res.status(500).json({ error: 'Error updating todo' });
@@ -2479,14 +2386,14 @@ app.put('/api/meetings/:id/todos/:todoId', strictLimiter, async (req, res) => {
 
 app.delete('/api/meetings/:id/todos/:todoId', strictLimiter, async (req, res) => {
     try {
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const mIdx = meetings.findIndex(m => m.id === req.params.id);
         if (mIdx === -1) return res.status(404).json({ error: 'Meeting not found' });
         if (!Array.isArray(meetings[mIdx].todos)) meetings[mIdx].todos = [];
         const tIdx = meetings[mIdx].todos.findIndex(t => t.id === req.params.todoId);
         if (tIdx === -1) return res.status(404).json({ error: 'Todo not found' });
         meetings[mIdx].todos.splice(tIdx, 1);
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.json({ message: 'Todo deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting todo' });
@@ -2499,7 +2406,7 @@ app.post('/api/meetings/:id/protocols', strictLimiter, async (req, res) => {
     try {
         const { title, content, author, status } = req.body;
         if (!title || !title.trim()) return res.status(400).json({ error: 'Protocol title is required' });
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const idx = meetings.findIndex(m => m.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Meeting not found' });
         const newProtocol = {
@@ -2513,7 +2420,7 @@ app.post('/api/meetings/:id/protocols', strictLimiter, async (req, res) => {
         };
         if (!Array.isArray(meetings[idx].protocols)) meetings[idx].protocols = [];
         meetings[idx].protocols.push(newProtocol);
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.status(201).json(newProtocol);
     } catch {
         res.status(500).json({ error: 'Error creating protocol' });
@@ -2523,7 +2430,7 @@ app.post('/api/meetings/:id/protocols', strictLimiter, async (req, res) => {
 app.put('/api/meetings/:id/protocols/:protocolId', strictLimiter, async (req, res) => {
     try {
         const { title, content, author, status } = req.body;
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const mIdx = meetings.findIndex(m => m.id === req.params.id);
         if (mIdx === -1) return res.status(404).json({ error: 'Meeting not found' });
         if (!Array.isArray(meetings[mIdx].protocols)) meetings[mIdx].protocols = [];
@@ -2537,7 +2444,7 @@ app.put('/api/meetings/:id/protocols/:protocolId', strictLimiter, async (req, re
             status: status || meetings[mIdx].protocols[pIdx].status,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.json(meetings[mIdx].protocols[pIdx]);
     } catch {
         res.status(500).json({ error: 'Error updating protocol' });
@@ -2546,14 +2453,14 @@ app.put('/api/meetings/:id/protocols/:protocolId', strictLimiter, async (req, re
 
 app.delete('/api/meetings/:id/protocols/:protocolId', strictLimiter, async (req, res) => {
     try {
-        const meetings = await readJson(MEETINGS_FILE);
+        const meetings = await db.getCollection('meetings');
         const mIdx = meetings.findIndex(m => m.id === req.params.id);
         if (mIdx === -1) return res.status(404).json({ error: 'Meeting not found' });
         if (!Array.isArray(meetings[mIdx].protocols)) meetings[mIdx].protocols = [];
         const pIdx = meetings[mIdx].protocols.findIndex(p => p.id === req.params.protocolId);
         if (pIdx === -1) return res.status(404).json({ error: 'Protocol not found' });
         meetings[mIdx].protocols.splice(pIdx, 1);
-        await writeJson(MEETINGS_FILE, meetings);
+        await db.setCollection('meetings', meetings);
         res.json({ message: 'Protocol deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting protocol' });
@@ -2564,7 +2471,7 @@ app.delete('/api/meetings/:id/protocols/:protocolId', strictLimiter, async (req,
 
 app.get('/api/evaluations', async (req, res) => {
     try {
-        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluations = await db.getCollection('evaluations');
         res.json(evaluations);
     } catch {
         res.status(500).json({ error: 'Error reading evaluations' });
@@ -2576,7 +2483,7 @@ app.post('/api/evaluations', strictLimiter, async (req, res) => {
         const { employeeName, evaluatorName, period, type, status, dueDate, overallScore, comments } = req.body;
         if (!employeeName || !employeeName.trim()) return res.status(400).json({ error: 'Employee name is required' });
         if (!period || !period.trim()) return res.status(400).json({ error: 'Period is required' });
-        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluations = await db.getCollection('evaluations');
         const newEvaluation = {
             id: generateId(),
             employeeName: employeeName.trim(),
@@ -2592,7 +2499,7 @@ app.post('/api/evaluations', strictLimiter, async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         evaluations.push(newEvaluation);
-        await writeJson(EVALUATIONS_FILE, evaluations);
+        await db.setCollection('evaluations', evaluations);
         res.status(201).json(newEvaluation);
     } catch {
         res.status(500).json({ error: 'Error creating evaluation' });
@@ -2601,7 +2508,7 @@ app.post('/api/evaluations', strictLimiter, async (req, res) => {
 
 app.get('/api/evaluations/:id', async (req, res) => {
     try {
-        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluations = await db.getCollection('evaluations');
         const evaluation = evaluations.find(e => e.id === req.params.id);
         if (!evaluation) return res.status(404).json({ error: 'Evaluation not found' });
         res.json(evaluation);
@@ -2613,7 +2520,7 @@ app.get('/api/evaluations/:id', async (req, res) => {
 app.put('/api/evaluations/:id', strictLimiter, async (req, res) => {
     try {
         const { employeeName, evaluatorName, period, type, status, dueDate, overallScore, comments } = req.body;
-        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluations = await db.getCollection('evaluations');
         const idx = evaluations.findIndex(e => e.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Evaluation not found' });
         evaluations[idx] = {
@@ -2628,7 +2535,7 @@ app.put('/api/evaluations/:id', strictLimiter, async (req, res) => {
             comments: comments !== undefined ? comments.trim() : evaluations[idx].comments,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(EVALUATIONS_FILE, evaluations);
+        await db.setCollection('evaluations', evaluations);
         res.json(evaluations[idx]);
     } catch {
         res.status(500).json({ error: 'Error updating evaluation' });
@@ -2637,11 +2544,11 @@ app.put('/api/evaluations/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/evaluations/:id', strictLimiter, async (req, res) => {
     try {
-        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluations = await db.getCollection('evaluations');
         const idx = evaluations.findIndex(e => e.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Evaluation not found' });
         evaluations.splice(idx, 1);
-        await writeJson(EVALUATIONS_FILE, evaluations);
+        await db.setCollection('evaluations', evaluations);
         res.json({ message: 'Evaluation deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting evaluation' });
@@ -2654,7 +2561,7 @@ app.post('/api/evaluations/:id/goals', strictLimiter, async (req, res) => {
     try {
         const { title, description, score, status } = req.body;
         if (!title || !title.trim()) return res.status(400).json({ error: 'Goal title is required' });
-        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluations = await db.getCollection('evaluations');
         const idx = evaluations.findIndex(e => e.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Evaluation not found' });
         const newGoal = {
@@ -2668,7 +2575,7 @@ app.post('/api/evaluations/:id/goals', strictLimiter, async (req, res) => {
         if (!Array.isArray(evaluations[idx].goals)) evaluations[idx].goals = [];
         evaluations[idx].goals.push(newGoal);
         evaluations[idx].updatedAt = new Date().toISOString();
-        await writeJson(EVALUATIONS_FILE, evaluations);
+        await db.setCollection('evaluations', evaluations);
         res.status(201).json(newGoal);
     } catch {
         res.status(500).json({ error: 'Error creating goal' });
@@ -2678,7 +2585,7 @@ app.post('/api/evaluations/:id/goals', strictLimiter, async (req, res) => {
 app.put('/api/evaluations/:id/goals/:goalId', strictLimiter, async (req, res) => {
     try {
         const { title, description, score, status } = req.body;
-        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluations = await db.getCollection('evaluations');
         const eIdx = evaluations.findIndex(e => e.id === req.params.id);
         if (eIdx === -1) return res.status(404).json({ error: 'Evaluation not found' });
         if (!Array.isArray(evaluations[eIdx].goals)) evaluations[eIdx].goals = [];
@@ -2692,7 +2599,7 @@ app.put('/api/evaluations/:id/goals/:goalId', strictLimiter, async (req, res) =>
             status: status || evaluations[eIdx].goals[gIdx].status
         };
         evaluations[eIdx].updatedAt = new Date().toISOString();
-        await writeJson(EVALUATIONS_FILE, evaluations);
+        await db.setCollection('evaluations', evaluations);
         res.json(evaluations[eIdx].goals[gIdx]);
     } catch {
         res.status(500).json({ error: 'Error updating goal' });
@@ -2701,7 +2608,7 @@ app.put('/api/evaluations/:id/goals/:goalId', strictLimiter, async (req, res) =>
 
 app.delete('/api/evaluations/:id/goals/:goalId', strictLimiter, async (req, res) => {
     try {
-        const evaluations = await readJson(EVALUATIONS_FILE);
+        const evaluations = await db.getCollection('evaluations');
         const eIdx = evaluations.findIndex(e => e.id === req.params.id);
         if (eIdx === -1) return res.status(404).json({ error: 'Evaluation not found' });
         if (!Array.isArray(evaluations[eIdx].goals)) evaluations[eIdx].goals = [];
@@ -2709,7 +2616,7 @@ app.delete('/api/evaluations/:id/goals/:goalId', strictLimiter, async (req, res)
         if (gIdx === -1) return res.status(404).json({ error: 'Goal not found' });
         evaluations[eIdx].goals.splice(gIdx, 1);
         evaluations[eIdx].updatedAt = new Date().toISOString();
-        await writeJson(EVALUATIONS_FILE, evaluations);
+        await db.setCollection('evaluations', evaluations);
         res.json({ message: 'Goal deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting goal' });
@@ -2724,7 +2631,7 @@ const POSITION_EMPLOYMENT_TYPES = ['Permanent', 'Contractor', 'Freelancer', 'Par
 
 app.get('/api/open-positions', async (req, res) => {
     try {
-        const positions = await readJson(OPEN_POSITIONS_FILE);
+        const positions = await db.getCollection('open_positions');
         res.json(positions);
     } catch {
         res.status(500).json({ error: 'Error reading open positions' });
@@ -2760,9 +2667,9 @@ app.post('/api/open-positions', strictLimiter, async (req, res) => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-        const positions = await readJson(OPEN_POSITIONS_FILE);
+        const positions = await db.getCollection('open_positions');
         positions.push(newPosition);
-        await writeJson(OPEN_POSITIONS_FILE, positions);
+        await db.setCollection('open_positions', positions);
         res.status(201).json(newPosition);
     } catch {
         res.status(500).json({ error: 'Error creating open position' });
@@ -2771,7 +2678,7 @@ app.post('/api/open-positions', strictLimiter, async (req, res) => {
 
 app.put('/api/open-positions/:id', strictLimiter, async (req, res) => {
     try {
-        const positions = await readJson(OPEN_POSITIONS_FILE);
+        const positions = await db.getCollection('open_positions');
         const idx = positions.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Position not found' });
         const { title, department, employmentType, priority, status, requestedBy, targetDate, requiredSkills, description, notes } = req.body;
@@ -2801,7 +2708,7 @@ app.put('/api/open-positions/:id', strictLimiter, async (req, res) => {
             notes: notes !== undefined ? notes.trim() : positions[idx].notes,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(OPEN_POSITIONS_FILE, positions);
+        await db.setCollection('open_positions', positions);
         res.json(positions[idx]);
     } catch {
         res.status(500).json({ error: 'Error updating open position' });
@@ -2810,11 +2717,11 @@ app.put('/api/open-positions/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/open-positions/:id', strictLimiter, async (req, res) => {
     try {
-        const positions = await readJson(OPEN_POSITIONS_FILE);
+        const positions = await db.getCollection('open_positions');
         const idx = positions.findIndex(p => p.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Position not found' });
         positions.splice(idx, 1);
-        await writeJson(OPEN_POSITIONS_FILE, positions);
+        await db.setCollection('open_positions', positions);
         res.status(204).send();
     } catch {
         res.status(500).json({ error: 'Error deleting open position' });
@@ -2829,7 +2736,7 @@ const OUTLOOK_TASK_STATUSES = ['To Do', 'In Progress', 'Done'];
 
 app.get('/api/outlook', async (req, res) => {
     try {
-        const items = await readJson(OUTLOOK_FILE);
+        const items = await db.getCollection('outlook');
         res.json(items);
     } catch {
         res.status(500).json({ error: 'Error reading outlook items' });
@@ -2857,9 +2764,9 @@ app.post('/api/outlook', strictLimiter, async (req, res) => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-        const items = await readJson(OUTLOOK_FILE);
+        const items = await db.getCollection('outlook');
         items.push(newItem);
-        await writeJson(OUTLOOK_FILE, items);
+        await db.setCollection('outlook', items);
         res.status(201).json(newItem);
     } catch {
         res.status(500).json({ error: 'Error creating outlook item' });
@@ -2868,7 +2775,7 @@ app.post('/api/outlook', strictLimiter, async (req, res) => {
 
 app.get('/api/outlook/:id', async (req, res) => {
     try {
-        const items = await readJson(OUTLOOK_FILE);
+        const items = await db.getCollection('outlook');
         const item = items.find(i => i.id === req.params.id);
         if (!item) return res.status(404).json({ error: 'Outlook item not found' });
         res.json(item);
@@ -2880,7 +2787,7 @@ app.get('/api/outlook/:id', async (req, res) => {
 app.put('/api/outlook/:id', strictLimiter, async (req, res) => {
     try {
         const { title, owner, ragStatus, status, implementationDate, description } = req.body;
-        const items = await readJson(OUTLOOK_FILE);
+        const items = await db.getCollection('outlook');
         const idx = items.findIndex(i => i.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Outlook item not found' });
         if (title !== undefined && !title.trim()) return res.status(400).json({ error: 'Title cannot be empty' });
@@ -2897,7 +2804,7 @@ app.put('/api/outlook/:id', strictLimiter, async (req, res) => {
             description: description !== undefined ? description.trim() : items[idx].description,
             updatedAt: new Date().toISOString()
         };
-        await writeJson(OUTLOOK_FILE, items);
+        await db.setCollection('outlook', items);
         res.json(items[idx]);
     } catch {
         res.status(500).json({ error: 'Error updating outlook item' });
@@ -2906,11 +2813,11 @@ app.put('/api/outlook/:id', strictLimiter, async (req, res) => {
 
 app.delete('/api/outlook/:id', strictLimiter, async (req, res) => {
     try {
-        const items = await readJson(OUTLOOK_FILE);
+        const items = await db.getCollection('outlook');
         const idx = items.findIndex(i => i.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Outlook item not found' });
         items.splice(idx, 1);
-        await writeJson(OUTLOOK_FILE, items);
+        await db.setCollection('outlook', items);
         res.json({ message: 'Outlook item deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting outlook item' });
@@ -2923,7 +2830,7 @@ app.post('/api/outlook/:id/tasks', strictLimiter, async (req, res) => {
     try {
         const { title, description, assignee, dueDate, status } = req.body;
         if (!title || !title.trim()) return res.status(400).json({ error: 'Task title is required' });
-        const items = await readJson(OUTLOOK_FILE);
+        const items = await db.getCollection('outlook');
         const idx = items.findIndex(i => i.id === req.params.id);
         if (idx === -1) return res.status(404).json({ error: 'Outlook item not found' });
         const newTask = {
@@ -2938,7 +2845,7 @@ app.post('/api/outlook/:id/tasks', strictLimiter, async (req, res) => {
         if (!Array.isArray(items[idx].tasks)) items[idx].tasks = [];
         items[idx].tasks.push(newTask);
         items[idx].updatedAt = new Date().toISOString();
-        await writeJson(OUTLOOK_FILE, items);
+        await db.setCollection('outlook', items);
         res.status(201).json(newTask);
     } catch {
         res.status(500).json({ error: 'Error creating task' });
@@ -2948,7 +2855,7 @@ app.post('/api/outlook/:id/tasks', strictLimiter, async (req, res) => {
 app.put('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => {
     try {
         const { title, description, assignee, dueDate, status } = req.body;
-        const items = await readJson(OUTLOOK_FILE);
+        const items = await db.getCollection('outlook');
         const iIdx = items.findIndex(i => i.id === req.params.id);
         if (iIdx === -1) return res.status(404).json({ error: 'Outlook item not found' });
         if (!Array.isArray(items[iIdx].tasks)) items[iIdx].tasks = [];
@@ -2965,7 +2872,7 @@ app.put('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => {
             status: status || items[iIdx].tasks[tIdx].status
         };
         items[iIdx].updatedAt = new Date().toISOString();
-        await writeJson(OUTLOOK_FILE, items);
+        await db.setCollection('outlook', items);
         res.json(items[iIdx].tasks[tIdx]);
     } catch {
         res.status(500).json({ error: 'Error updating task' });
@@ -2974,7 +2881,7 @@ app.put('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => {
 
 app.delete('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => {
     try {
-        const items = await readJson(OUTLOOK_FILE);
+        const items = await db.getCollection('outlook');
         const iIdx = items.findIndex(i => i.id === req.params.id);
         if (iIdx === -1) return res.status(404).json({ error: 'Outlook item not found' });
         if (!Array.isArray(items[iIdx].tasks)) items[iIdx].tasks = [];
@@ -2982,7 +2889,7 @@ app.delete('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => 
         if (tIdx === -1) return res.status(404).json({ error: 'Task not found' });
         items[iIdx].tasks.splice(tIdx, 1);
         items[iIdx].updatedAt = new Date().toISOString();
-        await writeJson(OUTLOOK_FILE, items);
+        await db.setCollection('outlook', items);
         res.json({ message: 'Task deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting task' });
@@ -2991,24 +2898,14 @@ app.delete('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => 
 
 // Health check endpoint used by the CI/CD pipeline to verify the deployment
 app.get('/health', limiter, async (req, res) => {
-    // Verify the data directory is writable so that a deployment with a
-    // missing or read-only persistent volume is reported as unhealthy rather
-    // than silently losing all user data.
-    const healthFile = path.join(DATA_DIR, '.health');
     try {
-        await fs.writeFile(healthFile, '1');
-        try {
-            await fs.unlink(healthFile);
-        } catch (_) {
-            // Best-effort cleanup; failure here doesn't affect correctness.
-        }
-        res.json({ status: 'ok', uptime: process.uptime(), dataDir: DATA_DIR });
+        await db.query('SELECT 1');
+        res.json({ status: 'ok', uptime: process.uptime() });
     } catch (err) {
         res.status(503).json({
             status: 'degraded',
             uptime: process.uptime(),
-            dataDir: DATA_DIR,
-            error: `Data directory not writable: ${err.message}`
+            error: `Database connection failed: ${err.message}`
         });
     }
 });

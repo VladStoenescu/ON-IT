@@ -17,9 +17,18 @@ services:
       - key: NODE_ENV
         scope: RUN_TIME
         value: production
-      - key: DATA_DIR
+      - key: DB_HOST
         scope: RUN_TIME
-        value: /data
-    storage:
-      - name: on-it-data
-        mount_path: /data
+        value: app-b577de97-4d36-493c-981c-d7faa5c293ee-do-user-27694528-0.d.db.ondigitalocean.com
+      - key: DB_PORT
+        scope: RUN_TIME
+        value: "25060"
+      - key: DB_USER
+        scope: RUN_TIME
+        value: onpointbackoffice
+      - key: DB_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+      - key: DB_NAME
+        scope: RUN_TIME
+        value: onpointbackoffice

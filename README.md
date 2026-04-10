@@ -147,46 +147,49 @@ PORT=8080 npm start
 
 The built-in admin account (`vlad.stoenescu@on-point.com`) is created on first boot with the password defined by the `ADMIN_PASSWORD` environment variable. If the variable is not set the server falls back to the default password `Admin@2024!` and logs a warning.
 
-**Set a strong password before going live.** In the DigitalOcean App Platform dashboard navigate to *Settings → Environment Variables* and add `ADMIN_PASSWORD` as an **Encrypted** variable. You only need to set it once; the password hash is stored in the persistent volume and is never overwritten by subsequent deployments.
+**Set a strong password before going live.** In the DigitalOcean App Platform dashboard navigate to *Settings → Environment Variables* and add `ADMIN_PASSWORD` as an **Encrypted** variable. You only need to set it once; the password hash is stored in the database and is never overwritten by subsequent deployments.
 
-> On every deployment the server ensures the admin account exists and that its section permissions are up-to-date with all currently deployed features. User accounts created by the admin also persist across deployments because they are stored in the same persistent volume (`/data/users.json`).
+> On every deployment the server ensures the admin account exists and that its section permissions are up-to-date with all currently deployed features. User accounts created by the admin also persist across deployments because they are stored in the database.
 
 ## Data Persistence
 
-All data is stored as JSON files in the directory pointed to by the `DATA_DIR` environment variable (defaults to `data/` relative to `server.js` when not set).
+All data is stored in a **PostgreSQL database**. The server connects using the following environment variables:
 
-> **Important:** The data JSON files are intentionally **not committed to the repository**. This prevents `git pull` from ever overwriting your live data. On first boot the server creates every required file automatically inside `DATA_DIR`.
+| Variable      | Description                        | Default                                                                                        |
+|---------------|------------------------------------|------------------------------------------------------------------------------------------------|
+| `DATABASE_URL`| Full connection string (takes priority over individual vars) | —                                                               |
+| `DB_HOST`     | PostgreSQL host                    | `app-b577de97-4d36-493c-981c-d7faa5c293ee-do-user-27694528-0.d.db.ondigitalocean.com`         |
+| `DB_PORT`     | PostgreSQL port                    | `25060`                                                                                        |
+| `DB_USER`     | Database username                  | `onpointbackoffice`                                                                            |
+| `DB_PASSWORD` | Database password (**required**)   | —                                                                                              |
+| `DB_NAME`     | Database name                      | `onpointbackoffice`                                                                            |
 
-When deployed to DigitalOcean App Platform the `.do/app.yaml` spec mounts a persistent volume at `/data` and sets `DATA_DIR=/data`, so all data files survive deployments and container restarts.
+SSL is always enabled (`rejectUnauthorized: false`) to support DigitalOcean managed databases.
 
-All writes to JSON data files use an atomic write pattern (write to a `.tmp` file first, then rename) to prevent data corruption if the process is killed mid-write. The `GET /health` endpoint verifies that the data directory is writable on every request; a deployment with a missing or broken volume mount will return HTTP 503 and be detected as unhealthy by App Platform before traffic is routed to it.
+On first boot the server automatically creates all required tables (using `CREATE TABLE IF NOT EXISTS`) and seeds default data (e.g. skill categories). No manual schema migration is needed for new deployments.
+
+The `GET /health` endpoint tests the database connection on every request; a deployment that cannot reach the database will return HTTP 503 and be flagged as unhealthy by App Platform before traffic is routed to it.
 
 ### PM2 / bare-metal deployments
 
-The `ecosystem.config.js` sets `DATA_DIR=/opt/on-it-data` so that data is stored **outside** the git working tree. Create the directory once on the server before starting the application:
+Set the database environment variables before starting the application:
 
 ```bash
-sudo mkdir -p /opt/on-it-data
-sudo chown $(whoami) /opt/on-it-data
-```
-
-Then start (or restart) the application with PM2:
-
-```bash
+export DB_HOST=<host>
+export DB_PORT=<port>
+export DB_USER=<user>
+export DB_PASSWORD=<password>
+export DB_NAME=<database>
 pm2 start ecosystem.config.js --env production
 ```
 
-Because `/opt/on-it-data` is outside the repository, running `git pull` to update the code will never touch the data files.
-
 ### User accounts
 
-User accounts are stored in `users.json` inside `DATA_DIR`. Because this file lives on the persistent volume:
+User accounts are stored in the `users` table. Because data lives in the managed database:
 
 - **All user accounts created via the Admin panel survive redeployments** — no users are ever deleted by a deployment.
 - The admin account is guaranteed to exist after every deployment; its section permissions are automatically kept in sync with any newly released features.
-- Active login sessions (stored in `sessions.json`) also survive redeployments, so users do not need to log in again after an update as long as their session has not expired (sessions last 7 days).
-
-The files stored include ideas, employees, onboarding templates & processes, training templates & assignments, IT landscape, IT assets, employee skills, skill categories, CRM contacts, CRM deals, process ownership, partnerships, meetings, evaluations, open positions, outlook items, users, and sessions.
+- Active login sessions (stored in the `sessions` table) also survive redeployments, so users do not need to log in again after an update as long as their session has not expired (sessions last 7 days).
 
 Each idea record includes:
 
