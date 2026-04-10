@@ -155,9 +155,9 @@ if (!fsSync.existsSync(SESSIONS_FILE)) {
             });
         } else {
             users[adminIndex].role = 'admin';
-            if (!users[adminIndex].permissions.includes('admin')) {
-                users[adminIndex].permissions = [...ALLOWED_SECTIONS, 'admin'];
-            }
+            // Always sync admin permissions with the current full section list so
+            // newly deployed features are immediately accessible to the admin.
+            users[adminIndex].permissions = [...ALLOWED_SECTIONS, 'admin'];
         }
         fsSync.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
     } catch (e) {

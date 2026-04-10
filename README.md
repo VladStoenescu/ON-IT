@@ -138,11 +138,27 @@ You can change the server port by setting the `PORT` environment variable:
 PORT=8080 npm start
 ```
 
+### Admin password
+
+The built-in admin account (`vlad.stoenescu@on-point.com`) is created on first boot with the password defined by the `ADMIN_PASSWORD` environment variable. If the variable is not set the server falls back to the default password `Admin@2024!` and logs a warning.
+
+**Set a strong password before going live.** In the DigitalOcean App Platform dashboard navigate to *Settings → Environment Variables* and add `ADMIN_PASSWORD` as an **Encrypted** variable. You only need to set it once; the password hash is stored in the persistent volume and is never overwritten by subsequent deployments.
+
+> On every deployment the server ensures the admin account exists and that its section permissions are up-to-date with all currently deployed features. User accounts created by the admin also persist across deployments because they are stored in the same persistent volume (`/data/users.json`).
+
 ## Data Persistence
 
 All data is stored as JSON files in the directory pointed to by the `DATA_DIR` environment variable (defaults to `data/` relative to `server.js` when not set).
 
 When deployed to DigitalOcean App Platform the `.do/app.yaml` spec mounts a persistent volume at `/data` and sets `DATA_DIR=/data`, so all data files survive deployments and container restarts.
+
+### User accounts
+
+User accounts are stored in `users.json` inside `DATA_DIR`. Because this file lives on the persistent volume:
+
+- **All user accounts created via the Admin panel survive redeployments** — no users are ever deleted by a deployment.
+- The admin account is guaranteed to exist after every deployment; its section permissions are automatically kept in sync with any newly released features.
+- Active login sessions (stored in `sessions.json`) also survive redeployments, so users do not need to log in again after an update as long as their session has not expired (sessions last 7 days).
 
 The files stored include ideas, employees, onboarding templates & processes, training templates & assignments, IT landscape, IT assets, employee skills, skill categories, CRM contacts, CRM deals, process ownership, partnerships, meetings, evaluations, open positions, outlook items, users, and sessions.
 
