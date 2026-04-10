@@ -347,6 +347,29 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =
     }
 });
 
+app.post('/api/admin/users/:id/reset-password', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { newPassword } = req.body;
+        if (!newPassword || newPassword.length < 8) {
+            return res.status(400).json({ error: 'New password must be at least 8 characters' });
+        }
+        const users = await db.getCollection('users');
+        const userIndex = users.findIndex(u => u.id === req.params.id);
+        if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
+        if (users[userIndex].email === ADMIN_EMAIL) {
+            return res.status(400).json({ error: 'Cannot reset admin password from this endpoint' });
+        }
+        users[userIndex].passwordHash = await bcrypt.hash(newPassword, 10);
+        await db.setCollection('users', users);
+        // Invalidate all existing sessions for the user
+        const sessions = await db.getCollection('sessions');
+        await db.setCollection('sessions', sessions.filter(s => s.userId !== req.params.id));
+        res.json({ message: 'Password reset successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error resetting password' });
+    }
+});
+
 // ─── Global Auth Middleware for all subsequent API routes ────────────────────
 app.use('/api', (req, res, next) => {
     if (req.path.startsWith('/auth/')) return next();
