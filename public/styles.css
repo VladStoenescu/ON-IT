@@ -2645,6 +2645,44 @@ body {
 .auth-error { background: #fff0f0; color: #c0392b; border: 1px solid #ffd5d5; }
 .auth-success { background: #f0fff4; color: #27ae60; border: 1px solid #c3fae8; }
 .auth-message.hidden { display: none; }
+.pw-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.pw-input-wrapper input {
+    flex: 1;
+    padding-right: 58px;
+}
+.pw-toggle-btn {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #636366;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 6px;
+    border-radius: 4px;
+    user-select: none;
+    line-height: 1;
+}
+.pw-toggle-btn:hover {
+    background: #f2f2f7;
+    color: #1C1C1E;
+}
+.forgot-pw-link {
+    background: none;
+    border: none;
+    color: #636366;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.forgot-pw-link:hover { color: #1C1C1E; }
 
 /* ─── Topbar User ────────────────────────────────────────────────────────────── */
 .topbar-user {

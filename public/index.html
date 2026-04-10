@@ -35,10 +35,19 @@
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="login-password" required placeholder="Password">
+                    <div class="pw-input-wrapper">
+                        <input type="password" id="login-password" required placeholder="Password">
+                        <button type="button" class="pw-toggle-btn" onclick="togglePasswordVisibility('login-password', this)" tabindex="-1">Show</button>
+                    </div>
                 </div>
                 <div id="login-error" class="auth-message auth-error hidden"></div>
                 <button type="submit" class="btn-primary" style="width:100%">Sign In</button>
+                <div style="text-align:center;margin-top:12px">
+                    <button type="button" class="forgot-pw-link" onclick="toggleForgotPassword()">Forgot your password?</button>
+                </div>
+                <div id="forgot-pw-info" class="auth-message hidden" style="margin-top:8px;background:#f0f4ff;color:#1a56db;border:1px solid #c7d7fd;text-align:center;">
+                    Please contact your system administrator to reset your password.
+                </div>
             </form>
         </div>
         <div id="auth-register-panel" class="auth-panel">
@@ -53,7 +62,17 @@
                 </div>
                 <div class="form-group">
                     <label>Password <small>(min. 8 characters)</small></label>
-                    <input type="password" id="register-password" required placeholder="Password" minlength="8">
+                    <div class="pw-input-wrapper">
+                        <input type="password" id="register-password" required placeholder="Password" minlength="8">
+                        <button type="button" class="pw-toggle-btn" onclick="togglePasswordVisibility('register-password', this)" tabindex="-1">Show</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <div class="pw-input-wrapper">
+                        <input type="password" id="register-password-confirm" required placeholder="Repeat your password" minlength="8">
+                        <button type="button" class="pw-toggle-btn" onclick="togglePasswordVisibility('register-password-confirm', this)" tabindex="-1">Show</button>
+                    </div>
                 </div>
                 <div id="register-error" class="auth-message auth-error hidden"></div>
                 <div id="register-success" class="auth-message auth-success hidden"></div>
@@ -2912,11 +2931,24 @@
         <form onsubmit="submitChangePassword(event)">
             <div class="form-group">
                 <label>Current Password</label>
-                <input type="password" id="cp-current" required placeholder="Current password">
+                <div class="pw-input-wrapper">
+                    <input type="password" id="cp-current" required placeholder="Current password">
+                    <button type="button" class="pw-toggle-btn" onclick="togglePasswordVisibility('cp-current', this)" tabindex="-1">Show</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>New Password <small>(min. 8 characters)</small></label>
-                <input type="password" id="cp-new" required placeholder="New password" minlength="8">
+                <div class="pw-input-wrapper">
+                    <input type="password" id="cp-new" required placeholder="New password" minlength="8">
+                    <button type="button" class="pw-toggle-btn" onclick="togglePasswordVisibility('cp-new', this)" tabindex="-1">Show</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Confirm New Password</label>
+                <div class="pw-input-wrapper">
+                    <input type="password" id="cp-confirm" required placeholder="Repeat new password" minlength="8">
+                    <button type="button" class="pw-toggle-btn" onclick="togglePasswordVisibility('cp-confirm', this)" tabindex="-1">Show</button>
+                </div>
             </div>
             <div id="cp-error" class="auth-message auth-error hidden"></div>
             <div id="cp-success" class="auth-message auth-success hidden"></div>
@@ -2940,11 +2972,17 @@
             <p id="arp-user-email" style="margin:0 0 16px;color:#636366;font-size:14px;"></p>
             <div class="form-group">
                 <label>New Password <small>(min. 8 characters)</small></label>
-                <input type="password" id="arp-new" required placeholder="New password" minlength="8">
+                <div class="pw-input-wrapper">
+                    <input type="password" id="arp-new" required placeholder="New password" minlength="8">
+                    <button type="button" class="pw-toggle-btn" onclick="togglePasswordVisibility('arp-new', this)" tabindex="-1">Show</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>Confirm New Password</label>
-                <input type="password" id="arp-confirm" required placeholder="Confirm new password" minlength="8">
+                <div class="pw-input-wrapper">
+                    <input type="password" id="arp-confirm" required placeholder="Confirm new password" minlength="8">
+                    <button type="button" class="pw-toggle-btn" onclick="togglePasswordVisibility('arp-confirm', this)" tabindex="-1">Show</button>
+                </div>
             </div>
             <div id="arp-error" class="auth-message auth-error hidden"></div>
             <div style="display:flex;gap:8px;margin-top:16px">
