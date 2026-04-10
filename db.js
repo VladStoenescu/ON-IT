@@ -13,7 +13,14 @@
 
 'use strict';
 
-const { Pool } = require('pg');
+const pg = require('pg');
+const { Pool } = pg;
+
+// Ensure self-signed / managed-DB certificates are always accepted.
+// Some pg v8 builds ignore the per-Pool ssl option when a connectionString
+// with embedded sslmode params is provided; setting the module-level default
+// guarantees the behaviour regardless of the connection path.
+pg.defaults.ssl = { rejectUnauthorized: false };
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
