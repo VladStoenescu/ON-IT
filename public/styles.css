@@ -634,6 +634,147 @@ body {
     border: 1px solid #ffe0b2;
 }
 
+.badge.status.prioritized {
+    background: #e8eaf6;
+    color: #283593;
+    border: 1px solid #c5cae9;
+}
+
+.badge.status.implemented {
+    background: #e8f5e9;
+    color: #1b5e20;
+    border: 1px solid #c8e6c9;
+}
+
+.idea-actions {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    flex-shrink: 0;
+}
+
+.idea-admin-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.idea-admin-label {
+    font-size: var(--fs-sm);
+    color: #666;
+    font-weight: 600;
+}
+
+.idea-status-btn {
+    padding: 3px 10px;
+    border-radius: 3px;
+    border: 1px solid var(--brand-border);
+    background: #f5f5f5;
+    color: #555;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+}
+
+.idea-status-btn:hover {
+    background: #e0e0e0;
+}
+
+.idea-status-btn.active {
+    background: var(--brand-red);
+    color: #fff;
+    border-color: var(--brand-red);
+}
+
+.idea-comments-section {
+    margin-top: 14px;
+}
+
+.idea-comments {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.idea-comment {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: #fafafa;
+    border: 1px solid var(--brand-border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: var(--fs-sm);
+}
+
+.idea-comment-text {
+    flex: 1;
+    color: #333;
+    line-height: 1.5;
+}
+
+.idea-comment-meta {
+    color: #999;
+    font-size: 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.idea-comment-delete {
+    background: none;
+    border: none;
+    color: #bbb;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.idea-comment-delete:hover {
+    color: var(--brand-red);
+}
+
+.idea-add-comment {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.idea-comment-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--brand-border);
+    border-radius: 4px;
+    font-size: var(--fs-sm);
+    font-family: inherit;
+}
+
+.idea-comment-input:focus {
+    outline: none;
+    border-color: var(--brand-red);
+}
+
+.btn-sm {
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--brand-border);
+    background: #f5f5f5;
+    color: #333;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.btn-sm:hover {
+    background: #e0e0e0;
+}
+
 .no-ideas {
     text-align: center;
     color: #999;

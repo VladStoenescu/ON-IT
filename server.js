@@ -501,6 +501,126 @@ app.get('/api/ideas/:id', async (req, res) => {
     }
 });
 
+// Update idea (admin: status; creator: title/description)
+app.put('/api/ideas/:id', requireAuth, async (req, res) => {
+    try {
+        const data = await fs.readFile(DATA_FILE, 'utf8');
+        const ideas = JSON.parse(data);
+        const idx = ideas.findIndex(i => i.id === req.params.id);
+
+        if (idx === -1) {
+            return res.status(404).json({ error: 'Idea not found' });
+        }
+
+        const idea = ideas[idx];
+        const isAdmin = req.user.role === 'admin';
+        const creatorName = req.user.name || req.user.email;
+        const isCreator = idea.submittedBy === creatorName;
+
+        if (!isAdmin && !isCreator) {
+            return res.status(403).json({ error: 'Not authorized to update this idea' });
+        }
+
+        if (isAdmin && req.body.status !== undefined) {
+            const allowed = ['Pending', 'Prioritized', 'Implemented'];
+            if (!allowed.includes(req.body.status)) {
+                return res.status(400).json({ error: 'Invalid status value' });
+            }
+            idea.status = req.body.status;
+        }
+
+        if (isCreator) {
+            if (req.body.title !== undefined) {
+                if (!req.body.title.trim()) return res.status(400).json({ error: 'Title cannot be empty' });
+                idea.title = req.body.title.trim();
+            }
+            if (req.body.description !== undefined) {
+                if (!req.body.description.trim()) return res.status(400).json({ error: 'Description cannot be empty' });
+                idea.description = req.body.description.trim();
+            }
+        }
+
+        ideas[idx] = idea;
+        await fs.writeFile(DATA_FILE, JSON.stringify(ideas, null, 2));
+        res.json(idea);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating idea' });
+    }
+});
+
+// Add comment to idea (creator only)
+app.post('/api/ideas/:id/comments', requireAuth, async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: 'Comment text is required' });
+        }
+
+        const data = await fs.readFile(DATA_FILE, 'utf8');
+        const ideas = JSON.parse(data);
+        const idx = ideas.findIndex(i => i.id === req.params.id);
+
+        if (idx === -1) {
+            return res.status(404).json({ error: 'Idea not found' });
+        }
+
+        const idea = ideas[idx];
+        const creatorName = req.user.name || req.user.email;
+        if (idea.submittedBy !== creatorName) {
+            return res.status(403).json({ error: 'Only the idea creator can add comments' });
+        }
+
+        if (!idea.comments) idea.comments = [];
+        const comment = {
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            text: text.trim(),
+            author: creatorName,
+            createdAt: new Date().toISOString()
+        };
+        idea.comments.push(comment);
+
+        ideas[idx] = idea;
+        await fs.writeFile(DATA_FILE, JSON.stringify(ideas, null, 2));
+        res.status(201).json(comment);
+    } catch (error) {
+        res.status(500).json({ error: 'Error adding comment' });
+    }
+});
+
+// Delete comment from idea (creator only)
+app.delete('/api/ideas/:id/comments/:commentId', requireAuth, async (req, res) => {
+    try {
+        const data = await fs.readFile(DATA_FILE, 'utf8');
+        const ideas = JSON.parse(data);
+        const idx = ideas.findIndex(i => i.id === req.params.id);
+
+        if (idx === -1) {
+            return res.status(404).json({ error: 'Idea not found' });
+        }
+
+        const idea = ideas[idx];
+        const creatorName = req.user.name || req.user.email;
+        if (idea.submittedBy !== creatorName) {
+            return res.status(403).json({ error: 'Only the idea creator can delete comments' });
+        }
+
+        if (!idea.comments) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+        const commentIdx = idea.comments.findIndex(c => c.id === req.params.commentId);
+        if (commentIdx === -1) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+
+        idea.comments.splice(commentIdx, 1);
+        ideas[idx] = idea;
+        await fs.writeFile(DATA_FILE, JSON.stringify(ideas, null, 2));
+        res.json({ message: 'Comment deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting comment' });
+    }
+});
+
 // ─── Onboarding Templates API ────────────────────────────────────────────────
 
 app.get('/api/onboarding/templates', async (req, res) => {

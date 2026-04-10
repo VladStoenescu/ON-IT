@@ -1470,6 +1470,34 @@
         </div>
     </div>
 
+    <!-- Idea Edit Modal -->
+    <div id="idea-edit-modal" class="modal-overlay hidden" onclick="closeIdeaEditModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Edit Idea</h3>
+                <button class="modal-close" onclick="closeIdeaEditModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="idea-edit-form" onsubmit="submitIdeaEdit(event)">
+                    <input type="hidden" id="idea-edit-id">
+                    <div class="form-group">
+                        <label>Title *</label>
+                        <input type="text" id="idea-edit-title" required placeholder="Idea title">
+                    </div>
+                    <div class="form-group">
+                        <label>Description *</label>
+                        <textarea id="idea-edit-description" rows="5" required placeholder="Describe your idea in detail"></textarea>
+                    </div>
+                    <p id="idea-edit-error" class="form-error hidden"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeIdeaEditModal()">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Meeting Modal -->
     <div id="meeting-modal" class="modal-overlay hidden" onclick="closeMeetingModalOnBg(event)">
         <div class="modal modal-lg">
