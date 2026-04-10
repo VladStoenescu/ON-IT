@@ -128,7 +128,7 @@ The CI/CD workflow (`.github/workflows/deploy.yml`) validates that the app build
 
 When both secrets are present the `deploy` job polls the deployment status and fails the workflow if the deployment ends in an error state. Without the secrets the job simply prints a notice and exits successfully — App Platform will still deploy automatically via `deploy_on_push`.
 
-> **Note on persistent data:** App Platform does not mount a persistent filesystem across deployments. The JSON files in `data/` are recreated from the in-repository defaults on each deploy. For durable storage, migrate to a managed database such as [DigitalOcean Managed PostgreSQL](https://www.digitalocean.com/products/managed-databases-postgresql) and update the server to use it.
+> **Data persistence:** The `.do/app.yaml` spec includes a persistent volume named `on-it-data` mounted at `/data`. All JSON data files are written there (via the `DATA_DIR=/data` environment variable), so they survive deployments and container restarts. The volume is provisioned automatically when the app is first created from this spec.
 
 ## Configuration
 
@@ -140,7 +140,13 @@ PORT=8080 npm start
 
 ## Data Persistence
 
-All ideas are stored in `data/ideas.json`. Each idea includes:
+All data is stored as JSON files in the directory pointed to by the `DATA_DIR` environment variable (defaults to `data/` relative to `server.js` when not set).
+
+When deployed to DigitalOcean App Platform the `.do/app.yaml` spec mounts a persistent volume at `/data` and sets `DATA_DIR=/data`, so all data files survive deployments and container restarts.
+
+The files stored include ideas, employees, onboarding templates & processes, training templates & assignments, IT landscape, IT assets, employee skills, skill categories, CRM contacts, CRM deals, process ownership, partnerships, meetings, evaluations, open positions, outlook items, users, and sessions.
+
+Each idea record includes:
 
 - **id**: Unique identifier
 - **title**: Idea title

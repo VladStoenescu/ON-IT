@@ -11,27 +11,28 @@ const bcrypt = require('bcryptjs');
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'ideas.json');
-const TEMPLATES_FILE = path.join(__dirname, 'data', 'onboarding-templates.json');
-const PROCESSES_FILE = path.join(__dirname, 'data', 'onboarding-processes.json');
-const EMPLOYEES_FILE = path.join(__dirname, 'data', 'employees.json');
-const TRAINING_TEMPLATES_FILE = path.join(__dirname, 'data', 'training-templates.json');
-const TRAINING_ASSIGNMENTS_FILE = path.join(__dirname, 'data', 'training-assignments.json');
-const IT_LANDSCAPE_FILE = path.join(__dirname, 'data', 'it-landscape.json');
-const IT_ASSETS_FILE = path.join(__dirname, 'data', 'it-assets.json');
-const EMPLOYEE_SKILLS_FILE = path.join(__dirname, 'data', 'employee-skills.json');
-const SKILL_CATEGORIES_FILE = path.join(__dirname, 'data', 'skill-categories.json');
-const CRM_CONTACTS_FILE = path.join(__dirname, 'data', 'crm-contacts.json');
-const CRM_DEALS_FILE = path.join(__dirname, 'data', 'crm-deals.json');
-const PROCESS_OWNERSHIP_FILE = path.join(__dirname, 'data', 'process-ownership.json');
-const PARTNERSHIPS_FILE = path.join(__dirname, 'data', 'partnerships.json');
-const MEETINGS_FILE = path.join(__dirname, 'data', 'meetings.json');
-const EVALUATIONS_FILE = path.join(__dirname, 'data', 'evaluations.json');
-const OPEN_POSITIONS_FILE = path.join(__dirname, 'data', 'open-positions.json');
-const OUTLOOK_FILE = path.join(__dirname, 'data', 'outlook.json');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const DATA_FILE = path.join(DATA_DIR, 'ideas.json');
+const TEMPLATES_FILE = path.join(DATA_DIR, 'onboarding-templates.json');
+const PROCESSES_FILE = path.join(DATA_DIR, 'onboarding-processes.json');
+const EMPLOYEES_FILE = path.join(DATA_DIR, 'employees.json');
+const TRAINING_TEMPLATES_FILE = path.join(DATA_DIR, 'training-templates.json');
+const TRAINING_ASSIGNMENTS_FILE = path.join(DATA_DIR, 'training-assignments.json');
+const IT_LANDSCAPE_FILE = path.join(DATA_DIR, 'it-landscape.json');
+const IT_ASSETS_FILE = path.join(DATA_DIR, 'it-assets.json');
+const EMPLOYEE_SKILLS_FILE = path.join(DATA_DIR, 'employee-skills.json');
+const SKILL_CATEGORIES_FILE = path.join(DATA_DIR, 'skill-categories.json');
+const CRM_CONTACTS_FILE = path.join(DATA_DIR, 'crm-contacts.json');
+const CRM_DEALS_FILE = path.join(DATA_DIR, 'crm-deals.json');
+const PROCESS_OWNERSHIP_FILE = path.join(DATA_DIR, 'process-ownership.json');
+const PARTNERSHIPS_FILE = path.join(DATA_DIR, 'partnerships.json');
+const MEETINGS_FILE = path.join(DATA_DIR, 'meetings.json');
+const EVALUATIONS_FILE = path.join(DATA_DIR, 'evaluations.json');
+const OPEN_POSITIONS_FILE = path.join(DATA_DIR, 'open-positions.json');
+const OUTLOOK_FILE = path.join(DATA_DIR, 'outlook.json');
 
-const USERS_FILE = path.join(__dirname, 'data', 'users.json');
-const SESSIONS_FILE = path.join(__dirname, 'data', 'sessions.json');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
 const ALLOWED_SECTIONS = ['home', 'submit', 'view', 'onboarding', 'trainings', 'landscape', 'assets', 'skills', 'crm', 'pipeline', 'processes', 'partnerships', 'meetings', 'evaluations', 'open-positions', 'outlook'];
 const ADMIN_EMAIL = 'vlad.stoenescu@on-point.com';
@@ -57,8 +58,8 @@ app.use(express.static('public'));
 app.use('/api/', limiter); // Apply rate limiting to all API routes
 
 // Ensure data directory and files exist
-if (!fsSync.existsSync(path.join(__dirname, 'data'))) {
-    fsSync.mkdirSync(path.join(__dirname, 'data'), { mode: 0o755 });
+if (!fsSync.existsSync(DATA_DIR)) {
+    fsSync.mkdirSync(DATA_DIR, { recursive: true, mode: 0o755 });
 }
 if (!fsSync.existsSync(DATA_FILE)) {
     fsSync.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
@@ -107,6 +108,9 @@ if (!fsSync.existsSync(EVALUATIONS_FILE)) {
 }
 if (!fsSync.existsSync(OPEN_POSITIONS_FILE)) {
     fsSync.writeFileSync(OPEN_POSITIONS_FILE, JSON.stringify([], null, 2));
+}
+if (!fsSync.existsSync(OUTLOOK_FILE)) {
+    fsSync.writeFileSync(OUTLOOK_FILE, JSON.stringify([], null, 2));
 }
 if (!fsSync.existsSync(SKILL_CATEGORIES_FILE)) {
     const defaultCategories = [
