@@ -187,7 +187,13 @@
             </nav>
 
             <div class="sidebar-footer">
-                <span class="sidebar-footer-text">ON-POINT v1.0</span>
+                <button class="nav-item profile-nav-item" data-section="profile" onclick="showTab('profile', event)">
+                    <div class="sidebar-avatar" id="sidebar-avatar"></div>
+                    <div class="sidebar-profile-info">
+                        <span class="sidebar-profile-name" id="sidebar-profile-name"></span>
+                        <span class="sidebar-profile-sub">My Profile</span>
+                    </div>
+                </button>
             </div>
         </aside>
 
@@ -203,7 +209,10 @@
                 </button>
                 <span class="topbar-title" id="page-title">Home</span>
                 <div class="topbar-user">
-                    <span id="topbar-username" class="topbar-username"></span>
+                    <button class="topbar-avatar-btn" onclick="showTab('profile')" title="My Profile">
+                        <div class="topbar-avatar" id="topbar-avatar"></div>
+                        <span id="topbar-username" class="topbar-username"></span>
+                    </button>
                     <button class="btn-change-password" onclick="showChangePasswordModal()" title="Change password">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </button>
@@ -2812,6 +2821,48 @@
             </form>
         </div>
     </div>
+
+<!-- Profile tab -->
+<div id="profile-tab" class="tab-content">
+    <div class="profile-page">
+        <div class="profile-card">
+            <div class="profile-hero">
+                <div class="profile-avatar-lg" id="profile-avatar-lg"></div>
+                <div class="profile-hero-info">
+                    <h2 class="profile-hero-name" id="profile-hero-name"></h2>
+                    <p class="profile-hero-email" id="profile-hero-email"></p>
+                    <span class="role-badge" id="profile-hero-role"></span>
+                </div>
+            </div>
+            <form onsubmit="submitProfile(event)" class="profile-form">
+                <div class="profile-form-grid">
+                    <div class="form-group">
+                        <label for="profile-office">Office</label>
+                        <input type="text" id="profile-office" maxlength="100" placeholder="e.g. London, Paris, Bucharest…">
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-avatar-url">Profile Picture URL</label>
+                        <input type="url" id="profile-avatar-url" placeholder="https://example.com/photo.jpg">
+                    </div>
+                    <div class="form-group profile-bio-group">
+                        <label for="profile-bio">Short Bio</label>
+                        <textarea id="profile-bio" rows="3" maxlength="500" placeholder="Tell us a bit about yourself…"></textarea>
+                    </div>
+                </div>
+                <div id="profile-error" class="auth-message auth-error hidden"></div>
+                <div id="profile-success" class="auth-message auth-success hidden"></div>
+                <div class="profile-actions">
+                    <button type="submit" class="btn-primary">Save Profile</button>
+                    <button type="button" class="btn-secondary" onclick="showChangePasswordModal()">Change Password</button>
+                    <button type="button" class="btn-signout" onclick="logout()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Sign Out
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Admin tab -->
 <div id="admin-tab" class="tab-content">
