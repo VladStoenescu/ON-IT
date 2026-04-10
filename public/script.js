@@ -212,7 +212,7 @@ function renderAdminUsers(users) {
         html += `<div class="upc-header">`;
         html += `<div class="upc-info"><div class="upc-name">${escapeHtml(user.name || '—')}</div><div class="upc-email">${escapeHtml(user.email)}</div></div>`;
         html += `<div class="upc-meta"><span class="role-badge role-${safeRole}">${escapeHtml(safeRole)}</span>`;
-        html += isAdmin ? `<span class="text-muted-sm">Protected</span>` : `<button class="btn-danger-sm" data-user-email="${escapeHtml(user.email)}" onclick="handleDeleteUser(event)">Delete</button>`;
+        html += isAdmin ? `<span class="text-muted-sm">Protected</span>` : `<button class="btn-warning-sm" data-user-email="${escapeHtml(user.email)}" onclick="handleResetUserPassword(event)">Reset Password</button><button class="btn-danger-sm" data-user-email="${escapeHtml(user.email)}" onclick="handleDeleteUser(event)">Delete</button>`;
         html += `</div></div>`;
 
         html += `<div class="upc-perms">`;
@@ -304,6 +304,59 @@ function handleDeleteUser(event) {
     const card = btn.closest('.user-perm-card');
     if (!card) return;
     deleteUser(card.dataset.userId, btn.dataset.userEmail);
+}
+
+function openAdminResetPasswordModal(userId, email) {
+    document.getElementById('arp-user-id').value = userId;
+    document.getElementById('arp-user-email').textContent = `User: ${email}`;
+    document.getElementById('arp-new').value = '';
+    document.getElementById('arp-confirm').value = '';
+    document.getElementById('arp-error').classList.add('hidden');
+    document.getElementById('admin-reset-password-modal').style.display = 'flex';
+    document.getElementById('arp-new').focus();
+}
+
+function closeAdminResetPasswordModal() {
+    document.getElementById('admin-reset-password-modal').style.display = 'none';
+}
+
+async function submitAdminResetPassword(event) {
+    event.preventDefault();
+    const userId = document.getElementById('arp-user-id').value;
+    const newPassword = document.getElementById('arp-new').value;
+    const confirm = document.getElementById('arp-confirm').value;
+    const errEl = document.getElementById('arp-error');
+    errEl.classList.add('hidden');
+    if (newPassword !== confirm) {
+        errEl.textContent = 'Passwords do not match.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    try {
+        const res = await _origFetch(`/api/admin/users/${userId}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ newPassword })
+        });
+        const d = await res.json();
+        if (!res.ok) {
+            errEl.textContent = d.error || 'Error resetting password';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        closeAdminResetPasswordModal();
+        alert('Password has been reset successfully.');
+    } catch {
+        errEl.textContent = 'Network error.';
+        errEl.classList.remove('hidden');
+    }
+}
+
+function handleResetUserPassword(event) {
+    const btn = event.currentTarget;
+    const card = btn.closest('.user-perm-card');
+    if (!card) return;
+    openAdminResetPasswordModal(card.dataset.userId, btn.dataset.userEmail);
 }
 
 // Constants
@@ -746,6 +799,42 @@ function filterIdeas() {
     if (categoryFilter) filtered = filtered.filter(i => i.category === categoryFilter);
     if (typeFilter) filtered = filtered.filter(i => i.type === typeFilter);
     displayIdeas(filtered);
+}
+
+function downloadIdeasCSV() {
+    const categoryFilter = document.getElementById('filter-category').value;
+    const typeFilter = document.getElementById('filter-type').value;
+    let ideas = allIdeas;
+    if (categoryFilter) ideas = ideas.filter(i => i.category === categoryFilter);
+    if (typeFilter) ideas = ideas.filter(i => i.type === typeFilter);
+    ideas = [...ideas].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+    const headers = ['Title', 'Description', 'Category', 'Type', 'Submitted By', 'Submitted At', 'Status', 'Comments'];
+    const csvEscape = val => {
+        const s = val == null ? '' : String(val);
+        return '"' + s.replace(/"/g, '""') + '"';
+    };
+    const rows = ideas.map(idea => [
+        csvEscape(idea.title),
+        csvEscape(idea.description),
+        csvEscape(idea.category),
+        csvEscape(idea.type),
+        csvEscape(idea.submittedBy),
+        csvEscape(idea.submittedAt ? new Date(idea.submittedAt).toISOString() : ''),
+        csvEscape(idea.status || ''),
+        csvEscape((idea.comments || []).length)
+    ]);
+
+    const csvContent = [headers.map(csvEscape), ...rows].map(r => r.join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ideas.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 function formatDate(dateString) {

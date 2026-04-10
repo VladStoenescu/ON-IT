@@ -534,6 +534,7 @@ body {
     display: flex;
     gap: 15px;
     margin-bottom: 20px;
+    align-items: center;
 }
 
 .filter-bar select {
@@ -548,6 +549,11 @@ body {
 .filter-bar select:focus {
     outline: none;
     border-color: var(--brand-red);
+}
+
+.filter-bar .btn-secondary {
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .ideas-list {
@@ -2731,6 +2737,17 @@ body {
     transition: background 0.15s;
 }
 .btn-danger-sm:hover { background: #C8312B; color: #fff; }
+.btn-warning-sm {
+    padding: 4px 10px;
+    background: #fff8e1;
+    color: #b45309;
+    border: 1px solid #ffe08a;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-warning-sm:hover { background: #b45309; color: #fff; }
 .text-muted-sm { font-size: 12px; color: #aeaeb2; }
 
 /* ─── User Permission Cards ──────────────────────────────────────────────────── */
