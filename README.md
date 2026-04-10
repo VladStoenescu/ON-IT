@@ -130,6 +130,11 @@ When both secrets are present the `deploy` job polls the deployment status and f
 
 > **Data persistence:** The `.do/app.yaml` spec includes a persistent volume named `on-it-data` mounted at `/data`. All JSON data files are written there (via the `DATA_DIR=/data` environment variable), so they survive deployments and container restarts. The volume is provisioned automatically when the app is first created from this spec.
 
+> **If data still disappears after deploying:**
+>
+> 1. Open the DigitalOcean control panel, go to your app → **Components → on-it**, and confirm a storage volume is listed with mount path `/data`. If no volume appears, the App Platform only provisions the volume when the app is *first created* from the spec — delete and recreate the app from `.do/app.yaml` to provision it.
+> 2. Check `GET /health`: it now validates the data directory is writable and returns `{"status":"ok","dataDir":"/data"}`. A `"status":"degraded"` response means the volume is missing or not writable, and App Platform will mark the deployment unhealthy so you are alerted before traffic is routed to it.
+
 ## Configuration
 
 You can change the server port by setting the `PORT` environment variable:
@@ -153,6 +158,8 @@ All data is stored as JSON files in the directory pointed to by the `DATA_DIR` e
 > **Important:** The data JSON files are intentionally **not committed to the repository**. This prevents `git pull` from ever overwriting your live data. On first boot the server creates every required file automatically inside `DATA_DIR`.
 
 When deployed to DigitalOcean App Platform the `.do/app.yaml` spec mounts a persistent volume at `/data` and sets `DATA_DIR=/data`, so all data files survive deployments and container restarts.
+
+All writes to JSON data files use an atomic write pattern (write to a `.tmp` file first, then rename) to prevent data corruption if the process is killed mid-write. The `GET /health` endpoint verifies that the data directory is writable on every request; a deployment with a missing or broken volume mount will return HTTP 503 and be detected as unhealthy by App Platform before traffic is routed to it.
 
 ### PM2 / bare-metal deployments
 

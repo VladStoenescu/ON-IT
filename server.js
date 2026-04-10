@@ -58,6 +58,7 @@ app.use(express.static('public'));
 app.use('/api/', limiter); // Apply rate limiting to all API routes
 
 // Ensure data directory and files exist
+console.log(`Data directory: ${DATA_DIR}`);
 if (!fsSync.existsSync(DATA_DIR)) {
     fsSync.mkdirSync(DATA_DIR, { recursive: true, mode: 0o755 });
 }
@@ -186,7 +187,12 @@ async function readJson(file) {
 }
 
 async function writeJson(file, data) {
-    await fs.writeFile(file, JSON.stringify(data, null, 2));
+    // Write to a temp file first, then atomically rename to the target.
+    // This prevents a corrupt/empty file being left behind if the process
+    // crashes or the container is restarted mid-write.
+    const tmp = file + '.tmp';
+    await fs.writeFile(tmp, JSON.stringify(data, null, 2));
+    await fs.rename(tmp, file);
 }
 
 function computeOverdueSteps(processes) {
@@ -2864,8 +2870,27 @@ app.delete('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => 
 });
 
 // Health check endpoint used by the CI/CD pipeline to verify the deployment
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime() });
+app.get('/health', limiter, async (req, res) => {
+    // Verify the data directory is writable so that a deployment with a
+    // missing or read-only persistent volume is reported as unhealthy rather
+    // than silently losing all user data.
+    const healthFile = path.join(DATA_DIR, '.health');
+    try {
+        await fs.writeFile(healthFile, '1');
+        try {
+            await fs.unlink(healthFile);
+        } catch (_) {
+            // Best-effort cleanup; failure here doesn't affect correctness.
+        }
+        res.json({ status: 'ok', uptime: process.uptime(), dataDir: DATA_DIR });
+    } catch (err) {
+        res.status(503).json({
+            status: 'degraded',
+            uptime: process.uptime(),
+            dataDir: DATA_DIR,
+            error: `Data directory not writable: ${err.message}`
+        });
+    }
 });
 
 app.listen(PORT, () => {
