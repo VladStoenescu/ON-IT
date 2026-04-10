@@ -168,7 +168,7 @@ body {
 }
 
 .sidebar-footer {
-    padding: 14px 16px;
+    padding: 8px 0;
     border-top: 1px solid rgba(255, 255, 255, 0.07);
     flex-shrink: 0;
 }
@@ -176,6 +176,65 @@ body {
 .sidebar-footer-text {
     font-size: var(--fs-xs);
     color: rgba(255, 255, 255, 0.22);
+    font-weight: 500;
+}
+
+/* Sidebar profile nav item */
+.profile-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: background 0.15s;
+    white-space: nowrap;
+    border-right: 3px solid transparent;
+}
+.profile-nav-item:hover { background: var(--sidebar-hover); }
+.profile-nav-item.active {
+    background: rgba(200, 49, 43, 0.14);
+    border-right-color: var(--brand-red);
+}
+
+.sidebar-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--brand-red);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.sidebar-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.sidebar-profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    min-width: 0;
+}
+.sidebar-profile-name {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--sidebar-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sidebar-profile-sub {
+    font-size: var(--fs-xs);
+    color: var(--sidebar-muted);
     font-weight: 500;
 }
 
@@ -2447,10 +2506,38 @@ body {
     gap: 8px;
     margin-left: auto;
 }
+.topbar-avatar-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 8px;
+    transition: background 0.15s;
+}
+.topbar-avatar-btn:hover { background: var(--brand-gray); }
+.topbar-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--brand-red);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 2px solid rgba(200, 49, 43, 0.25);
+}
+.topbar-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .topbar-username {
     font-size: 13px;
     font-weight: 500;
-    color: rgba(255,255,255,0.85);
+    color: var(--brand-text);
     white-space: nowrap;
 }
 .btn-logout {
@@ -2458,27 +2545,27 @@ body {
     align-items: center;
     gap: 6px;
     padding: 6px 12px;
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.2);
+    background: #fff0f0;
+    border: 1px solid #ffd5d5;
     border-radius: 8px;
-    color: rgba(255,255,255,0.9);
+    color: var(--brand-red);
     font-size: 13px;
     cursor: pointer;
     transition: background 0.15s;
 }
-.btn-logout:hover { background: rgba(255,255,255,0.2); }
+.btn-logout:hover { background: var(--brand-red); color: #fff; }
 .btn-change-password {
     display: flex;
     align-items: center;
     padding: 6px;
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.2);
+    background: var(--brand-gray);
+    border: 1px solid var(--brand-border);
     border-radius: 8px;
-    color: rgba(255,255,255,0.9);
+    color: var(--brand-muted);
     cursor: pointer;
     transition: background 0.15s;
 }
-.btn-change-password:hover { background: rgba(255,255,255,0.2); }
+.btn-change-password:hover { background: var(--brand-border); color: var(--brand-text); }
 
 /* ─── Admin Panel ────────────────────────────────────────────────────────────── */
 .admin-only { display: none; }
@@ -2621,3 +2708,96 @@ body {
     padding: 0;
 }
 .modal-close:hover { color: #1C1C1E; }
+
+/* ─── User Profile Page ──────────────────────────────────────────────────────── */
+.profile-page {
+    padding: 32px;
+    max-width: 680px;
+}
+.profile-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid var(--brand-border);
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.profile-hero {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 28px 28px 24px;
+    background: linear-gradient(135deg, var(--brand-red) 0%, #9B2119 100%);
+}
+.profile-avatar-lg {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+    font-size: 26px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.4);
+}
+.profile-avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
+.profile-hero-info { min-width: 0; }
+.profile-hero-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.profile-hero-email {
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    margin: 0 0 8px;
+}
+.profile-form {
+    padding: 24px 28px 28px;
+}
+.profile-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.profile-bio-group {
+    grid-column: 1 / -1;
+}
+.profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+.btn-signout {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: #fff0f0;
+    border: 1px solid #ffd5d5;
+    border-radius: 8px;
+    color: var(--brand-red);
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    margin-left: auto;
+}
+.btn-signout:hover { background: var(--brand-red); color: #fff; }
+@media (max-width: 600px) {
+    .profile-page { padding: 16px; }
+    .profile-form-grid { grid-template-columns: 1fr; }
+    .profile-hero { flex-direction: column; text-align: center; }
+    .btn-signout { margin-left: 0; }
+}

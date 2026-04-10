@@ -303,7 +303,10 @@ app.post('/api/auth/login', strictLimiter, async (req, res) => {
                 email: user.email,
                 name: user.name,
                 role: user.role,
-                permissions: user.permissions
+                permissions: user.permissions,
+                bio: user.bio || '',
+                office: user.office || '',
+                avatarUrl: user.avatarUrl || ''
             }
         });
     } catch (error) {
@@ -325,7 +328,30 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
     const u = req.user;
-    res.json({ id: u.id, email: u.email, name: u.name, role: u.role, permissions: u.permissions });
+    res.json({ id: u.id, email: u.email, name: u.name, role: u.role, permissions: u.permissions, bio: u.bio || '', office: u.office || '', avatarUrl: u.avatarUrl || '' });
+});
+
+app.put('/api/auth/profile', requireAuth, async (req, res) => {
+    try {
+        const { bio, office, avatarUrl } = req.body;
+        const users = await readJson(USERS_FILE);
+        const userIndex = users.findIndex(u => u.id === req.user.id);
+        if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
+        if (bio !== undefined) users[userIndex].bio = String(bio).trim().slice(0, 500);
+        if (office !== undefined) users[userIndex].office = String(office).trim().slice(0, 100);
+        if (avatarUrl !== undefined) {
+            const urlStr = String(avatarUrl).trim();
+            if (urlStr && !/^https?:\/\//.test(urlStr)) {
+                return res.status(400).json({ error: 'Avatar URL must start with http:// or https://' });
+            }
+            users[userIndex].avatarUrl = urlStr.slice(0, 500);
+        }
+        await writeJson(USERS_FILE, users);
+        const { passwordHash, ...updated } = users[userIndex];
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating profile' });
+    }
 });
 
 app.put('/api/auth/change-password', requireAuth, strictLimiter, async (req, res) => {

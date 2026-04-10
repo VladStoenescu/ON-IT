@@ -46,6 +46,7 @@ function hideAuthOverlay() {
     document.querySelector('.app-shell').style.display = 'flex';
     const usernameEl = document.getElementById('topbar-username');
     if (usernameEl && currentUser) usernameEl.textContent = currentUser.name || currentUser.email;
+    updateUserAvatars();
 }
 
 function applyPermissions(user) {
@@ -53,6 +54,7 @@ function applyPermissions(user) {
     document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         const section = item.getAttribute('data-section');
         if (section === 'admin') return;
+        if (section === 'profile') return;
         item.style.display = permissions.includes(section) ? '' : 'none';
     });
     if (user.role === 'admin') {
@@ -324,7 +326,8 @@ const PAGE_TITLES = {
     evaluations: 'Evaluations',
     'open-positions': 'Open Positions',
     outlook: 'Outlook',
-    admin: 'User Management'
+    admin: 'User Management',
+    profile: 'My Profile'
 };
 
 // Store all ideas for filtering
@@ -426,6 +429,7 @@ function showTab(tabName) {
         loadOutlook();
     }
     if (tabName === 'admin') loadAdminUsers();
+    if (tabName === 'profile') loadProfile();
 
     // Close sidebar on mobile after navigating
     if (window.innerWidth < MOBILE_BREAKPOINT) closeSidebar();
@@ -6270,6 +6274,92 @@ async function deleteOutlookTask(outlookId, taskId) {
     } catch {
         alert('Network error. Please try again.');
     }
+}
+
+// ─── User Profile ─────────────────────────────────────────────────────────────
+
+function getInitials(name) {
+    if (!name) return '?';
+    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function renderAvatarEl(el, user) {
+    if (!el) return;
+    el.innerHTML = '';
+    if (user && user.avatarUrl) {
+        const img = document.createElement('img');
+        img.src = user.avatarUrl;
+        img.alt = user.name || '';
+        img.addEventListener('error', function() {
+            el.innerHTML = '';
+            el.textContent = getInitials(user ? user.name : '');
+            el.classList.add('avatar-initials');
+        });
+        el.classList.remove('avatar-initials');
+        el.appendChild(img);
+    } else {
+        el.textContent = getInitials(user ? user.name : '');
+        el.classList.add('avatar-initials');
+    }
+}
+
+function updateUserAvatars() {
+    if (!currentUser) return;
+    renderAvatarEl(document.getElementById('topbar-avatar'), currentUser);
+    renderAvatarEl(document.getElementById('sidebar-avatar'), currentUser);
+    const nameEl = document.getElementById('sidebar-profile-name');
+    if (nameEl) nameEl.textContent = currentUser.name || currentUser.email;
+}
+
+function loadProfile() {
+    if (!currentUser) return;
+    renderAvatarEl(document.getElementById('profile-avatar-lg'), currentUser);
+    const heroName = document.getElementById('profile-hero-name');
+    const heroEmail = document.getElementById('profile-hero-email');
+    const heroRole = document.getElementById('profile-hero-role');
+    if (heroName) heroName.textContent = currentUser.name || '';
+    if (heroEmail) heroEmail.textContent = currentUser.email || '';
+    if (heroRole) {
+        const safeRole = ['admin', 'user'].includes(currentUser.role) ? currentUser.role : 'user';
+        heroRole.textContent = safeRole;
+        heroRole.className = `role-badge role-${safeRole}`;
+    }
+    const bioEl = document.getElementById('profile-bio');
+    const officeEl = document.getElementById('profile-office');
+    const avatarUrlEl = document.getElementById('profile-avatar-url');
+    if (bioEl) bioEl.value = currentUser.bio || '';
+    if (officeEl) officeEl.value = currentUser.office || '';
+    if (avatarUrlEl) avatarUrlEl.value = currentUser.avatarUrl || '';
+    const errEl = document.getElementById('profile-error');
+    const okEl = document.getElementById('profile-success');
+    if (errEl) errEl.classList.add('hidden');
+    if (okEl) okEl.classList.add('hidden');
+}
+
+async function submitProfile(e) {
+    e.preventDefault();
+    const errorEl = document.getElementById('profile-error');
+    const successEl = document.getElementById('profile-success');
+    errorEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+    const bio = document.getElementById('profile-bio').value;
+    const office = document.getElementById('profile-office').value;
+    const avatarUrl = document.getElementById('profile-avatar-url').value.trim();
+    try {
+        const res = await _origFetch('/api/auth/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ bio, office, avatarUrl })
+        });
+        const data = await res.json();
+        if (!res.ok) { errorEl.textContent = data.error || 'Error saving profile'; errorEl.classList.remove('hidden'); return; }
+        currentUser = { ...currentUser, bio: data.bio || '', office: data.office || '', avatarUrl: data.avatarUrl || '' };
+        updateUserAvatars();
+        renderAvatarEl(document.getElementById('profile-avatar-lg'), currentUser);
+        successEl.textContent = 'Profile saved successfully!';
+        successEl.classList.remove('hidden');
+        setTimeout(() => successEl.classList.add('hidden'), 3000);
+    } catch { errorEl.textContent = 'Network error. Please try again.'; errorEl.classList.remove('hidden'); }
 }
 
 // Initialize auth on page load
