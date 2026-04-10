@@ -472,6 +472,9 @@ function closeSidebar() {
 
 // ─── Ideas: existing functionality ───────────────────────────────────────────
 
+// Delegated event handler for idea list interactions (edit, status, comment)
+document.getElementById('ideas-list').addEventListener('click', handleIdeasListClick);
+
 document.getElementById('idea-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = {
@@ -524,6 +527,37 @@ async function loadIdeas() {
     }
 }
 
+function getIdeaStatusClass(status) {
+    if (status === 'Prioritized') return 'prioritized';
+    if (status === 'Implemented') return 'implemented';
+    return '';
+}
+
+function renderIdeaComments(idea) {
+    const comments = idea.comments || [];
+    const creatorName = currentUser ? (currentUser.name || currentUser.email) : null;
+    const isCreator = creatorName && idea.submittedBy === creatorName;
+    let html = '';
+    if (comments.length > 0) {
+        html += `<div class="idea-comments">`;
+        comments.forEach(c => {
+            html += `<div class="idea-comment">
+                <span class="idea-comment-text">${escapeHtml(c.text)}</span>
+                <span class="idea-comment-meta">${escapeHtml(c.author)} · ${formatDate(c.createdAt)}</span>
+                ${isCreator ? `<button class="idea-comment-delete" data-idea-id="${escapeHtml(idea.id)}" data-comment-id="${escapeHtml(c.id)}" title="Delete comment">✕</button>` : ''}
+            </div>`;
+        });
+        html += `</div>`;
+    }
+    if (isCreator) {
+        html += `<div class="idea-add-comment">
+            <input type="text" class="idea-comment-input" data-idea-id="${escapeHtml(idea.id)}" placeholder="Add a comment…" maxlength="500">
+            <button class="btn-sm idea-comment-post" data-idea-id="${escapeHtml(idea.id)}">Post</button>
+        </div>`;
+    }
+    return html;
+}
+
 function displayIdeas(ideas) {
     const ideasList = document.getElementById('ideas-list');
     if (ideas.length === 0) {
@@ -531,8 +565,13 @@ function displayIdeas(ideas) {
         return;
     }
     ideas.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-    ideasList.innerHTML = ideas.map(idea => `
-        <div class="idea-card">
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    ideasList.innerHTML = ideas.map(idea => {
+        const creatorName = currentUser ? (currentUser.name || currentUser.email) : null;
+        const isCreator = creatorName && idea.submittedBy === creatorName;
+        const statusClass = getIdeaStatusClass(idea.status);
+        return `
+        <div class="idea-card" data-idea-id="${escapeHtml(idea.id)}">
             <div class="idea-header">
                 <div>
                     <div class="idea-title">${escapeHtml(idea.title)}</div>
@@ -540,15 +579,164 @@ function displayIdeas(ideas) {
                         Submitted by ${escapeHtml(idea.submittedBy)} on ${formatDate(idea.submittedAt)}
                     </div>
                 </div>
+                <div class="idea-actions">
+                    ${isCreator ? `<button class="btn-sm idea-edit-btn" data-idea-id="${escapeHtml(idea.id)}">Edit</button>` : ''}
+                </div>
             </div>
             <div class="idea-description">${escapeHtml(idea.description)}</div>
             <div class="idea-badges">
                 <span class="badge category">${escapeHtml(idea.category)}</span>
                 <span class="badge type">${escapeHtml(idea.type)}</span>
-                <span class="badge status">${escapeHtml(idea.status)}</span>
+                <span class="badge status ${statusClass}">${escapeHtml(idea.status)}</span>
             </div>
-        </div>
-    `).join('');
+            ${isAdmin ? `<div class="idea-admin-actions">
+                <span class="idea-admin-label">Set status:</span>
+                <button class="idea-status-btn${idea.status === 'Prioritized' ? ' active' : ''}" data-idea-id="${escapeHtml(idea.id)}" data-status="Prioritized">Prioritized</button>
+                <button class="idea-status-btn${idea.status === 'Implemented' ? ' active' : ''}" data-idea-id="${escapeHtml(idea.id)}" data-status="Implemented">Implemented</button>
+                <button class="idea-status-btn${idea.status === 'Pending' ? ' active' : ''}" data-idea-id="${escapeHtml(idea.id)}" data-status="Pending">Pending</button>
+            </div>` : ''}
+            <div class="idea-comments-section">${renderIdeaComments(idea)}</div>
+        </div>`;
+    }).join('');
+}
+
+function handleIdeasListClick(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const ideaId = btn.dataset.ideaId;
+    if (!ideaId) return;
+
+    if (btn.classList.contains('idea-edit-btn')) {
+        openIdeaEditModal(ideaId);
+    } else if (btn.classList.contains('idea-status-btn')) {
+        updateIdeaStatus(ideaId, btn.dataset.status);
+    } else if (btn.classList.contains('idea-comment-post')) {
+        submitIdeaComment(ideaId);
+    } else if (btn.classList.contains('idea-comment-delete')) {
+        deleteIdeaComment(ideaId, btn.dataset.commentId);
+    }
+}
+
+async function updateIdeaStatus(ideaId, status) {
+    try {
+        const res = await fetch(`${API_URL}/ideas/${ideaId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ status })
+        });
+        if (!res.ok) {
+            const d = await res.json();
+            alert(d.error || 'Error updating status');
+            return;
+        }
+        const updated = await res.json();
+        const idx = allIdeas.findIndex(i => i.id === ideaId);
+        if (idx !== -1) allIdeas[idx] = updated;
+        filterIdeas();
+    } catch (e) {
+        alert('Error connecting to server');
+    }
+}
+
+function openIdeaEditModal(ideaId) {
+    const idea = allIdeas.find(i => i.id === ideaId);
+    if (!idea) return;
+    document.getElementById('idea-edit-id').value = idea.id;
+    document.getElementById('idea-edit-title').value = idea.title;
+    document.getElementById('idea-edit-description').value = idea.description;
+    document.getElementById('idea-edit-error').classList.add('hidden');
+    document.getElementById('idea-edit-modal').classList.remove('hidden');
+}
+
+function closeIdeaEditModal() {
+    document.getElementById('idea-edit-modal').classList.add('hidden');
+}
+
+function closeIdeaEditModalOnBg(e) {
+    if (e.target === document.getElementById('idea-edit-modal')) closeIdeaEditModal();
+}
+
+async function submitIdeaEdit(e) {
+    e.preventDefault();
+    const ideaId = document.getElementById('idea-edit-id').value;
+    const title = document.getElementById('idea-edit-title').value.trim();
+    const description = document.getElementById('idea-edit-description').value.trim();
+    const errEl = document.getElementById('idea-edit-error');
+    errEl.classList.add('hidden');
+    if (!title || !description) {
+        errEl.textContent = 'Title and description are required.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    try {
+        const res = await fetch(`${API_URL}/ideas/${ideaId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ title, description })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errEl.textContent = data.error || 'Error updating idea';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        const idx = allIdeas.findIndex(i => i.id === ideaId);
+        if (idx !== -1) allIdeas[idx] = data;
+        closeIdeaEditModal();
+        filterIdeas();
+    } catch (err) {
+        errEl.textContent = 'Error connecting to server';
+        errEl.classList.remove('hidden');
+    }
+}
+
+async function submitIdeaComment(ideaId) {
+    const input = document.querySelector(`.idea-comment-input[data-idea-id="${CSS.escape(ideaId)}"]`);
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    try {
+        const res = await fetch(`${API_URL}/ideas/${ideaId}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            alert(data.error || 'Error adding comment');
+            return;
+        }
+        const idx = allIdeas.findIndex(i => i.id === ideaId);
+        if (idx !== -1) {
+            if (!allIdeas[idx].comments) allIdeas[idx].comments = [];
+            allIdeas[idx].comments.push(data);
+        }
+        filterIdeas();
+    } catch (err) {
+        alert('Error connecting to server');
+    }
+}
+
+async function deleteIdeaComment(ideaId, commentId) {
+    if (!confirm('Delete this comment?')) return;
+    try {
+        const res = await fetch(`${API_URL}/ideas/${ideaId}/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (!res.ok) {
+            const d = await res.json();
+            alert(d.error || 'Error deleting comment');
+            return;
+        }
+        const idx = allIdeas.findIndex(i => i.id === ideaId);
+        if (idx !== -1 && allIdeas[idx].comments) {
+            allIdeas[idx].comments = allIdeas[idx].comments.filter(c => c.id !== commentId);
+        }
+        filterIdeas();
+    } catch (err) {
+        alert('Error connecting to server');
+    }
 }
 
 function filterIdeas() {
