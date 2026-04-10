@@ -10,11 +10,14 @@ module.exports = {
             env_production: {
                 NODE_ENV: 'production',
                 PORT: 3000,
-                // Store data outside the git checkout so that `git pull` never
-                // overwrites user data.  Create this directory on the server before
-                // starting the application:
-                //   sudo mkdir -p /opt/on-it-data && sudo chown $(whoami) /opt/on-it-data
-                DATA_DIR: '/opt/on-it-data',
+                // PostgreSQL connection — set DB_PASSWORD (and optionally DB_HOST,
+                // DB_PORT, DB_USER, DB_NAME) in the server environment or via a
+                // .env file before starting the application.
+                // DB_HOST: 'app-b577de97-4d36-493c-981c-d7faa5c293ee-do-user-27694528-0.d.db.ondigitalocean.com',
+                // DB_PORT: '25060',
+                // DB_USER: 'onpointbackoffice',
+                // DB_NAME: 'onpointbackoffice',
+                // DB_PASSWORD: '',  // <-- set this securely
             },
             error_file: 'logs/err.log',
             out_file: 'logs/out.log',
