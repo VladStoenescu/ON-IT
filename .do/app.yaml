@@ -17,3 +17,9 @@ services:
       - key: NODE_ENV
         scope: RUN_TIME
         value: production
+      - key: DATA_DIR
+        scope: RUN_TIME
+        value: /data
+    storage:
+      - name: on-it-data
+        mount_path: /data
