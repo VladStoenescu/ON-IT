@@ -82,6 +82,24 @@ function showAuthTab(tab) {
     document.getElementById(`auth-${tab}-panel`).classList.add('active');
 }
 
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Hide';
+    } else {
+        input.type = 'password';
+        btn.textContent = 'Show';
+    }
+}
+
+function toggleForgotPassword() {
+    const el = document.getElementById('forgot-pw-info');
+    if (!el) return;
+    el.classList.toggle('hidden');
+}
+
 async function submitLogin(e) {
     e.preventDefault();
     const errorEl = document.getElementById('login-error');
@@ -112,6 +130,12 @@ async function submitRegister(e) {
     const name = document.getElementById('register-name').value.trim();
     const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
+    const passwordConfirm = document.getElementById('register-password-confirm').value;
+    if (password !== passwordConfirm) {
+        errorEl.textContent = 'Passwords do not match. Please try again.';
+        errorEl.classList.remove('hidden');
+        return;
+    }
     try {
         const res = await _origFetch('/api/auth/register', {
             method: 'POST',
@@ -139,6 +163,7 @@ function showChangePasswordModal() {
     document.getElementById('change-password-modal').style.display = 'flex';
     document.getElementById('cp-current').value = '';
     document.getElementById('cp-new').value = '';
+    document.getElementById('cp-confirm').value = '';
     document.getElementById('cp-error').classList.add('hidden');
     document.getElementById('cp-success').classList.add('hidden');
 }
@@ -155,6 +180,12 @@ async function submitChangePassword(e) {
     successEl.classList.add('hidden');
     const currentPassword = document.getElementById('cp-current').value;
     const newPassword = document.getElementById('cp-new').value;
+    const confirmPassword = document.getElementById('cp-confirm').value;
+    if (newPassword !== confirmPassword) {
+        errorEl.textContent = 'New passwords do not match. Please try again.';
+        errorEl.classList.remove('hidden');
+        return;
+    }
     try {
         const res = await _origFetch('/api/auth/change-password', {
             method: 'PUT',
