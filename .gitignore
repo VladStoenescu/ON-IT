@@ -9,6 +9,9 @@ yarn-error.log*
 # For DigitalOcean App Platform set DATA_DIR=/data (persistent volume, see .do/app.yaml).
 # For PM2 / bare-metal deployments set DATA_DIR=/opt/on-it-data (outside the git repo).
 data/*.json
+# Temp files created by the atomic-write helper (writeJson); normally transient
+# but can be left behind after a crash.
+data/*.tmp
 
 # Environment variables
 .env
