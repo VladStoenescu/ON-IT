@@ -2956,6 +2956,8 @@ app.post('/api/employment-certificates', strictLimiter, async (req, res) => {
         if (!EMP_CERT_STATUSES.includes(resolvedStatus)) return res.status(400).json({ error: 'Invalid status' });
         if (employmentType && !EMP_CERT_EMPLOYMENT_TYPES.includes(employmentType)) return res.status(400).json({ error: 'Invalid employment type' });
         if (salaryCurrency && !EMP_CERT_CURRENCIES.includes(salaryCurrency)) return res.status(400).json({ error: 'Invalid currency' });
+        const salaryValue = salary !== undefined && salary !== '' ? String(salary).trim() : '';
+        if (salaryValue !== '' && isNaN(Number(salaryValue))) return res.status(400).json({ error: 'Salary must be a numeric value' });
         const newCert = {
             id: generateId(),
             employeeName: employeeName.trim(),
@@ -2970,7 +2972,7 @@ app.post('/api/employment-certificates', strictLimiter, async (req, res) => {
             endDate: endDate || '',
             certificateType: resolvedType,
             status: resolvedStatus,
-            salary: salary !== undefined && salary !== '' ? salary.toString().trim() : '',
+            salary: salaryValue,
             salaryCurrency: salaryCurrency || 'CHF',
             authorizedSignatory: authorizedSignatory ? authorizedSignatory.trim() : '',
             signatoryTitle: signatoryTitle ? signatoryTitle.trim() : '',
@@ -3018,6 +3020,8 @@ app.put('/api/employment-certificates/:id', strictLimiter, async (req, res) => {
         if (status && !EMP_CERT_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' });
         if (employmentType && !EMP_CERT_EMPLOYMENT_TYPES.includes(employmentType)) return res.status(400).json({ error: 'Invalid employment type' });
         if (salaryCurrency && !EMP_CERT_CURRENCIES.includes(salaryCurrency)) return res.status(400).json({ error: 'Invalid currency' });
+        const salaryValue = salary !== undefined ? String(salary).trim() : undefined;
+        if (salaryValue !== undefined && salaryValue !== '' && isNaN(Number(salaryValue))) return res.status(400).json({ error: 'Salary must be a numeric value' });
         certs[idx] = {
             ...certs[idx],
             employeeName: employeeName !== undefined ? employeeName.trim() : certs[idx].employeeName,
@@ -3032,7 +3036,7 @@ app.put('/api/employment-certificates/:id', strictLimiter, async (req, res) => {
             endDate: endDate !== undefined ? endDate : certs[idx].endDate,
             certificateType: certificateType || certs[idx].certificateType,
             status: status || certs[idx].status,
-            salary: salary !== undefined ? salary.toString().trim() : certs[idx].salary,
+            salary: salaryValue !== undefined ? salaryValue : certs[idx].salary,
             salaryCurrency: salaryCurrency || certs[idx].salaryCurrency,
             authorizedSignatory: authorizedSignatory !== undefined ? authorizedSignatory.trim() : certs[idx].authorizedSignatory,
             signatoryTitle: signatoryTitle !== undefined ? signatoryTitle.trim() : certs[idx].signatoryTitle,
