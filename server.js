@@ -10,7 +10,7 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
-const ALLOWED_SECTIONS = ['home', 'submit', 'view', 'onboarding', 'trainings', 'landscape', 'assets', 'skills', 'crm', 'pipeline', 'processes', 'partnerships', 'meetings', 'evaluations', 'open-positions', 'outlook'];
+const ALLOWED_SECTIONS = ['home', 'submit', 'view', 'onboarding', 'trainings', 'landscape', 'assets', 'skills', 'crm', 'pipeline', 'processes', 'partnerships', 'meetings', 'evaluations', 'open-positions', 'outlook', 'employment-certificates'];
 const ADMIN_EMAIL = 'vlad.stoenescu@on-point.com';
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -2917,6 +2917,150 @@ app.delete('/api/outlook/:id/tasks/:taskId', strictLimiter, async (req, res) => 
         res.json({ message: 'Task deleted' });
     } catch {
         res.status(500).json({ error: 'Error deleting task' });
+    }
+});
+
+// ─── Employment Certificates API ─────────────────────────────────────────────
+
+const EMP_CERT_TYPES = ['Employment Confirmation', 'Salary Confirmation', 'Reference Letter', 'Work Experience Letter', 'Other'];
+const EMP_CERT_STATUSES = ['Draft', 'Issued'];
+const EMP_CERT_EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Freelancer', 'Intern', 'Other'];
+const EMP_CERT_ENTITIES = ['ON-POINT Switzerland', 'ON-POINT Germany', 'ON-POINT UK'];
+const EMP_CERT_CURRENCIES = ['CHF', 'EUR', 'GBP', 'USD'];
+
+app.get('/api/employment-certificates', async (req, res) => {
+    try {
+        const certs = await db.getCollection('employment_certificates');
+        res.json(certs);
+    } catch {
+        res.status(500).json({ error: 'Error reading employment certificates' });
+    }
+});
+
+app.post('/api/employment-certificates', strictLimiter, async (req, res) => {
+    try {
+        const {
+            employeeName, employeeEmail, dateOfBirth, address,
+            jobTitle, department, employmentType, entity,
+            startDate, endDate, certificateType, status,
+            salary, salaryCurrency, authorizedSignatory, signatoryTitle,
+            issueDate, notes
+        } = req.body;
+        if (!employeeName || !employeeName.trim()) return res.status(400).json({ error: 'Employee name is required' });
+        if (!jobTitle || !jobTitle.trim()) return res.status(400).json({ error: 'Job title is required' });
+        if (!startDate) return res.status(400).json({ error: 'Start date is required' });
+        if (!entity || !EMP_CERT_ENTITIES.includes(entity)) return res.status(400).json({ error: 'Valid entity is required' });
+        const resolvedType = certificateType || 'Employment Confirmation';
+        if (!EMP_CERT_TYPES.includes(resolvedType)) return res.status(400).json({ error: 'Invalid certificate type' });
+        const resolvedStatus = status || 'Draft';
+        if (!EMP_CERT_STATUSES.includes(resolvedStatus)) return res.status(400).json({ error: 'Invalid status' });
+        if (employmentType && !EMP_CERT_EMPLOYMENT_TYPES.includes(employmentType)) return res.status(400).json({ error: 'Invalid employment type' });
+        if (salaryCurrency && !EMP_CERT_CURRENCIES.includes(salaryCurrency)) return res.status(400).json({ error: 'Invalid currency' });
+        const salaryValue = salary !== undefined && salary !== '' ? String(salary).trim() : '';
+        if (salaryValue !== '' && isNaN(Number(salaryValue))) return res.status(400).json({ error: 'Salary must be a numeric value' });
+        const newCert = {
+            id: generateId(),
+            employeeName: employeeName.trim(),
+            employeeEmail: employeeEmail ? employeeEmail.trim() : '',
+            dateOfBirth: dateOfBirth || '',
+            address: address ? address.trim() : '',
+            jobTitle: jobTitle.trim(),
+            department: department ? department.trim() : '',
+            employmentType: employmentType || '',
+            entity: entity.trim(),
+            startDate: startDate,
+            endDate: endDate || '',
+            certificateType: resolvedType,
+            status: resolvedStatus,
+            salary: salaryValue,
+            salaryCurrency: salaryCurrency || 'CHF',
+            authorizedSignatory: authorizedSignatory ? authorizedSignatory.trim() : '',
+            signatoryTitle: signatoryTitle ? signatoryTitle.trim() : '',
+            issueDate: issueDate || '',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const certs = await db.getCollection('employment_certificates');
+        certs.push(newCert);
+        await db.setCollection('employment_certificates', certs);
+        res.status(201).json(newCert);
+    } catch {
+        res.status(500).json({ error: 'Error creating employment certificate' });
+    }
+});
+
+app.get('/api/employment-certificates/:id', async (req, res) => {
+    try {
+        const certs = await db.getCollection('employment_certificates');
+        const cert = certs.find(c => c.id === req.params.id);
+        if (!cert) return res.status(404).json({ error: 'Employment certificate not found' });
+        res.json(cert);
+    } catch {
+        res.status(500).json({ error: 'Error reading employment certificate' });
+    }
+});
+
+app.put('/api/employment-certificates/:id', strictLimiter, async (req, res) => {
+    try {
+        const {
+            employeeName, employeeEmail, dateOfBirth, address,
+            jobTitle, department, employmentType, entity,
+            startDate, endDate, certificateType, status,
+            salary, salaryCurrency, authorizedSignatory, signatoryTitle,
+            issueDate, notes
+        } = req.body;
+        const certs = await db.getCollection('employment_certificates');
+        const idx = certs.findIndex(c => c.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Employment certificate not found' });
+        if (employeeName !== undefined && !employeeName.trim()) return res.status(400).json({ error: 'Employee name cannot be empty' });
+        if (jobTitle !== undefined && !jobTitle.trim()) return res.status(400).json({ error: 'Job title cannot be empty' });
+        if (entity && !EMP_CERT_ENTITIES.includes(entity)) return res.status(400).json({ error: 'Invalid entity' });
+        if (certificateType && !EMP_CERT_TYPES.includes(certificateType)) return res.status(400).json({ error: 'Invalid certificate type' });
+        if (status && !EMP_CERT_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+        if (employmentType && !EMP_CERT_EMPLOYMENT_TYPES.includes(employmentType)) return res.status(400).json({ error: 'Invalid employment type' });
+        if (salaryCurrency && !EMP_CERT_CURRENCIES.includes(salaryCurrency)) return res.status(400).json({ error: 'Invalid currency' });
+        const salaryValue = salary !== undefined ? String(salary).trim() : undefined;
+        if (salaryValue !== undefined && salaryValue !== '' && isNaN(Number(salaryValue))) return res.status(400).json({ error: 'Salary must be a numeric value' });
+        certs[idx] = {
+            ...certs[idx],
+            employeeName: employeeName !== undefined ? employeeName.trim() : certs[idx].employeeName,
+            employeeEmail: employeeEmail !== undefined ? employeeEmail.trim() : certs[idx].employeeEmail,
+            dateOfBirth: dateOfBirth !== undefined ? dateOfBirth : certs[idx].dateOfBirth,
+            address: address !== undefined ? address.trim() : certs[idx].address,
+            jobTitle: jobTitle !== undefined ? jobTitle.trim() : certs[idx].jobTitle,
+            department: department !== undefined ? department.trim() : certs[idx].department,
+            employmentType: employmentType !== undefined ? employmentType : certs[idx].employmentType,
+            entity: entity || certs[idx].entity,
+            startDate: startDate !== undefined ? startDate : certs[idx].startDate,
+            endDate: endDate !== undefined ? endDate : certs[idx].endDate,
+            certificateType: certificateType || certs[idx].certificateType,
+            status: status || certs[idx].status,
+            salary: salaryValue !== undefined ? salaryValue : certs[idx].salary,
+            salaryCurrency: salaryCurrency || certs[idx].salaryCurrency,
+            authorizedSignatory: authorizedSignatory !== undefined ? authorizedSignatory.trim() : certs[idx].authorizedSignatory,
+            signatoryTitle: signatoryTitle !== undefined ? signatoryTitle.trim() : certs[idx].signatoryTitle,
+            issueDate: issueDate !== undefined ? issueDate : certs[idx].issueDate,
+            notes: notes !== undefined ? notes.trim() : certs[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await db.setCollection('employment_certificates', certs);
+        res.json(certs[idx]);
+    } catch {
+        res.status(500).json({ error: 'Error updating employment certificate' });
+    }
+});
+
+app.delete('/api/employment-certificates/:id', strictLimiter, async (req, res) => {
+    try {
+        const certs = await db.getCollection('employment_certificates');
+        const idx = certs.findIndex(c => c.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Employment certificate not found' });
+        certs.splice(idx, 1);
+        await db.setCollection('employment_certificates', certs);
+        res.json({ message: 'Employment certificate deleted' });
+    } catch {
+        res.status(500).json({ error: 'Error deleting employment certificate' });
     }
 });
 

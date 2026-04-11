@@ -2579,6 +2579,18 @@ body {
     font-weight: 600;
 }
 
+/* ─── Employment Certificates ─────────────────────────────────────────────────── */
+
+.ec-type-badge,
+.ec-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 /* ─── Auth Overlay ───────────────────────────────────────────────────────────── */
 .auth-overlay {
     position: fixed;

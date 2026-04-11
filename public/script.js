@@ -212,7 +212,7 @@ async function loadAdminUsers() {
 const ADMIN_FEATURE_GROUPS = [
     { id: 'core',         label: 'Core',          sections: ['home'] },
     { id: 'innovation',   label: 'Innovation',     sections: ['submit', 'view'] },
-    { id: 'people',       label: 'People',         sections: ['onboarding', 'skills', 'open-positions'] },
+    { id: 'people',       label: 'People',         sections: ['onboarding', 'skills', 'open-positions', 'employment-certificates'] },
     { id: 'learning',     label: 'Learning',       sections: ['trainings'] },
     { id: 'tools',        label: 'Tools & Costs',  sections: ['landscape', 'assets'] },
     { id: 'crm',          label: 'Sales & CRM',    sections: ['crm', 'pipeline'] },
@@ -224,6 +224,7 @@ const ADMIN_FEATURE_GROUPS = [
 const ADMIN_SECTION_LABELS = {
     home: 'Home', submit: 'Submit Idea', view: 'View Ideas',
     onboarding: 'Onboarding', skills: 'Skills & Talent', 'open-positions': 'Open Positions',
+    'employment-certificates': 'Employment Certificates',
     trainings: 'Trainings', landscape: 'IT Landscape', assets: 'IT Assets',
     crm: 'CRM Contacts', pipeline: 'Sales Pipeline', processes: 'Process Map',
     partnerships: 'Partnerships', meetings: 'Meetings', evaluations: 'Evaluations', outlook: 'Outlook'
@@ -409,6 +410,7 @@ const PAGE_TITLES = {
     meetings: 'Meetings',
     evaluations: 'Evaluations',
     'open-positions': 'Open Positions',
+    'employment-certificates': 'Employment Certificates',
     outlook: 'Outlook',
     admin: 'User Management',
     profile: 'My Profile'
@@ -444,6 +446,9 @@ let allOpenPositions = [];
 
 // Store all outlook items for filtering
 let allOutlook = [];
+
+// Store all employment certificates for filtering
+let allEmpCerts = [];
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -511,6 +516,9 @@ function showTab(tabName) {
     }
     if (tabName === 'outlook') {
         loadOutlook();
+    }
+    if (tabName === 'employment-certificates') {
+        loadEmpCerts();
     }
     if (tabName === 'admin') loadAdminUsers();
     if (tabName === 'profile') loadProfile();
@@ -6671,6 +6679,312 @@ async function submitProfile(e) {
         console.error('Error saving profile:', err);
         errorEl.textContent = 'Network error. Please try again.';
         errorEl.classList.remove('hidden');
+    }
+}
+
+// ─── Employment Certificates ──────────────────────────────────────────────────
+
+const EC_TYPE_COLORS = {
+    'Employment Confirmation': { bg: '#e3f2fd', color: '#1565c0' },
+    'Salary Confirmation':     { bg: '#e8f5e9', color: '#2e7d32' },
+    'Reference Letter':        { bg: '#fff8e1', color: '#e65100' },
+    'Work Experience Letter':  { bg: '#ede7f6', color: '#4527a0' },
+    'Other':                   { bg: '#f5f5f5', color: '#616161' }
+};
+
+const EC_STATUS_COLORS = {
+    'Draft':  { bg: '#fff8e1', color: '#e65100' },
+    'Issued': { bg: '#e8f5e9', color: '#2e7d32' }
+};
+
+function showEmpCertsSection(sectionId, btn) {
+    document.querySelectorAll('#employment-certificates-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#employment-certificates-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const section = document.getElementById(sectionId);
+    if (section) section.classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+async function loadEmpCerts() {
+    try {
+        const res = await fetch(`${API_URL}/employment-certificates`);
+        if (!res.ok) throw new Error('Failed to load employment certificates');
+        allEmpCerts = await res.json();
+        renderEmpCerts();
+        renderEmpCertsDashboard();
+    } catch (err) {
+        const c = document.getElementById('ec-table-container');
+        if (c) c.innerHTML = '<p class="error-state">Failed to load employment certificates.</p>';
+    }
+}
+
+function renderEmpCertsDashboard() {
+    const total = allEmpCerts.length;
+    const draft = allEmpCerts.filter(c => c.status === 'Draft').length;
+    const issued = allEmpCerts.filter(c => c.status === 'Issued').length;
+
+    const kpiEl = document.getElementById('ec-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total Certificates</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#e65100">${draft}</div><div class="kpi-label">Draft</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:#2e7d32">${issued}</div><div class="kpi-label">Issued</div></div>
+        `;
+    }
+
+    // By certificate type
+    const byType = {};
+    allEmpCerts.forEach(c => { byType[c.certificateType] = (byType[c.certificateType] || 0) + 1; });
+    const byTypeEl = document.getElementById('ec-by-type');
+    if (byTypeEl) {
+        if (Object.keys(byType).length === 0) {
+            byTypeEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No certificates yet.</p>';
+        } else {
+            const maxCount = Math.max(...Object.values(byType));
+            byTypeEl.innerHTML = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+                const pct = Math.round((count / maxCount) * 100);
+                const col = (EC_TYPE_COLORS[type] || { color: '#616161' }).color;
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(type)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // By entity
+    const byEntity = {};
+    allEmpCerts.forEach(c => { byEntity[c.entity] = (byEntity[c.entity] || 0) + 1; });
+    const byEntityEl = document.getElementById('ec-by-entity');
+    if (byEntityEl) {
+        if (Object.keys(byEntity).length === 0) {
+            byEntityEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No data yet.</p>';
+        } else {
+            const maxEntityCount = Math.max(...Object.values(byEntity));
+            byEntityEl.innerHTML = Object.entries(byEntity).sort((a, b) => b[1] - a[1]).map(([entity, count]) => {
+                const pct = Math.round((count / maxEntityCount) * 100);
+                return `<div class="chart-bar-row">
+                    <span class="chart-bar-label">${escapeHtml(entity)}</span>
+                    <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:#1976d2"></div></div>
+                    <span class="chart-bar-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Recent certificates
+    const recentEl = document.getElementById('ec-recent');
+    if (recentEl) {
+        const recentList = [...allEmpCerts]
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+            .slice(0, 5);
+        if (recentList.length === 0) {
+            recentEl.innerHTML = '<p class="empty-state" style="font-size:var(--fs-sm)">No certificates yet.</p>';
+        } else {
+            recentEl.innerHTML = recentList.map(c => {
+                const tc = EC_TYPE_COLORS[c.certificateType] || { bg: '#f5f5f5', color: '#616161' };
+                const sc = EC_STATUS_COLORS[c.status] || { bg: '#f5f5f5', color: '#616161' };
+                return `<div class="recent-item">
+                    <div class="recent-item-main">
+                        <span class="recent-item-name">${escapeHtml(c.employeeName)}</span>
+                        <span class="ec-type-badge" style="background:${tc.bg};color:${tc.color}">${escapeHtml(c.certificateType)}</span>
+                    </div>
+                    <div class="recent-item-sub">${escapeHtml(c.entity)} · <span class="ec-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(c.status)}</span></div>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function renderEmpCerts() {
+    const search = (document.getElementById('ec-search')?.value || '').toLowerCase();
+    const type = document.getElementById('ec-filter-type')?.value || '';
+    const status = document.getElementById('ec-filter-status')?.value || '';
+    const entity = document.getElementById('ec-filter-entity')?.value || '';
+
+    let certs = allEmpCerts.filter(c => {
+        if (type && c.certificateType !== type) return false;
+        if (status && c.status !== status) return false;
+        if (entity && c.entity !== entity) return false;
+        if (search) {
+            const hay = [c.employeeName, c.employeeEmail, c.jobTitle, c.department, c.entity, c.authorizedSignatory, c.notes].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    certs = [...certs].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+
+    const container = document.getElementById('ec-table-container');
+    if (!container) return;
+
+    if (certs.length === 0) {
+        container.innerHTML = '<p class="empty-state">No certificates found. Click "+ New Certificate" to get started.</p>';
+        return;
+    }
+
+    const rows = certs.map(c => {
+        const tc = EC_TYPE_COLORS[c.certificateType] || { bg: '#f5f5f5', color: '#616161' };
+        const sc = EC_STATUS_COLORS[c.status] || { bg: '#f5f5f5', color: '#616161' };
+        const period = c.endDate
+            ? `${escapeHtml(c.startDate)} – ${escapeHtml(c.endDate)}`
+            : `${escapeHtml(c.startDate)} – present`;
+        const salaryLabel = c.salary ? `${escapeHtml(c.salary)} ${escapeHtml(c.salaryCurrency)}` : '—';
+        return `<tr>
+            <td><strong>${escapeHtml(c.employeeName)}</strong>${c.employeeEmail ? `<br><span class="text-muted-sm">${escapeHtml(c.employeeEmail)}</span>` : ''}</td>
+            <td>${escapeHtml(c.jobTitle)}${c.department ? `<br><span class="text-muted-sm">${escapeHtml(c.department)}</span>` : ''}</td>
+            <td>${escapeHtml(c.entity)}</td>
+            <td><span class="ec-type-badge" style="background:${tc.bg};color:${tc.color}">${escapeHtml(c.certificateType)}</span></td>
+            <td><span class="ec-status-badge" style="background:${sc.bg};color:${sc.color}">${escapeHtml(c.status)}</span></td>
+            <td style="white-space:nowrap">${period}</td>
+            <td>${salaryLabel}</td>
+            <td>${c.issueDate ? escapeHtml(c.issueDate) : '—'}</td>
+            <td class="action-cell">
+                <button class="btn-icon" title="Edit" onclick="openEmpCertModal('${escapeHtml(c.id)}')">✏️</button>
+                <button class="btn-icon" title="Delete" onclick="deleteEmpCert('${escapeHtml(c.id)}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="asset-table-scroll"><table class="asset-table">
+        <thead><tr>
+            <th>Employee</th>
+            <th>Job Title / Dept.</th>
+            <th>Entity</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Employment Period</th>
+            <th>Salary</th>
+            <th>Issue Date</th>
+            <th>Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function openEmpCertModal(id) {
+    const modal = document.getElementById('emp-cert-modal');
+    const titleEl = document.getElementById('emp-cert-modal-title');
+    const submitBtn = document.getElementById('ec-submit-btn');
+    if (!modal) return;
+
+    document.getElementById('emp-cert-form').reset();
+    document.getElementById('ec-id').value = '';
+    document.getElementById('ec-success').classList.add('hidden');
+    document.getElementById('ec-error').classList.add('hidden');
+
+    if (id) {
+        const c = allEmpCerts.find(x => x.id === id);
+        if (!c) return;
+        titleEl.textContent = 'Edit Employment Certificate';
+        submitBtn.textContent = 'Save Changes';
+        document.getElementById('ec-id').value = c.id;
+        document.getElementById('ec-emp-name').value = c.employeeName || '';
+        document.getElementById('ec-emp-email').value = c.employeeEmail || '';
+        document.getElementById('ec-dob').value = c.dateOfBirth || '';
+        document.getElementById('ec-address').value = c.address || '';
+        document.getElementById('ec-job-title').value = c.jobTitle || '';
+        document.getElementById('ec-department').value = c.department || '';
+        document.getElementById('ec-employment-type').value = c.employmentType || '';
+        document.getElementById('ec-entity').value = c.entity || '';
+        document.getElementById('ec-start-date').value = c.startDate || '';
+        document.getElementById('ec-end-date').value = c.endDate || '';
+        document.getElementById('ec-cert-type').value = c.certificateType || 'Employment Confirmation';
+        document.getElementById('ec-status').value = c.status || 'Draft';
+        document.getElementById('ec-salary').value = c.salary || '';
+        document.getElementById('ec-currency').value = c.salaryCurrency || 'CHF';
+        document.getElementById('ec-issue-date').value = c.issueDate || '';
+        document.getElementById('ec-signatory').value = c.authorizedSignatory || '';
+        document.getElementById('ec-signatory-title').value = c.signatoryTitle || '';
+        document.getElementById('ec-notes').value = c.notes || '';
+    } else {
+        titleEl.textContent = 'New Employment Certificate';
+        submitBtn.textContent = 'Save Certificate';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeEmpCertModal() {
+    const modal = document.getElementById('emp-cert-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function closeEmpCertModalOnBg(event) {
+    if (event.target === document.getElementById('emp-cert-modal')) closeEmpCertModal();
+}
+
+async function submitEmpCert(event) {
+    event.preventDefault();
+    const id = document.getElementById('ec-id').value;
+    const successEl = document.getElementById('ec-success');
+    const errorEl = document.getElementById('ec-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        employeeName: document.getElementById('ec-emp-name').value.trim(),
+        employeeEmail: document.getElementById('ec-emp-email').value.trim(),
+        dateOfBirth: document.getElementById('ec-dob').value,
+        address: document.getElementById('ec-address').value.trim(),
+        jobTitle: document.getElementById('ec-job-title').value.trim(),
+        department: document.getElementById('ec-department').value.trim(),
+        employmentType: document.getElementById('ec-employment-type').value,
+        entity: document.getElementById('ec-entity').value,
+        startDate: document.getElementById('ec-start-date').value,
+        endDate: document.getElementById('ec-end-date').value,
+        certificateType: document.getElementById('ec-cert-type').value,
+        status: document.getElementById('ec-status').value,
+        salary: document.getElementById('ec-salary').value.trim(),
+        salaryCurrency: document.getElementById('ec-currency').value,
+        issueDate: document.getElementById('ec-issue-date').value,
+        authorizedSignatory: document.getElementById('ec-signatory').value.trim(),
+        signatoryTitle: document.getElementById('ec-signatory-title').value.trim(),
+        notes: document.getElementById('ec-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/employment-certificates/${id}` : `${API_URL}/employment-certificates`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving certificate';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Certificate updated!' : 'Certificate created!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allEmpCerts.findIndex(c => c.id === id);
+            if (idx !== -1) allEmpCerts[idx] = { ...allEmpCerts[idx], ...data };
+        } else {
+            allEmpCerts.push(data);
+        }
+        renderEmpCerts();
+        renderEmpCertsDashboard();
+        setTimeout(() => closeEmpCertModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteEmpCert(id) {
+    if (!confirm('Are you sure you want to delete this employment certificate?')) return;
+    try {
+        const res = await fetch(`${API_URL}/employment-certificates/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting certificate'); return; }
+        allEmpCerts = allEmpCerts.filter(c => c.id !== id);
+        renderEmpCerts();
+        renderEmpCertsDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
     }
 }
 
