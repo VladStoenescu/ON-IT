@@ -136,6 +136,11 @@
                     <span>Open Positions</span>
                 </button>
 
+                <button class="nav-item" data-section="employment-certificates" onclick="showTab('employment-certificates', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><line x1="7" y1="6" x2="13" y2="6"/><line x1="7" y1="9" x2="13" y2="9"/><line x1="7" y1="12" x2="10" y2="12"/><polyline points="11 14 13 16 16 12"/></svg>
+                    <span>Employment Certificates</span>
+                </button>
+
                 <p class="nav-group-label">Learning</p>
 
                 <button class="nav-item" data-section="trainings" onclick="showTab('trainings', event)">
@@ -951,6 +956,70 @@
                         </div>
                         <div id="op-table-container" class="asset-table-wrapper">
                             <p class="loading">Loading open positions…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Employment Certificates Tab ─────────────────────── -->
+                <div id="employment-certificates-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showEmpCertsSection('ec-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showEmpCertsSection('ec-list', this)">All Certificates</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="ec-dashboard" class="ob-section active">
+                        <h2 class="section-title">Employment Certificates Dashboard</h2>
+                        <div id="ec-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>By Certificate Type</h3>
+                                <div id="ec-by-type"></div>
+                            </div>
+                            <div class="entity-chart-box">
+                                <h3>By Entity</h3>
+                                <div id="ec-by-entity"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Recent Certificates</h3>
+                                <div id="ec-recent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Certificates Section -->
+                    <div id="ec-list" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Employment Certificates</h2>
+                            <button class="btn-primary" onclick="openEmpCertModal()">+ New Certificate</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="ec-search" placeholder="Search by employee, job title, entity…" oninput="renderEmpCerts()" class="ls-filter-input">
+                            <select id="ec-filter-type" onchange="renderEmpCerts()" class="ls-filter-select">
+                                <option value="">All Types</option>
+                                <option value="Employment Confirmation">Employment Confirmation</option>
+                                <option value="Salary Confirmation">Salary Confirmation</option>
+                                <option value="Reference Letter">Reference Letter</option>
+                                <option value="Work Experience Letter">Work Experience Letter</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <select id="ec-filter-status" onchange="renderEmpCerts()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="Draft">Draft</option>
+                                <option value="Issued">Issued</option>
+                            </select>
+                            <select id="ec-filter-entity" onchange="renderEmpCerts()" class="ls-filter-select">
+                                <option value="">All Entities</option>
+                                <option value="ON-POINT Switzerland">ON-POINT Switzerland</option>
+                                <option value="ON-POINT Germany">ON-POINT Germany</option>
+                                <option value="ON-POINT UK">ON-POINT UK</option>
+                            </select>
+                        </div>
+                        <div id="ec-table-container" class="asset-table-wrapper">
+                            <p class="loading">Loading employment certificates…</p>
                         </div>
                     </div>
                 </div>
@@ -2990,6 +3059,148 @@
                 <button type="submit" class="btn-primary">Reset Password</button>
             </div>
         </form>
+    </div>
+</div>
+<!-- Employment Certificate Modal -->
+<div id="emp-cert-modal" class="modal-overlay hidden" onclick="closeEmpCertModalOnBg(event)">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h3 id="emp-cert-modal-title">New Employment Certificate</h3>
+            <button class="modal-close" onclick="closeEmpCertModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <form id="emp-cert-form" onsubmit="submitEmpCert(event)">
+                <input type="hidden" id="ec-id">
+
+                <p class="form-section-label" style="font-weight:600;margin-bottom:8px;color:var(--text-muted)">Employee Information</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Employee Full Name *</label>
+                        <input type="text" id="ec-emp-name" required placeholder="e.g. Jane Smith">
+                    </div>
+                    <div class="form-group">
+                        <label>Employee Email</label>
+                        <input type="email" id="ec-emp-email" placeholder="jane@company.com">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <input type="date" id="ec-dob">
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <input type="text" id="ec-address" placeholder="e.g. 123 Main St, Zurich">
+                    </div>
+                </div>
+
+                <p class="form-section-label" style="font-weight:600;margin:12px 0 8px;color:var(--text-muted)">Employment Details</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Job Title / Role *</label>
+                        <input type="text" id="ec-job-title" required placeholder="e.g. Senior Consultant">
+                    </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <input type="text" id="ec-department" placeholder="e.g. SAP Integration">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Employment Type</label>
+                        <select id="ec-employment-type" class="ls-filter-select" style="width:100%">
+                            <option value="">Select type</option>
+                            <option value="Full-time">Full-time</option>
+                            <option value="Part-time">Part-time</option>
+                            <option value="Contract">Contract</option>
+                            <option value="Freelancer">Freelancer</option>
+                            <option value="Intern">Intern</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Entity *</label>
+                        <select id="ec-entity" required class="ls-filter-select" style="width:100%">
+                            <option value="">Select entity</option>
+                            <option value="ON-POINT Switzerland">ON-POINT Switzerland</option>
+                            <option value="ON-POINT Germany">ON-POINT Germany</option>
+                            <option value="ON-POINT UK">ON-POINT UK</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date *</label>
+                        <input type="date" id="ec-start-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>End Date <small>(leave blank if still employed)</small></label>
+                        <input type="date" id="ec-end-date">
+                    </div>
+                </div>
+
+                <p class="form-section-label" style="font-weight:600;margin:12px 0 8px;color:var(--text-muted)">Certificate Details</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Certificate Type</label>
+                        <select id="ec-cert-type" class="ls-filter-select" style="width:100%">
+                            <option value="Employment Confirmation">Employment Confirmation</option>
+                            <option value="Salary Confirmation">Salary Confirmation</option>
+                            <option value="Reference Letter">Reference Letter</option>
+                            <option value="Work Experience Letter">Work Experience Letter</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="ec-status" class="ls-filter-select" style="width:100%">
+                            <option value="Draft">Draft</option>
+                            <option value="Issued">Issued</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Salary <small>(optional)</small></label>
+                        <input type="text" id="ec-salary" placeholder="e.g. 80000">
+                    </div>
+                    <div class="form-group">
+                        <label>Currency</label>
+                        <select id="ec-currency" class="ls-filter-select" style="width:100%">
+                            <option value="CHF">CHF</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Issue Date</label>
+                        <input type="date" id="ec-issue-date">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Authorized Signatory</label>
+                        <input type="text" id="ec-signatory" placeholder="e.g. Hans Müller">
+                    </div>
+                    <div class="form-group">
+                        <label>Signatory Title</label>
+                        <input type="text" id="ec-signatory-title" placeholder="e.g. Head of HR">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="ec-notes" rows="3" placeholder="Additional notes or special instructions…"></textarea>
+                </div>
+
+                <p id="ec-success" class="form-success hidden"></p>
+                <p id="ec-error" class="form-error hidden"></p>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeEmpCertModal()">Cancel</button>
+                    <button type="submit" id="ec-submit-btn" class="btn-primary">Save Certificate</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
