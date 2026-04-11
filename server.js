@@ -400,7 +400,7 @@ app.post('/api/ideas', requireAuth, strictLimiter, async (req, res) => {
         const ideas = await db.getCollection('ideas');
         
         const newIdea = {
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: generateId(),
             title,
             description,
             category,
@@ -504,7 +504,7 @@ app.post('/api/ideas/:id/comments', requireAuth, async (req, res) => {
 
         if (!idea.comments) idea.comments = [];
         const comment = {
-            id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            id: generateId(),
             text: text.trim(),
             author: creatorName,
             createdAt: new Date().toISOString()
