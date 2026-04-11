@@ -209,6 +209,7 @@ app.post('/api/auth/login', strictLimiter, async (req, res) => {
         const now = new Date();
         const activeSessions = sessions.filter(s => new Date(s.expiresAt) > now);
         activeSessions.push({
+            id: token,
             token,
             userId: user.id,
             createdAt: new Date().toISOString(),
