@@ -575,6 +575,25 @@ document.getElementById('idea-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fileInput = document.getElementById('idea-files');
     const files = fileInput ? Array.from(fileInput.files) : [];
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (files.length > 5) {
+        showMessage('error', 'Maximum 5 files allowed per idea');
+        setTimeout(() => hideMessage('error'), MESSAGE_DISPLAY_DURATION);
+        return;
+    }
+    for (const f of files) {
+        if (!ALLOWED_TYPES.includes(f.type)) {
+            showMessage('error', `File type not allowed: ${f.name}`);
+            setTimeout(() => hideMessage('error'), MESSAGE_DISPLAY_DURATION);
+            return;
+        }
+        if (f.size > MAX_SIZE) {
+            showMessage('error', `File exceeds 5 MB limit: ${f.name}`);
+            setTimeout(() => hideMessage('error'), MESSAGE_DISPLAY_DURATION);
+            return;
+        }
+    }
     let attachments = [];
     if (files.length > 0) {
         try {
@@ -628,7 +647,7 @@ async function loadIdeas() {
     try {
         const [ideasRes, usersRes] = await Promise.all([
             fetch(`${API_URL}/ideas`),
-            fetch(`${API_URL}/users`)
+            fetch(`${API_URL}/users`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
         ]);
         const ideas = await ideasRes.json();
         allIdeas = ideas;

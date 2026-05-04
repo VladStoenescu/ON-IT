@@ -517,9 +517,16 @@ app.get('/api/ideas/:id/attachments/:attachmentId', requireAuth, async (req, res
         const matches = att.data.match(/^data:([^;,]+)(?:;[^;,]+)*;base64,(.+)$/);
         if (!matches) return res.status(400).json({ error: 'Invalid attachment data' });
         const mimeType = matches[1];
+        // Verify the extracted MIME type is in the allowlist to prevent serving unexpected content
+        if (!IDEA_ATTACHMENT_ALLOWED_TYPES.includes(mimeType)) {
+            return res.status(400).json({ error: 'Invalid attachment type' });
+        }
         const buffer = Buffer.from(matches[2], 'base64');
         res.set('Content-Type', mimeType);
-        res.set('Content-Disposition', `attachment; filename="${encodeURIComponent(att.name)}"`);
+        // Use RFC 6266 / RFC 5987 safe Content-Disposition header
+        const safeName = att.name.replace(/[^\w.\-]/g, '_');
+        const encodedName = encodeURIComponent(att.name);
+        res.set('Content-Disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodedName}`);
         res.send(buffer);
     } catch (error) {
         res.status(500).json({ error: 'Error downloading attachment' });
