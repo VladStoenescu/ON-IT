@@ -214,7 +214,7 @@ const ADMIN_FEATURE_GROUPS = [
     { id: 'innovation',   label: 'Innovation',     sections: ['submit', 'view'] },
     { id: 'people',       label: 'People',         sections: ['onboarding', 'skills', 'open-positions', 'employment-certificates'] },
     { id: 'learning',     label: 'Learning',       sections: ['trainings'] },
-    { id: 'tools',        label: 'Tools & Costs',  sections: ['landscape', 'assets'] },
+    { id: 'tools',        label: 'Tools & Costs',  sections: ['landscape', 'assets', 'insurance'] },
     { id: 'crm',          label: 'Sales & CRM',    sections: ['crm', 'pipeline'] },
     { id: 'operations',   label: 'Operations',     sections: ['processes'] },
     { id: 'partnerships', label: 'Partnerships',   sections: ['partnerships'] },
@@ -225,7 +225,7 @@ const ADMIN_SECTION_LABELS = {
     home: 'Home', submit: 'Submit Idea', view: 'View Ideas',
     onboarding: 'Onboarding', skills: 'Skills & Talent', 'open-positions': 'Open Positions',
     'employment-certificates': 'Employment Certificates',
-    trainings: 'Trainings', landscape: 'IT Landscape', assets: 'IT Assets',
+    trainings: 'Trainings', landscape: 'IT Landscape', assets: 'IT Assets', insurance: 'Insurance',
     crm: 'CRM Contacts', pipeline: 'Sales Pipeline', processes: 'Process Map',
     partnerships: 'Partnerships', meetings: 'Meetings', evaluations: 'Evaluations', outlook: 'Outlook'
 };
@@ -402,6 +402,7 @@ const PAGE_TITLES = {
     trainings: 'Trainings',
     landscape: 'IT Landscape',
     assets: 'IT Asset Inventory',
+    insurance: 'Insurance',
     skills: 'Skills & Talent',
     crm: 'CRM Contacts',
     pipeline: 'Sales Pipeline',
@@ -427,6 +428,9 @@ let allITTools = [];
 
 // Store all IT assets for filtering
 let allITAssets = [];
+
+// Store all insurance plans for filtering
+let allInsurancePlans = [];
 
 // Store all CRM contacts and deals for filtering
 let allCRMContacts = [];
@@ -491,6 +495,9 @@ function showTab(tabName) {
     }
     if (tabName === 'assets') {
         loadITAssets();
+    }
+    if (tabName === 'insurance') {
+        loadInsurancePlans();
     }
     if (tabName === 'skills') {
         loadSkillProfiles();
@@ -2648,6 +2655,275 @@ async function deleteTool(id) {
         allITTools = allITTools.filter(t => t.id !== id);
         renderITTools();
         renderITDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Insurance ───────────────────────────────────────────────────────────────
+
+const INSURANCE_COMPANY_COLORS = {
+    'ON-POINT Switzerland': { bg: '#e8f5e9', color: '#2e7d32', border: '#a5d6a7' },
+    'ON-POINT Germany':     { bg: '#e3f2fd', color: '#1565c0', border: '#90caf9' },
+    'ON-POINT UK':          { bg: '#fce4ec', color: '#880e4f', border: '#f48fb1' },
+    Other:                  { bg: '#f5f5f5', color: '#424242', border: '#bdbdbd' }
+};
+
+const INSURANCE_STATUS_COLORS = {
+    active:    { bg: '#e8f5e9', color: '#2e7d32', label: 'Active' },
+    expired:   { bg: '#fce4ec', color: '#880e4f', label: 'Expired' },
+    pending:   { bg: '#fff8e1', color: '#f57f17', label: 'Pending' },
+    cancelled: { bg: '#f5f5f5', color: '#616161', label: 'Cancelled' }
+};
+
+function showInsuranceSection(sectionId, btn) {
+    document.querySelectorAll('#insurance-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#insurance-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+async function loadInsurancePlans() {
+    try {
+        const res = await fetch(`${API_URL}/insurance`);
+        if (!res.ok) throw new Error('Failed to load insurance plans');
+        allInsurancePlans = await res.json();
+        renderInsurancePlans();
+        renderInsuranceDashboard();
+    } catch (err) {
+        document.getElementById('ins-plans-list').innerHTML = '<p class="error-state">Failed to load insurance plans.</p>';
+    }
+}
+
+function renderInsurancePlans() {
+    const search = (document.getElementById('ins-search')?.value || '').toLowerCase();
+    const company = document.getElementById('ins-filter-company')?.value || '';
+    const type = document.getElementById('ins-filter-type')?.value || '';
+    const status = document.getElementById('ins-filter-status')?.value || '';
+
+    let plans = allInsurancePlans.filter(p => {
+        if (company && p.company !== company) return false;
+        if (type && p.type !== type) return false;
+        if (status && p.status !== status) return false;
+        if (search && !p.name.toLowerCase().includes(search) && !(p.provider || '').toLowerCase().includes(search)) return false;
+        return true;
+    });
+
+    const container = document.getElementById('ins-plans-list');
+    if (!container) return;
+
+    if (plans.length === 0) {
+        container.innerHTML = '<p class="empty-state">No insurance plans found. Click "+ Add Plan" to get started.</p>';
+        return;
+    }
+
+    container.innerHTML = plans.map(plan => {
+        const cc = INSURANCE_COMPANY_COLORS[plan.company] || INSURANCE_COMPANY_COLORS.Other;
+        const sc = INSURANCE_STATUS_COLORS[plan.status] || INSURANCE_STATUS_COLORS.active;
+        const costStr = plan.cost !== null && plan.cost !== undefined
+            ? `${Number(plan.cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${plan.currency}`
+            : '—';
+        const billingLabel = { monthly: '/mo', annual: '/yr', 'one-time': ' one-time' }[plan.billingCycle] || '';
+        return `<div class="it-tool-card">
+            <div class="it-tool-card-header">
+                <div class="it-tool-name">${escapeHtml(plan.name)}</div>
+                <div class="it-tool-badges">
+                    <span class="it-dept-badge" style="background:${cc.bg};color:${cc.color};border-color:${cc.border}">${escapeHtml(plan.company)}</span>
+                    <span class="it-status-badge" style="background:${sc.bg};color:${sc.color}">${sc.label}</span>
+                </div>
+            </div>
+            ${plan.provider ? `<div class="it-tool-vendor">${escapeHtml(plan.provider)}</div>` : ''}
+            <div class="it-tool-footer">
+                <div class="it-tool-cost">
+                    <span class="it-cost-value">${costStr}</span>${plan.cost !== null && plan.cost !== undefined ? `<span class="it-cost-cycle">${billingLabel}</span>` : ''}
+                </div>
+                <div class="it-tool-meta">${escapeHtml(plan.type || 'Other')}</div>
+            </div>
+            <div class="it-tool-actions">
+                <button class="btn-link" data-plan-id="${plan.id}" onclick="openEditInsuranceModal(this.dataset.planId)">Edit</button>
+                <button class="btn-link btn-link-danger" data-plan-id="${plan.id}" onclick="deleteInsurancePlan(this.dataset.planId)">Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderInsuranceDashboard() {
+    const active = allInsurancePlans.filter(p => p.status === 'active');
+
+    function monthlyEquiv(plan) {
+        if (plan.cost === null || plan.cost === undefined) return 0;
+        if (plan.billingCycle === 'monthly') return plan.cost;
+        if (plan.billingCycle === 'annual') return plan.cost / 12;
+        return 0;
+    }
+    function annualEquiv(plan) {
+        if (plan.cost === null || plan.cost === undefined) return 0;
+        if (plan.billingCycle === 'monthly') return plan.cost * 12;
+        if (plan.billingCycle === 'annual') return plan.cost;
+        return 0;
+    }
+
+    const totalMonthly = active.reduce((s, p) => s + monthlyEquiv(p), 0);
+    const totalAnnual = active.reduce((s, p) => s + annualEquiv(p), 0);
+
+    const kpiEl = document.getElementById('ins-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${allInsurancePlans.length}</div><div class="kpi-label">Total Plans</div></div>
+            <div class="kpi-card"><div class="kpi-value">${active.length}</div><div class="kpi-label">Active Plans</div></div>
+            <div class="kpi-card"><div class="kpi-value">€${totalMonthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Est. Monthly Cost</div></div>
+            <div class="kpi-card"><div class="kpi-value">€${totalAnnual.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Est. Annual Cost</div></div>
+        `;
+    }
+
+    // By company/country
+    const companyEl = document.getElementById('ins-by-company');
+    if (companyEl) {
+        const byCompany = {};
+        active.forEach(p => {
+            if (!byCompany[p.company]) byCompany[p.company] = { count: 0, monthly: 0 };
+            byCompany[p.company].count++;
+            byCompany[p.company].monthly += monthlyEquiv(p);
+        });
+        const entries = Object.entries(byCompany).sort((a, b) => b[1].monthly - a[1].monthly);
+        if (entries.length === 0) {
+            companyEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No active plans yet.</p>';
+        } else {
+            companyEl.innerHTML = entries.map(([company, data]) => {
+                const cc = INSURANCE_COMPANY_COLORS[company] || INSURANCE_COMPANY_COLORS.Other;
+                return `<div class="ls-dept-row">
+                    <span class="it-dept-badge" style="background:${cc.bg};color:${cc.color};border-color:${cc.border}">${escapeHtml(company)}</span>
+                    <span class="ls-dept-count">${data.count} plan${data.count !== 1 ? 's' : ''}</span>
+                    <span class="ls-dept-cost">€${data.monthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}/mo</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Recent plans overview
+    const overviewEl = document.getElementById('ins-plans-overview');
+    if (overviewEl) {
+        const recent = [...allInsurancePlans].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
+        if (recent.length === 0) {
+            overviewEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No plans added yet.</p>';
+        } else {
+            overviewEl.innerHTML = recent.map(p => {
+                const cc = INSURANCE_COMPANY_COLORS[p.company] || INSURANCE_COMPANY_COLORS.Other;
+                const costStr = p.cost !== null && p.cost !== undefined ? `${Number(p.cost).toLocaleString()} ${p.currency}` : '—';
+                return `<div class="ls-overview-row">
+                    <span class="it-dept-badge" style="background:${cc.bg};color:${cc.color};border-color:${cc.border};flex-shrink:0">${escapeHtml(p.company)}</span>
+                    <span class="ls-overview-name">${escapeHtml(p.name)}</span>
+                    <span class="ls-overview-cost">${costStr}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function openInsuranceModal() {
+    const modal = document.getElementById('insurance-modal');
+    const form = document.getElementById('insurance-form');
+    form.reset();
+    document.getElementById('ins-id').value = '';
+    document.getElementById('insurance-modal-title').textContent = 'Add Insurance Plan';
+    document.getElementById('ins-submit-btn').textContent = 'Add Plan';
+    document.getElementById('ins-success').classList.add('hidden');
+    document.getElementById('ins-error').classList.add('hidden');
+    modal.classList.remove('hidden');
+}
+
+function openEditInsuranceModal(id) {
+    const plan = allInsurancePlans.find(p => p.id === id);
+    if (!plan) return;
+    document.getElementById('insurance-modal-title').textContent = 'Edit Insurance Plan';
+    document.getElementById('ins-submit-btn').textContent = 'Save Changes';
+    document.getElementById('ins-id').value = plan.id;
+    document.getElementById('ins-name').value = plan.name || '';
+    document.getElementById('ins-provider').value = plan.provider || '';
+    document.getElementById('ins-company').value = plan.company || '';
+    document.getElementById('ins-type').value = plan.type || 'Other';
+    document.getElementById('ins-cost').value = plan.cost !== null && plan.cost !== undefined ? plan.cost : '';
+    document.getElementById('ins-currency').value = plan.currency || 'EUR';
+    document.getElementById('ins-billing').value = plan.billingCycle || 'annual';
+    document.getElementById('ins-coverage-start').value = plan.coverageStart || '';
+    document.getElementById('ins-coverage-end').value = plan.coverageEnd || '';
+    document.getElementById('ins-status').value = plan.status || 'active';
+    document.getElementById('ins-notes').value = plan.notes || '';
+    document.getElementById('ins-success').classList.add('hidden');
+    document.getElementById('ins-error').classList.add('hidden');
+    document.getElementById('insurance-modal').classList.remove('hidden');
+}
+
+function closeInsuranceModal() {
+    document.getElementById('insurance-modal').classList.add('hidden');
+}
+
+function closeInsuranceModalOnBg(e) {
+    if (e.target === document.getElementById('insurance-modal')) closeInsuranceModal();
+}
+
+async function submitInsurancePlan(event) {
+    event.preventDefault();
+    const id = document.getElementById('ins-id').value;
+    const successEl = document.getElementById('ins-success');
+    const errorEl = document.getElementById('ins-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        name: document.getElementById('ins-name').value.trim(),
+        provider: document.getElementById('ins-provider').value.trim(),
+        company: document.getElementById('ins-company').value,
+        type: document.getElementById('ins-type').value,
+        cost: document.getElementById('ins-cost').value !== '' ? parseFloat(document.getElementById('ins-cost').value) : null,
+        currency: document.getElementById('ins-currency').value,
+        billingCycle: document.getElementById('ins-billing').value,
+        coverageStart: document.getElementById('ins-coverage-start').value || null,
+        coverageEnd: document.getElementById('ins-coverage-end').value || null,
+        status: document.getElementById('ins-status').value,
+        notes: document.getElementById('ins-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/insurance/${id}` : `${API_URL}/insurance`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving plan';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Plan updated successfully!' : 'Plan added successfully!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allInsurancePlans.findIndex(p => p.id === id);
+            if (idx !== -1) allInsurancePlans[idx] = data;
+        } else {
+            allInsurancePlans.push(data);
+        }
+        renderInsurancePlans();
+        renderInsuranceDashboard();
+        setTimeout(() => closeInsuranceModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteInsurancePlan(id) {
+    if (!confirm('Are you sure you want to delete this insurance plan?')) return;
+    try {
+        const res = await fetch(`${API_URL}/insurance/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting plan'); return; }
+        allInsurancePlans = allInsurancePlans.filter(p => p.id !== id);
+        renderInsurancePlans();
+        renderInsuranceDashboard();
     } catch (err) {
         alert('Network error. Please try again.');
     }

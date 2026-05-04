@@ -160,6 +160,11 @@
                     <span>IT Assets</span>
                 </button>
 
+                <button class="nav-item" data-section="insurance" onclick="showTab('insurance', event)">
+                    <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L3 5v5c0 4.4 3 8.1 7 9 4-0.9 7-4.6 7-9V5l-7-3z"/><polyline points="7 10 9 12 13 8"/></svg>
+                    <span>Insurance</span>
+                </button>
+
                 <p class="nav-group-label">Sales &amp; CRM</p>
 
                 <button class="nav-item" data-section="crm" onclick="showTab('crm', event)">
@@ -822,6 +827,72 @@
                         </div>
                         <div id="assets-table-container" class="asset-table-wrapper">
                             <p class="loading">Loading IT assets…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Insurance Tab ──────────────────────────────────────── -->
+                <div id="insurance-tab" class="tab-content ob-tab-content">
+                    <!-- Sub-navigation -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" onclick="showInsuranceSection('ins-dashboard', this)">Dashboard</button>
+                        <button class="sub-tab-btn" onclick="showInsuranceSection('ins-plans', this)">All Plans</button>
+                    </div>
+
+                    <!-- Dashboard Section -->
+                    <div id="ins-dashboard" class="ob-section active">
+                        <h2 class="section-title">Insurance Dashboard</h2>
+                        <div id="ins-kpi-cards" class="kpi-grid">
+                            <div class="kpi-card loading-card"><span class="kpi-spinner"></span></div>
+                        </div>
+                        <div class="dashboard-bottom">
+                            <div class="entity-chart-box">
+                                <h3>Cost by Company / Country</h3>
+                                <div id="ins-by-company"></div>
+                            </div>
+                            <div class="recent-activity-box">
+                                <h3>Recent Plans</h3>
+                                <div id="ins-plans-overview"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Plans Section -->
+                    <div id="ins-plans" class="ob-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Insurance Plans</h2>
+                            <button class="btn-primary" onclick="openInsuranceModal()">+ Add Plan</button>
+                        </div>
+                        <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                            <input type="text" id="ins-search" placeholder="Search by name or provider…" oninput="renderInsurancePlans()" class="ls-filter-input">
+                            <select id="ins-filter-company" onchange="renderInsurancePlans()" class="ls-filter-select">
+                                <option value="">All Companies</option>
+                                <option value="ON-POINT Switzerland">ON-POINT Switzerland</option>
+                                <option value="ON-POINT Germany">ON-POINT Germany</option>
+                                <option value="ON-POINT UK">ON-POINT UK</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <select id="ins-filter-type" onchange="renderInsurancePlans()" class="ls-filter-select">
+                                <option value="">All Types</option>
+                                <option value="Health">Health</option>
+                                <option value="Life">Life</option>
+                                <option value="Liability">Liability</option>
+                                <option value="Property">Property</option>
+                                <option value="Cyber">Cyber</option>
+                                <option value="Travel">Travel</option>
+                                <option value="Directors &amp; Officers">Directors &amp; Officers</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <select id="ins-filter-status" onchange="renderInsurancePlans()" class="ls-filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                                <option value="pending">Pending</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div id="ins-plans-list" class="it-tools-grid">
+                            <p class="loading">Loading insurance plans…</p>
                         </div>
                     </div>
                 </div>
@@ -2293,6 +2364,108 @@
                     </div>
                     <div id="tool-success" class="message success hidden"></div>
                     <div id="tool-error" class="message error hidden"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insurance Modal -->
+    <div id="insurance-modal" class="modal-overlay hidden" onclick="closeInsuranceModalOnBg(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="insurance-modal-title">Add Insurance Plan</h3>
+                <button class="modal-close" onclick="closeInsuranceModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="insurance-form" onsubmit="submitInsurancePlan(event)">
+                    <input type="hidden" id="ins-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Plan Name *</label>
+                            <input type="text" id="ins-name" required placeholder="e.g. Swiss Health Plan">
+                        </div>
+                        <div class="form-group">
+                            <label>Provider</label>
+                            <input type="text" id="ins-provider" placeholder="e.g. Helvetia Insurance">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Company / Country *</label>
+                            <select id="ins-company" required>
+                                <option value="">Select company</option>
+                                <option value="ON-POINT Switzerland">ON-POINT Switzerland</option>
+                                <option value="ON-POINT Germany">ON-POINT Germany</option>
+                                <option value="ON-POINT UK">ON-POINT UK</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Insurance Type</label>
+                            <select id="ins-type">
+                                <option value="Health">Health</option>
+                                <option value="Life">Life</option>
+                                <option value="Liability">Liability</option>
+                                <option value="Property">Property</option>
+                                <option value="Cyber">Cyber</option>
+                                <option value="Travel">Travel</option>
+                                <option value="Directors &amp; Officers">Directors &amp; Officers</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cost</label>
+                            <input type="number" id="ins-cost" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select id="ins-currency">
+                                <option value="EUR">EUR</option>
+                                <option value="USD">USD</option>
+                                <option value="GBP">GBP</option>
+                                <option value="CHF">CHF</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Billing Cycle</label>
+                            <select id="ins-billing">
+                                <option value="annual">Annual</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="one-time">One-time</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Coverage Start</label>
+                            <input type="date" id="ins-coverage-start">
+                        </div>
+                        <div class="form-group">
+                            <label>Coverage End</label>
+                            <input type="date" id="ins-coverage-end">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="ins-status">
+                                <option value="active">Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="expired">Expired</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="ins-notes" rows="2" placeholder="Any additional notes"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeInsuranceModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="ins-submit-btn">Add Plan</button>
+                    </div>
+                    <div id="ins-success" class="message success hidden"></div>
+                    <div id="ins-error" class="message error hidden"></div>
                 </form>
             </div>
         </div>
