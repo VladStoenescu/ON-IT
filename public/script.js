@@ -2692,7 +2692,14 @@ async function loadInsurancePlans() {
         renderInsurancePlans();
         renderInsuranceDashboard();
     } catch (err) {
-        document.getElementById('ins-plans-list').innerHTML = '<p class="error-state">Failed to load insurance plans.</p>';
+        const kpiEl = document.getElementById('ins-kpi-cards');
+        if (kpiEl) kpiEl.innerHTML = '<p class="error-state">Failed to load insurance data.</p>';
+        const byCompanyEl = document.getElementById('ins-by-company');
+        if (byCompanyEl) byCompanyEl.innerHTML = '<p class="error-state">Failed to load company data.</p>';
+        const overviewEl = document.getElementById('ins-plans-overview');
+        if (overviewEl) overviewEl.innerHTML = '<p class="error-state">Failed to load recent plans.</p>';
+        const plansEl = document.getElementById('ins-plans-list');
+        if (plansEl) plansEl.innerHTML = '<p class="error-state">Failed to load insurance plans.</p>';
     }
 }
 
