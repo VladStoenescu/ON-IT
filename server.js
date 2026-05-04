@@ -3237,6 +3237,133 @@ app.get('/health', limiter, async (req, res) => {
     }
 });
 
+// ─── Insurance API ────────────────────────────────────────────────────────────
+
+const INSURANCE_TYPES = ['Health', 'Life', 'Liability', 'Property', 'Cyber', 'Travel', 'Directors & Officers', 'Other'];
+const INSURANCE_STATUSES = ['active', 'expired', 'pending', 'cancelled'];
+const INSURANCE_BILLING_CYCLES = ['monthly', 'annual', 'one-time'];
+const INSURANCE_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF'];
+const INSURANCE_COMPANIES = ['ON-POINT Switzerland', 'ON-POINT Germany', 'ON-POINT UK', 'Other'];
+
+app.get('/api/insurance', async (req, res) => {
+    try {
+        const plans = await db.getCollection('insurance');
+        res.json(plans);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading insurance plans' });
+    }
+});
+
+app.post('/api/insurance', strictLimiter, async (req, res) => {
+    try {
+        const { name, provider, type, company, cost, currency, billingCycle, coverageStart, coverageEnd, status, notes } = req.body;
+        if (!name || !company) {
+            return res.status(400).json({ error: 'Name and company are required' });
+        }
+        if (type && !INSURANCE_TYPES.includes(type)) {
+            return res.status(400).json({ error: 'Invalid insurance type' });
+        }
+        if (!INSURANCE_COMPANIES.includes(company)) {
+            return res.status(400).json({ error: 'Invalid company' });
+        }
+        if (billingCycle && !INSURANCE_BILLING_CYCLES.includes(billingCycle)) {
+            return res.status(400).json({ error: 'Invalid billing cycle' });
+        }
+        if (currency && !INSURANCE_CURRENCIES.includes(currency)) {
+            return res.status(400).json({ error: 'Invalid currency' });
+        }
+        if (status && !INSURANCE_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        const costValue = cost !== undefined && cost !== '' ? parseFloat(cost) : null;
+        if (costValue !== null && (isNaN(costValue) || costValue < 0)) {
+            return res.status(400).json({ error: 'Cost must be a non-negative number' });
+        }
+        const plans = await db.getCollection('insurance');
+        const newPlan = {
+            id: generateId(),
+            name: name.trim(),
+            provider: provider ? provider.trim() : '',
+            type: type || 'Other',
+            company,
+            cost: costValue,
+            currency: currency || 'EUR',
+            billingCycle: billingCycle || 'annual',
+            coverageStart: coverageStart || null,
+            coverageEnd: coverageEnd || null,
+            status: status || 'active',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        plans.push(newPlan);
+        await db.setCollection('insurance', plans);
+        res.status(201).json(newPlan);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating insurance plan' });
+    }
+});
+
+app.put('/api/insurance/:id', strictLimiter, async (req, res) => {
+    try {
+        const plans = await db.getCollection('insurance');
+        const idx = plans.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Insurance plan not found' });
+        const { name, provider, type, company, cost, currency, billingCycle, coverageStart, coverageEnd, status, notes } = req.body;
+        if (type && !INSURANCE_TYPES.includes(type)) {
+            return res.status(400).json({ error: 'Invalid insurance type' });
+        }
+        if (company && !INSURANCE_COMPANIES.includes(company)) {
+            return res.status(400).json({ error: 'Invalid company' });
+        }
+        if (billingCycle && !INSURANCE_BILLING_CYCLES.includes(billingCycle)) {
+            return res.status(400).json({ error: 'Invalid billing cycle' });
+        }
+        if (currency && !INSURANCE_CURRENCIES.includes(currency)) {
+            return res.status(400).json({ error: 'Invalid currency' });
+        }
+        if (status && !INSURANCE_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        const costValue = cost !== undefined && cost !== '' ? parseFloat(cost) : plans[idx].cost;
+        if (costValue !== null && costValue !== undefined && (isNaN(costValue) || costValue < 0)) {
+            return res.status(400).json({ error: 'Cost must be a non-negative number' });
+        }
+        plans[idx] = {
+            ...plans[idx],
+            name: name ? name.trim() : plans[idx].name,
+            provider: provider !== undefined ? provider.trim() : plans[idx].provider,
+            type: type || plans[idx].type,
+            company: company || plans[idx].company,
+            cost: cost !== undefined && cost !== '' ? costValue : plans[idx].cost,
+            currency: currency || plans[idx].currency,
+            billingCycle: billingCycle || plans[idx].billingCycle,
+            coverageStart: coverageStart !== undefined ? (coverageStart || null) : plans[idx].coverageStart,
+            coverageEnd: coverageEnd !== undefined ? (coverageEnd || null) : plans[idx].coverageEnd,
+            status: status || plans[idx].status,
+            notes: notes !== undefined ? notes.trim() : plans[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await db.setCollection('insurance', plans);
+        res.json(plans[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating insurance plan' });
+    }
+});
+
+app.delete('/api/insurance/:id', strictLimiter, async (req, res) => {
+    try {
+        const plans = await db.getCollection('insurance');
+        const idx = plans.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Insurance plan not found' });
+        plans.splice(idx, 1);
+        await db.setCollection('insurance', plans);
+        res.json({ message: 'Insurance plan deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting insurance plan' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Innovation Ideas Server running on http://localhost:${PORT}`);
 });
