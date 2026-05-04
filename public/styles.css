@@ -784,6 +784,104 @@ body {
     border-color: var(--brand-red);
 }
 
+.idea-assign-select {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--brand-border);
+    border-radius: 4px;
+    font-size: var(--fs-sm);
+    font-family: inherit;
+    background: #fff;
+    cursor: pointer;
+}
+
+.idea-assign-select:focus {
+    outline: none;
+    border-color: var(--brand-red);
+}
+
+.idea-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.idea-attachments-label {
+    font-size: var(--fs-sm);
+    color: #666;
+    font-weight: 600;
+    margin-right: 2px;
+}
+
+.idea-attachment {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #f5f5f5;
+    border: 1px solid var(--brand-border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: var(--fs-sm);
+}
+
+.idea-attachment-link {
+    color: var(--brand-red);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.idea-attachment-link:hover {
+    text-decoration: underline;
+}
+
+.idea-attachment-download {
+    background: none;
+    border: none;
+    color: var(--brand-red);
+    font-weight: 500;
+    font-size: var(--fs-sm);
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: none;
+}
+
+.idea-attachment-download:hover {
+    text-decoration: underline;
+}
+
+.idea-attachment-delete {
+    background: none;
+    border: none;
+    color: #bbb;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.idea-attachment-delete:hover {
+    color: var(--brand-red);
+}
+
+.file-input {
+    display: block;
+    width: 100%;
+    padding: 6px 0;
+    font-size: var(--fs-sm);
+    font-family: inherit;
+    color: #333;
+}
+
+.form-hint {
+    display: block;
+    font-size: var(--fs-sm);
+    color: #888;
+    margin-top: 4px;
+}
+
 .btn-sm {
     padding: 5px 12px;
     border-radius: 4px;
