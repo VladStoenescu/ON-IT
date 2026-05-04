@@ -29,7 +29,7 @@ const strictLimiter = rateLimit({
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '30mb' }));
 app.use(express.static('public'));
 app.use('/api/', limiter); // Apply rate limiting to all API routes
 
@@ -377,11 +377,58 @@ app.use('/api', (req, res, next) => {
     return requireAuth(req, res, next);
 });
 
-// Get all ideas
+// Get all users (basic info only) – used for assignment dropdowns etc.
+app.get('/api/users', requireAuth, async (req, res) => {
+    try {
+        const users = await db.getCollection('users');
+        res.json(users.map(u => ({ id: u.id, name: u.name || '', email: u.email })));
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching users' });
+    }
+});
+
+const IDEA_ATTACHMENT_ALLOWED_TYPES = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain'
+];
+const IDEA_ATTACHMENT_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const IDEA_ATTACHMENT_MAX_FILES = 5;
+
+function validateAttachments(attachments) {
+    if (!Array.isArray(attachments)) return { error: 'Attachments must be an array' };
+    if (attachments.length > IDEA_ATTACHMENT_MAX_FILES) {
+        return { error: `Maximum ${IDEA_ATTACHMENT_MAX_FILES} files allowed per idea` };
+    }
+    for (const att of attachments) {
+        if (!att.name || typeof att.name !== 'string') return { error: 'Each attachment must have a name' };
+        if (!att.type || !IDEA_ATTACHMENT_ALLOWED_TYPES.includes(att.type)) {
+            return { error: `File type "${att.type}" is not allowed` };
+        }
+        if (!att.data || typeof att.data !== 'string') return { error: 'Each attachment must have base64 data' };
+        // base64 overhead is ~4/3; approximate original byte size
+        const approxBytes = Math.ceil(att.data.length * 0.75);
+        if (approxBytes > IDEA_ATTACHMENT_MAX_SIZE_BYTES) {
+            return { error: `File "${att.name}" exceeds the 5 MB limit` };
+        }
+    }
+    return null;
+}
+
+// Get all ideas (attachment data excluded from list – only metadata returned)
 app.get('/api/ideas', async (req, res) => {
     try {
         const ideas = await db.getCollection('ideas');
-        res.json(ideas);
+        const stripped = ideas.map(idea => {
+            if (!idea.attachments) return idea;
+            return {
+                ...idea,
+                attachments: idea.attachments.map(({ data, ...meta }) => meta)
+            };
+        });
+        res.json(stripped);
     } catch (error) {
         res.status(500).json({ error: 'Error reading ideas' });
     }
@@ -390,11 +437,25 @@ app.get('/api/ideas', async (req, res) => {
 // Submit a new idea
 app.post('/api/ideas', requireAuth, strictLimiter, async (req, res) => {
     try {
-        const { title, description, category, type } = req.body;
+        const { title, description, category, type, attachments } = req.body;
 
         // Validation
         if (!title || !description || !category || !type) {
             return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        let validAttachments = [];
+        if (attachments && attachments.length > 0) {
+            const attError = validateAttachments(attachments);
+            if (attError) return res.status(400).json(attError);
+            validAttachments = attachments.map(att => ({
+                id: generateId(),
+                name: String(att.name).trim().slice(0, 255),
+                type: att.type,
+                size: Number(att.size) || 0,
+                data: att.data,
+                uploadedAt: new Date().toISOString()
+            }));
         }
 
         const ideas = await db.getCollection('ideas');
@@ -407,20 +468,26 @@ app.post('/api/ideas', requireAuth, strictLimiter, async (req, res) => {
             type,
             submittedBy: req.user.name || req.user.email,
             submittedAt: new Date().toISOString(),
-            status: 'Pending'
+            status: 'Pending',
+            attachments: validAttachments
         };
 
         ideas.push(newIdea);
         await db.setCollection('ideas', ideas);
 
-        res.status(201).json({ message: 'Idea submitted successfully', idea: newIdea });
+        // Return idea without attachment data in the response
+        const { attachments: _att, ...ideaMeta } = newIdea;
+        res.status(201).json({
+            message: 'Idea submitted successfully',
+            idea: { ...ideaMeta, attachments: validAttachments.map(({ data, ...m }) => m) }
+        });
     } catch (error) {
         res.status(500).json({ error: 'Error submitting idea' });
     }
 });
 
-// Get idea by ID
-app.get('/api/ideas/:id', async (req, res) => {
+// Get idea by ID (includes full attachment data)
+app.get('/api/ideas/:id', requireAuth, async (req, res) => {
     try {
         const ideas = await db.getCollection('ideas');
         const idea = ideas.find(i => i.id === req.params.id);
@@ -435,7 +502,50 @@ app.get('/api/ideas/:id', async (req, res) => {
     }
 });
 
-// Update idea (admin: status; creator: title/description)
+// Download a specific attachment
+app.get('/api/ideas/:id/attachments/:attachmentId', requireAuth, async (req, res) => {
+    try {
+        const ideas = await db.getCollection('ideas');
+        const idea = ideas.find(i => i.id === req.params.id);
+        if (!idea) return res.status(404).json({ error: 'Idea not found' });
+        const att = (idea.attachments || []).find(a => a.id === req.params.attachmentId);
+        if (!att) return res.status(404).json({ error: 'Attachment not found' });
+        // att.data is a data URL: "data:<mime>;base64,<data>"
+        const matches = att.data.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) return res.status(400).json({ error: 'Invalid attachment data' });
+        const mimeType = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        res.set('Content-Type', mimeType);
+        res.set('Content-Disposition', `attachment; filename="${encodeURIComponent(att.name)}"`);
+        res.send(buffer);
+    } catch (error) {
+        res.status(500).json({ error: 'Error downloading attachment' });
+    }
+});
+
+// Delete an attachment from an idea (admin or idea creator)
+app.delete('/api/ideas/:id/attachments/:attachmentId', requireAuth, async (req, res) => {
+    try {
+        const ideas = await db.getCollection('ideas');
+        const idx = ideas.findIndex(i => i.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Idea not found' });
+        const idea = ideas[idx];
+        const isAdmin = req.user.role === 'admin';
+        const creatorName = req.user.name || req.user.email;
+        const isCreator = idea.submittedBy === creatorName;
+        if (!isAdmin && !isCreator) return res.status(403).json({ error: 'Not authorized' });
+        const attIdx = (idea.attachments || []).findIndex(a => a.id === req.params.attachmentId);
+        if (attIdx === -1) return res.status(404).json({ error: 'Attachment not found' });
+        idea.attachments.splice(attIdx, 1);
+        ideas[idx] = idea;
+        await db.setCollection('ideas', ideas);
+        res.json({ message: 'Attachment deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting attachment' });
+    }
+});
+
+// Update idea (admin: status/assignedTo; creator: title/description/attachments)
 app.put('/api/ideas/:id', requireAuth, async (req, res) => {
     try {
         const ideas = await db.getCollection('ideas');
@@ -479,11 +589,38 @@ app.put('/api/ideas/:id', requireAuth, async (req, res) => {
                 if (!req.body.description.trim()) return res.status(400).json({ error: 'Description cannot be empty' });
                 idea.description = req.body.description.trim();
             }
+            // Allow adding new attachments
+            if (req.body.attachments !== undefined && Array.isArray(req.body.attachments) && req.body.attachments.length > 0) {
+                const existing = idea.attachments || [];
+                const newAtts = req.body.attachments;
+                const total = existing.length + newAtts.length;
+                if (total > IDEA_ATTACHMENT_MAX_FILES) {
+                    return res.status(400).json({ error: `Maximum ${IDEA_ATTACHMENT_MAX_FILES} files allowed per idea` });
+                }
+                const attError = validateAttachments(newAtts);
+                if (attError) return res.status(400).json(attError);
+                idea.attachments = [
+                    ...existing,
+                    ...newAtts.map(att => ({
+                        id: generateId(),
+                        name: String(att.name).trim().slice(0, 255),
+                        type: att.type,
+                        size: Number(att.size) || 0,
+                        data: att.data,
+                        uploadedAt: new Date().toISOString()
+                    }))
+                ];
+            }
         }
 
         ideas[idx] = idea;
         await db.setCollection('ideas', ideas);
-        res.json(idea);
+        // Return idea without attachment binary data
+        const responseIdea = {
+            ...idea,
+            attachments: (idea.attachments || []).map(({ data, ...meta }) => meta)
+        };
+        res.json(responseIdea);
     } catch (error) {
         res.status(500).json({ error: 'Error updating idea' });
     }

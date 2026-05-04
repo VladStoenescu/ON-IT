@@ -417,6 +417,9 @@ const PAGE_TITLES = {
 // Store all ideas for filtering
 let allIdeas = [];
 
+// Store all users for idea assignment dropdown
+let allUsers = [];
+
 // Store all IT tools for filtering
 let allITTools = [];
 
@@ -559,14 +562,36 @@ function closeSidebar() {
 // Delegated event handler for idea list interactions (edit, status, comment)
 document.getElementById('ideas-list').addEventListener('click', handleIdeasListClick);
 
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve({ name: file.name, type: file.type, size: file.size, data: e.target.result });
+        reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+        reader.readAsDataURL(file);
+    });
+}
+
 document.getElementById('idea-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const fileInput = document.getElementById('idea-files');
+    const files = fileInput ? Array.from(fileInput.files) : [];
+    let attachments = [];
+    if (files.length > 0) {
+        try {
+            attachments = await Promise.all(files.map(readFileAsBase64));
+        } catch (err) {
+            showMessage('error', err.message || 'Error reading files');
+            setTimeout(() => hideMessage('error'), MESSAGE_DISPLAY_DURATION);
+            return;
+        }
+    }
     const formData = {
         title: document.getElementById('title').value,
         description: document.getElementById('description').value,
         category: document.getElementById('category').value,
         type: document.getElementById('type').value,
-        submittedBy: currentUser.name || currentUser.email
+        submittedBy: currentUser.name || currentUser.email,
+        attachments
     };
     try {
         const response = await fetch(`${API_URL}/ideas`, {
@@ -601,9 +626,13 @@ function hideMessage(type) {
 
 async function loadIdeas() {
     try {
-        const response = await fetch(`${API_URL}/ideas`);
-        const ideas = await response.json();
+        const [ideasRes, usersRes] = await Promise.all([
+            fetch(`${API_URL}/ideas`),
+            fetch(`${API_URL}/users`)
+        ]);
+        const ideas = await ideasRes.json();
         allIdeas = ideas;
+        if (usersRes.ok) allUsers = await usersRes.json();
         displayIdeas(ideas);
     } catch (error) {
         document.getElementById('ideas-list').innerHTML =
@@ -648,6 +677,41 @@ function renderIdeaComments(idea) {
     return html;
 }
 
+function renderIdeaAttachments(idea, isAdmin, isCreator) {
+    const attachments = idea.attachments || [];
+    if (attachments.length === 0) return '';
+    const items = attachments.map(att => {
+        const deleteBtn = (isAdmin || isCreator)
+            ? `<button class="idea-attachment-delete" data-idea-id="${escapeHtml(idea.id)}" data-attachment-id="${escapeHtml(att.id)}" title="Delete attachment">✕</button>`
+            : '';
+        return `<div class="idea-attachment">
+            <button class="idea-attachment-download" data-idea-id="${escapeHtml(idea.id)}" data-attachment-id="${escapeHtml(att.id)}" data-attachment-name="${escapeHtml(att.name)}" title="Download ${escapeHtml(att.name)}">📎 ${escapeHtml(att.name)}</button>
+            ${deleteBtn}
+        </div>`;
+    }).join('');
+    return `<div class="idea-attachments"><span class="idea-attachments-label">Attachments:</span>${items}</div>`;
+}
+
+async function downloadIdeaAttachment(ideaId, attachmentId, filename) {
+    try {
+        const res = await fetch(`${API_URL}/ideas/${ideaId}/attachments/${attachmentId}`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (!res.ok) { alert('Error downloading attachment'); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert('Error downloading attachment');
+    }
+}
+
 function displayIdeas(ideas) {
     const ideasList = document.getElementById('ideas-list');
     if (ideas.length === 0) {
@@ -660,6 +724,11 @@ function displayIdeas(ideas) {
         const creatorName = currentUser ? (currentUser.name || currentUser.email) : null;
         const isCreator = creatorName && idea.submittedBy === creatorName;
         const statusClass = getIdeaStatusClass(idea.status);
+        const userOptions = allUsers.map(u => {
+            const display = u.name || u.email;
+            const selected = idea.assignedTo === display ? 'selected' : '';
+            return `<option value="${escapeHtml(display)}" ${selected}>${escapeHtml(display)}</option>`;
+        }).join('');
         return `
         <div class="idea-card" data-idea-id="${escapeHtml(idea.id)}">
             <div class="idea-header">
@@ -680,6 +749,7 @@ function displayIdeas(ideas) {
                 <span class="badge status ${statusClass}">${escapeHtml(idea.status)}</span>
             </div>
             ${idea.assignedTo ? `<div class="idea-assigned-to">Assigned to: <strong>${escapeHtml(idea.assignedTo)}</strong></div>` : ''}
+            ${renderIdeaAttachments(idea, isAdmin, isCreator)}
             ${isAdmin ? `<div class="idea-admin-actions">
                 <span class="idea-admin-label">Set status:</span>
                 <button class="idea-status-btn${idea.status === 'Prioritized' ? ' active' : ''}" data-idea-id="${escapeHtml(idea.id)}" data-status="Prioritized">Prioritized</button>
@@ -688,7 +758,10 @@ function displayIdeas(ideas) {
             </div>
             <div class="idea-admin-actions">
                 <span class="idea-admin-label">Assign to:</span>
-                <input type="text" class="idea-assign-input" data-idea-id="${escapeHtml(idea.id)}" value="${escapeHtml(idea.assignedTo || '')}" placeholder="Name or leave blank" aria-label="Assign idea to">
+                <select class="idea-assign-select" data-idea-id="${escapeHtml(idea.id)}" aria-label="Assign idea to">
+                    <option value="">— None —</option>
+                    ${userOptions}
+                </select>
                 <button class="btn-sm idea-assign-btn" data-idea-id="${escapeHtml(idea.id)}">Save</button>
             </div>` : ''}
             <div class="idea-comments-section">${renderIdeaComments(idea)}</div>
@@ -711,8 +784,12 @@ function handleIdeasListClick(e) {
     } else if (btn.classList.contains('idea-comment-delete')) {
         deleteIdeaComment(ideaId, btn.dataset.commentId);
     } else if (btn.classList.contains('idea-assign-btn')) {
-        const input = document.querySelector(`.idea-assign-input[data-idea-id="${CSS.escape(ideaId)}"]`);
-        if (input) assignIdea(ideaId, input.value.trim());
+        const select = document.querySelector(`.idea-assign-select[data-idea-id="${CSS.escape(ideaId)}"]`);
+        if (select) assignIdea(ideaId, select.value);
+    } else if (btn.classList.contains('idea-attachment-delete')) {
+        deleteIdeaAttachment(ideaId, btn.dataset.attachmentId);
+    } else if (btn.classList.contains('idea-attachment-download')) {
+        downloadIdeaAttachment(ideaId, btn.dataset.attachmentId, btn.dataset.attachmentName);
     }
 }
 
@@ -752,6 +829,28 @@ async function assignIdea(ideaId, assignedTo) {
         const updated = await res.json();
         const idx = allIdeas.findIndex(i => i.id === ideaId);
         if (idx !== -1) allIdeas[idx] = updated;
+        filterIdeas();
+    } catch (e) {
+        alert('Error connecting to server');
+    }
+}
+
+async function deleteIdeaAttachment(ideaId, attachmentId) {
+    if (!confirm('Delete this attachment?')) return;
+    try {
+        const res = await fetch(`${API_URL}/ideas/${ideaId}/attachments/${attachmentId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (!res.ok) {
+            const d = await res.json();
+            alert(d.error || 'Error deleting attachment');
+            return;
+        }
+        const idx = allIdeas.findIndex(i => i.id === ideaId);
+        if (idx !== -1 && allIdeas[idx].attachments) {
+            allIdeas[idx].attachments = allIdeas[idx].attachments.filter(a => a.id !== attachmentId);
+        }
         filterIdeas();
     } catch (e) {
         alert('Error connecting to server');
