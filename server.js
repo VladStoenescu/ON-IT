@@ -408,8 +408,11 @@ function validateAttachments(attachments) {
             return { error: `File type "${att.type}" is not allowed` };
         }
         if (!att.data || typeof att.data !== 'string') return { error: 'Each attachment must have base64 data' };
+        // Extract the raw base64 portion from the data URL (after the last comma)
+        const commaIdx = att.data.indexOf(',');
+        const base64Part = commaIdx !== -1 ? att.data.slice(commaIdx + 1) : att.data;
         // base64 overhead is ~4/3; approximate original byte size
-        const approxBytes = Math.ceil(att.data.length * 0.75);
+        const approxBytes = Math.ceil(base64Part.length * 0.75);
         if (approxBytes > IDEA_ATTACHMENT_MAX_SIZE_BYTES) {
             return { error: `File "${att.name}" exceeds the 5 MB limit` };
         }
@@ -476,7 +479,7 @@ app.post('/api/ideas', requireAuth, strictLimiter, async (req, res) => {
         await db.setCollection('ideas', ideas);
 
         // Return idea without attachment data in the response
-        const { attachments: _att, ...ideaMeta } = newIdea;
+        const { attachments: _attachmentsData, ...ideaMeta } = newIdea;
         res.status(201).json({
             message: 'Idea submitted successfully',
             idea: { ...ideaMeta, attachments: validAttachments.map(({ data, ...m }) => m) }
@@ -510,8 +513,8 @@ app.get('/api/ideas/:id/attachments/:attachmentId', requireAuth, async (req, res
         if (!idea) return res.status(404).json({ error: 'Idea not found' });
         const att = (idea.attachments || []).find(a => a.id === req.params.attachmentId);
         if (!att) return res.status(404).json({ error: 'Attachment not found' });
-        // att.data is a data URL: "data:<mime>;base64,<data>"
-        const matches = att.data.match(/^data:([^;]+);base64,(.+)$/);
+        // att.data is a data URL: "data:<mime>[;charset=...];base64,<data>"
+        const matches = att.data.match(/^data:([^;,]+)(?:;[^;,]+)*;base64,(.+)$/);
         if (!matches) return res.status(400).json({ error: 'Invalid attachment data' });
         const mimeType = matches[1];
         const buffer = Buffer.from(matches[2], 'base64');

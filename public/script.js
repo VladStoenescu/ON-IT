@@ -697,7 +697,12 @@ async function downloadIdeaAttachment(ideaId, attachmentId, filename) {
         const res = await fetch(`${API_URL}/ideas/${ideaId}/attachments/${attachmentId}`, {
             headers: { 'Authorization': `Bearer ${getToken()}` }
         });
-        if (!res.ok) { alert('Error downloading attachment'); return; }
+        if (!res.ok) {
+            let msg = 'Error downloading attachment';
+            try { const d = await res.json(); msg = d.error || msg; } catch {}
+            alert(msg);
+            return;
+        }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
