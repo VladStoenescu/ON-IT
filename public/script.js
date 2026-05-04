@@ -55,7 +55,7 @@ function applyPermissions(user) {
         const section = item.getAttribute('data-section');
         if (section === 'admin') return;
         if (section === 'profile') return;
-        item.style.display = permissions.includes(section) ? '' : 'none';
+        item.style.display = (user.role === 'admin' || permissions.includes(section)) ? '' : 'none';
     });
     if (user.role === 'admin') {
         document.querySelectorAll('.admin-only').forEach(el => {
