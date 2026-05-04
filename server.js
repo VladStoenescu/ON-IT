@@ -3223,6 +3223,130 @@ app.delete('/api/employment-certificates/:id', strictLimiter, async (req, res) =
     }
 });
 
+// ─── Insurances API ───────────────────────────────────────────────────────────
+
+const INSURANCE_TYPES = ['Health', 'Life', 'Liability', 'Property', 'Cyber', 'Travel', 'Other'];
+const INSURANCE_BILLING_CYCLES = ['monthly', 'annual', 'one-time'];
+const INSURANCE_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF'];
+const INSURANCE_STATUSES = ['active', 'inactive', 'under-review'];
+
+app.get('/api/insurances', async (req, res) => {
+    try {
+        const plans = await db.getCollection('insurances');
+        res.json(plans);
+    } catch (error) {
+        res.status(500).json({ error: 'Error reading insurances' });
+    }
+});
+
+app.post('/api/insurances', strictLimiter, async (req, res) => {
+    try {
+        const { planName, provider, type, company, country, description, cost, currency, billingCycle, contractStart, contractEnd, status, notes } = req.body;
+        if (!planName) {
+            return res.status(400).json({ error: 'Plan name is required' });
+        }
+        if (type && !INSURANCE_TYPES.includes(type)) {
+            return res.status(400).json({ error: 'Invalid insurance type' });
+        }
+        if (billingCycle && !INSURANCE_BILLING_CYCLES.includes(billingCycle)) {
+            return res.status(400).json({ error: 'Invalid billing cycle' });
+        }
+        if (currency && !INSURANCE_CURRENCIES.includes(currency)) {
+            return res.status(400).json({ error: 'Invalid currency' });
+        }
+        if (status && !INSURANCE_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        const costValue = cost !== undefined && cost !== '' ? parseFloat(cost) : null;
+        if (costValue !== null && (isNaN(costValue) || costValue < 0)) {
+            return res.status(400).json({ error: 'Cost must be a non-negative number' });
+        }
+        const plans = await db.getCollection('insurances');
+        const newPlan = {
+            id: generateId(),
+            planName: planName.trim(),
+            provider: provider ? provider.trim() : '',
+            type: type || 'Other',
+            company: company ? company.trim() : '',
+            country: country ? country.trim() : '',
+            description: description ? description.trim() : '',
+            cost: costValue,
+            currency: currency || 'EUR',
+            billingCycle: billingCycle || 'annual',
+            contractStart: contractStart || null,
+            contractEnd: contractEnd || null,
+            status: status || 'active',
+            notes: notes ? notes.trim() : '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        plans.push(newPlan);
+        await db.setCollection('insurances', plans);
+        res.status(201).json(newPlan);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating insurance plan' });
+    }
+});
+
+app.put('/api/insurances/:id', strictLimiter, async (req, res) => {
+    try {
+        const plans = await db.getCollection('insurances');
+        const idx = plans.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Insurance plan not found' });
+        const { planName, provider, type, company, country, description, cost, currency, billingCycle, contractStart, contractEnd, status, notes } = req.body;
+        if (type && !INSURANCE_TYPES.includes(type)) {
+            return res.status(400).json({ error: 'Invalid insurance type' });
+        }
+        if (billingCycle && !INSURANCE_BILLING_CYCLES.includes(billingCycle)) {
+            return res.status(400).json({ error: 'Invalid billing cycle' });
+        }
+        if (currency && !INSURANCE_CURRENCIES.includes(currency)) {
+            return res.status(400).json({ error: 'Invalid currency' });
+        }
+        if (status && !INSURANCE_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        const costValue = cost !== undefined && cost !== '' ? parseFloat(cost) : plans[idx].cost;
+        if (costValue !== null && costValue !== undefined && (isNaN(costValue) || costValue < 0)) {
+            return res.status(400).json({ error: 'Cost must be a non-negative number' });
+        }
+        plans[idx] = {
+            ...plans[idx],
+            planName: planName ? planName.trim() : plans[idx].planName,
+            provider: provider !== undefined ? provider.trim() : plans[idx].provider,
+            type: type || plans[idx].type,
+            company: company !== undefined ? company.trim() : plans[idx].company,
+            country: country !== undefined ? country.trim() : plans[idx].country,
+            description: description !== undefined ? description.trim() : plans[idx].description,
+            cost: cost !== undefined && cost !== '' ? costValue : plans[idx].cost,
+            currency: currency || plans[idx].currency,
+            billingCycle: billingCycle || plans[idx].billingCycle,
+            contractStart: contractStart !== undefined ? (contractStart || null) : plans[idx].contractStart,
+            contractEnd: contractEnd !== undefined ? (contractEnd || null) : plans[idx].contractEnd,
+            status: status || plans[idx].status,
+            notes: notes !== undefined ? notes.trim() : plans[idx].notes,
+            updatedAt: new Date().toISOString()
+        };
+        await db.setCollection('insurances', plans);
+        res.json(plans[idx]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating insurance plan' });
+    }
+});
+
+app.delete('/api/insurances/:id', strictLimiter, async (req, res) => {
+    try {
+        const plans = await db.getCollection('insurances');
+        const idx = plans.findIndex(p => p.id === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'Insurance plan not found' });
+        plans.splice(idx, 1);
+        await db.setCollection('insurances', plans);
+        res.json({ message: 'Insurance plan deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting insurance plan' });
+    }
+});
+
 // Health check endpoint used by the CI/CD pipeline to verify the deployment
 app.get('/health', limiter, async (req, res) => {
     try {
