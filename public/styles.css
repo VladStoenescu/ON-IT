@@ -1849,20 +1849,6 @@ body {
     .it-tools-grid { grid-template-columns: 1fr; }
 }
 
-/* ─── Insurance ──────────────────────────────────────────────────────────────── */
-
-.ins-country-badge {
-    display: inline-block;
-    padding: 3px 9px;
-    border-radius: 4px;
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    background: #e3f2fd;
-    color: #1565c0;
-    border: 1px solid #90caf9;
-    white-space: nowrap;
-}
-
 /* ─── IT Asset Inventory ─────────────────────────────────────────────────────── */
 
 .asset-table-wrapper {
