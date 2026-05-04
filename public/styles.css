@@ -764,6 +764,26 @@ body {
     border-color: var(--brand-red);
 }
 
+.idea-assigned-to {
+    font-size: var(--fs-sm);
+    color: #555;
+    margin-top: 8px;
+}
+
+.idea-assign-input {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--brand-border);
+    border-radius: 4px;
+    font-size: var(--fs-sm);
+    font-family: inherit;
+}
+
+.idea-assign-input:focus {
+    outline: none;
+    border-color: var(--brand-red);
+}
+
 .btn-sm {
     padding: 5px 12px;
     border-radius: 4px;

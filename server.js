@@ -462,6 +462,14 @@ app.put('/api/ideas/:id', requireAuth, async (req, res) => {
             idea.status = req.body.status;
         }
 
+        if (isAdmin && req.body.assignedTo !== undefined) {
+            const assignedTo = req.body.assignedTo ? String(req.body.assignedTo).trim() : '';
+            if (assignedTo.length > 200) {
+                return res.status(400).json({ error: 'Assigned to name must be 200 characters or fewer' });
+            }
+            idea.assignedTo = assignedTo;
+        }
+
         if (isCreator) {
             if (req.body.title !== undefined) {
                 if (!req.body.title.trim()) return res.status(400).json({ error: 'Title cannot be empty' });
@@ -481,7 +489,7 @@ app.put('/api/ideas/:id', requireAuth, async (req, res) => {
     }
 });
 
-// Add comment to idea (creator only)
+// Add comment to idea (any authenticated user)
 app.post('/api/ideas/:id/comments', requireAuth, async (req, res) => {
     try {
         const { text } = req.body;
@@ -497,16 +505,14 @@ app.post('/api/ideas/:id/comments', requireAuth, async (req, res) => {
         }
 
         const idea = ideas[idx];
-        const creatorName = req.user.name || req.user.email;
-        if (idea.submittedBy !== creatorName) {
-            return res.status(403).json({ error: 'Only the idea creator can add comments' });
-        }
+        const authorName = req.user.name || req.user.email;
 
         if (!idea.comments) idea.comments = [];
         const comment = {
             id: generateId(),
             text: text.trim(),
-            author: creatorName,
+            author: authorName,
+            authorId: req.user.id,
             createdAt: new Date().toISOString()
         };
         idea.comments.push(comment);
@@ -519,7 +525,7 @@ app.post('/api/ideas/:id/comments', requireAuth, async (req, res) => {
     }
 });
 
-// Delete comment from idea (creator only)
+// Delete comment from idea (comment author or admin only)
 app.delete('/api/ideas/:id/comments/:commentId', requireAuth, async (req, res) => {
     try {
         const ideas = await db.getCollection('ideas');
@@ -530,10 +536,7 @@ app.delete('/api/ideas/:id/comments/:commentId', requireAuth, async (req, res) =
         }
 
         const idea = ideas[idx];
-        const creatorName = req.user.name || req.user.email;
-        if (idea.submittedBy !== creatorName) {
-            return res.status(403).json({ error: 'Only the idea creator can delete comments' });
-        }
+        const isAdmin = req.user.role === 'admin';
 
         if (!idea.comments) {
             return res.status(404).json({ error: 'Comment not found' });
@@ -541,6 +544,15 @@ app.delete('/api/ideas/:id/comments/:commentId', requireAuth, async (req, res) =
         const commentIdx = idea.comments.findIndex(c => c.id === req.params.commentId);
         if (commentIdx === -1) {
             return res.status(404).json({ error: 'Comment not found' });
+        }
+
+        const comment = idea.comments[commentIdx];
+        const isCommentAuthor = comment.authorId
+            ? comment.authorId === req.user.id
+            : comment.author === (req.user.name || req.user.email);
+
+        if (!isAdmin && !isCommentAuthor) {
+            return res.status(403).json({ error: 'Not authorized to delete this comment' });
         }
 
         idea.comments.splice(commentIdx, 1);

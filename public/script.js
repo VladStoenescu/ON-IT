@@ -619,21 +619,27 @@ function getIdeaStatusClass(status) {
 
 function renderIdeaComments(idea) {
     const comments = idea.comments || [];
-    const creatorName = currentUser ? (currentUser.name || currentUser.email) : null;
-    const isCreator = creatorName && idea.submittedBy === creatorName;
+    const currentName = currentUser ? (currentUser.name || currentUser.email) : null;
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const isLoggedIn = !!currentUser;
     let html = '';
     if (comments.length > 0) {
         html += `<div class="idea-comments">`;
         comments.forEach(c => {
+            const isCommentAuthor = currentUser && (
+                (c.authorId && c.authorId === currentUser.id) ||
+                (!c.authorId && c.author === currentName)
+            );
+            const canDelete = isAdmin || isCommentAuthor;
             html += `<div class="idea-comment">
                 <span class="idea-comment-text">${escapeHtml(c.text)}</span>
                 <span class="idea-comment-meta">${escapeHtml(c.author)} · ${formatDate(c.createdAt)}</span>
-                ${isCreator ? `<button class="idea-comment-delete" data-idea-id="${escapeHtml(idea.id)}" data-comment-id="${escapeHtml(c.id)}" title="Delete comment">✕</button>` : ''}
+                ${canDelete ? `<button class="idea-comment-delete" data-idea-id="${escapeHtml(idea.id)}" data-comment-id="${escapeHtml(c.id)}" title="Delete comment">✕</button>` : ''}
             </div>`;
         });
         html += `</div>`;
     }
-    if (isCreator) {
+    if (isLoggedIn) {
         html += `<div class="idea-add-comment">
             <input type="text" class="idea-comment-input" data-idea-id="${escapeHtml(idea.id)}" placeholder="Add a comment…" maxlength="500">
             <button class="btn-sm idea-comment-post" data-idea-id="${escapeHtml(idea.id)}">Post</button>
@@ -673,11 +679,17 @@ function displayIdeas(ideas) {
                 <span class="badge type">${escapeHtml(idea.type)}</span>
                 <span class="badge status ${statusClass}">${escapeHtml(idea.status)}</span>
             </div>
+            ${idea.assignedTo ? `<div class="idea-assigned-to">Assigned to: <strong>${escapeHtml(idea.assignedTo)}</strong></div>` : ''}
             ${isAdmin ? `<div class="idea-admin-actions">
                 <span class="idea-admin-label">Set status:</span>
                 <button class="idea-status-btn${idea.status === 'Prioritized' ? ' active' : ''}" data-idea-id="${escapeHtml(idea.id)}" data-status="Prioritized">Prioritized</button>
                 <button class="idea-status-btn${idea.status === 'Implemented' ? ' active' : ''}" data-idea-id="${escapeHtml(idea.id)}" data-status="Implemented">Implemented</button>
                 <button class="idea-status-btn${idea.status === 'Pending' ? ' active' : ''}" data-idea-id="${escapeHtml(idea.id)}" data-status="Pending">Pending</button>
+            </div>
+            <div class="idea-admin-actions">
+                <span class="idea-admin-label">Assign to:</span>
+                <input type="text" class="idea-assign-input" data-idea-id="${escapeHtml(idea.id)}" value="${escapeHtml(idea.assignedTo || '')}" placeholder="Name or leave blank" aria-label="Assign idea to">
+                <button class="btn-sm idea-assign-btn" data-idea-id="${escapeHtml(idea.id)}">Save</button>
             </div>` : ''}
             <div class="idea-comments-section">${renderIdeaComments(idea)}</div>
         </div>`;
@@ -698,6 +710,9 @@ function handleIdeasListClick(e) {
         submitIdeaComment(ideaId);
     } else if (btn.classList.contains('idea-comment-delete')) {
         deleteIdeaComment(ideaId, btn.dataset.commentId);
+    } else if (btn.classList.contains('idea-assign-btn')) {
+        const input = document.querySelector(`.idea-assign-input[data-idea-id="${CSS.escape(ideaId)}"]`);
+        if (input) assignIdea(ideaId, input.value.trim());
     }
 }
 
@@ -711,6 +726,27 @@ async function updateIdeaStatus(ideaId, status) {
         if (!res.ok) {
             const d = await res.json();
             alert(d.error || 'Error updating status');
+            return;
+        }
+        const updated = await res.json();
+        const idx = allIdeas.findIndex(i => i.id === ideaId);
+        if (idx !== -1) allIdeas[idx] = updated;
+        filterIdeas();
+    } catch (e) {
+        alert('Error connecting to server');
+    }
+}
+
+async function assignIdea(ideaId, assignedTo) {
+    try {
+        const res = await fetch(`${API_URL}/ideas/${ideaId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ assignedTo })
+        });
+        if (!res.ok) {
+            const d = await res.json();
+            alert(d.error || 'Error assigning idea');
             return;
         }
         const updated = await res.json();
@@ -840,7 +876,7 @@ function downloadIdeasCSV() {
     if (typeFilter) ideas = ideas.filter(i => i.type === typeFilter);
     ideas = [...ideas].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
 
-    const headers = ['Title', 'Description', 'Category', 'Type', 'Submitted By', 'Submitted At', 'Status', 'Comments'];
+    const headers = ['Title', 'Description', 'Category', 'Type', 'Submitted By', 'Submitted At', 'Status', 'Assigned To', 'Comments'];
     const csvEscape = val => {
         const s = val == null ? '' : String(val);
         return '"' + s.replace(/"/g, '""') + '"';
@@ -853,6 +889,7 @@ function downloadIdeasCSV() {
         csvEscape(idea.submittedBy),
         csvEscape(idea.submittedAt ? new Date(idea.submittedAt).toISOString() : ''),
         csvEscape(idea.status || ''),
+        csvEscape(idea.assignedTo || ''),
         csvEscape((idea.comments || []).length)
     ]);
 
