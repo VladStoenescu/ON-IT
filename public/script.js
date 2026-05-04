@@ -214,7 +214,7 @@ const ADMIN_FEATURE_GROUPS = [
     { id: 'innovation',   label: 'Innovation',     sections: ['submit', 'view'] },
     { id: 'people',       label: 'People',         sections: ['onboarding', 'skills', 'open-positions', 'employment-certificates'] },
     { id: 'learning',     label: 'Learning',       sections: ['trainings'] },
-    { id: 'tools',        label: 'Tools & Costs',  sections: ['landscape', 'assets'] },
+    { id: 'tools',        label: 'Tools & Costs',  sections: ['landscape', 'assets', 'insurance', 'company-costs'] },
     { id: 'crm',          label: 'Sales & CRM',    sections: ['crm', 'pipeline'] },
     { id: 'operations',   label: 'Operations',     sections: ['processes'] },
     { id: 'partnerships', label: 'Partnerships',   sections: ['partnerships'] },
@@ -226,6 +226,7 @@ const ADMIN_SECTION_LABELS = {
     onboarding: 'Onboarding', skills: 'Skills & Talent', 'open-positions': 'Open Positions',
     'employment-certificates': 'Employment Certificates',
     trainings: 'Trainings', landscape: 'IT Landscape', assets: 'IT Assets',
+    insurance: 'Insurances', 'company-costs': 'Company Costs',
     crm: 'CRM Contacts', pipeline: 'Sales Pipeline', processes: 'Process Map',
     partnerships: 'Partnerships', meetings: 'Meetings', evaluations: 'Evaluations', outlook: 'Outlook'
 };
@@ -402,6 +403,8 @@ const PAGE_TITLES = {
     trainings: 'Trainings',
     landscape: 'IT Landscape',
     assets: 'IT Asset Inventory',
+    insurance: 'Insurances',
+    'company-costs': 'Company Costs',
     skills: 'Skills & Talent',
     crm: 'CRM Contacts',
     pipeline: 'Sales Pipeline',
@@ -427,6 +430,9 @@ let allITTools = [];
 
 // Store all IT assets for filtering
 let allITAssets = [];
+
+// Store all insurance plans for filtering
+let allInsurances = [];
 
 // Store all CRM contacts and deals for filtering
 let allCRMContacts = [];
@@ -491,6 +497,12 @@ function showTab(tabName) {
     }
     if (tabName === 'assets') {
         loadITAssets();
+    }
+    if (tabName === 'insurance') {
+        loadInsurances();
+    }
+    if (tabName === 'company-costs') {
+        loadCompanyCosts();
     }
     if (tabName === 'skills') {
         loadSkillProfiles();
@@ -2653,10 +2665,465 @@ async function deleteTool(id) {
     }
 }
 
+// ─── Insurances ──────────────────────────────────────────────────────────────
+
+const INSURANCE_TYPE_COLORS = {
+    Health:    { bg: '#e8f5e9', color: '#2e7d32', border: '#a5d6a7' },
+    Life:      { bg: '#e3f2fd', color: '#1565c0', border: '#90caf9' },
+    Liability: { bg: '#fff3e0', color: '#e65100', border: '#ffcc80' },
+    Property:  { bg: '#f3e5f5', color: '#6a1b9a', border: '#ce93d8' },
+    Cyber:     { bg: '#e8eaf6', color: '#283593', border: '#9fa8da' },
+    Travel:    { bg: '#e0f2f1', color: '#00695c', border: '#80cbc4' },
+    Other:     { bg: '#f5f5f5', color: '#424242', border: '#bdbdbd' }
+};
+
+function showInsuranceSection(sectionId, btn) {
+    document.querySelectorAll('#insurance-tab .ob-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('#insurance-tab .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+async function loadInsurances() {
+    try {
+        const res = await fetch(`${API_URL}/insurances`);
+        if (!res.ok) throw new Error('Failed to load insurance plans');
+        allInsurances = await res.json();
+        populateInsuranceCountryFilter();
+        renderInsurancePlans();
+        renderInsuranceDashboard();
+    } catch (err) {
+        document.getElementById('ins-plans-list').innerHTML = '<p class="error-state">Failed to load insurance plans.</p>';
+    }
+}
+
+function populateInsuranceCountryFilter() {
+    const countries = [...new Set(allInsurances.map(p => p.country).filter(Boolean))].sort();
+    const sel = document.getElementById('ins-filter-country');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All Countries</option>' +
+        countries.map(c => `<option value="${escapeHtml(c)}"${c === current ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+}
+
+function renderInsurancePlans() {
+    const search = (document.getElementById('ins-search')?.value || '').toLowerCase();
+    const type = document.getElementById('ins-filter-type')?.value || '';
+    const country = document.getElementById('ins-filter-country')?.value || '';
+    const status = document.getElementById('ins-filter-status')?.value || '';
+
+    let plans = allInsurances.filter(p => {
+        if (type && p.type !== type) return false;
+        if (country && p.country !== country) return false;
+        if (status && p.status !== status) return false;
+        if (search && !p.planName.toLowerCase().includes(search) && !(p.provider || '').toLowerCase().includes(search)) return false;
+        return true;
+    });
+
+    const container = document.getElementById('ins-plans-list');
+    if (!container) return;
+
+    if (plans.length === 0) {
+        container.innerHTML = '<p class="empty-state">No insurance plans found. Click "+ Add Plan" to get started.</p>';
+        return;
+    }
+
+    container.innerHTML = plans.map(plan => {
+        const tc = INSURANCE_TYPE_COLORS[plan.type] || INSURANCE_TYPE_COLORS.Other;
+        const costStr = plan.cost !== null && plan.cost !== undefined
+            ? `${Number(plan.cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${plan.currency}`
+            : '—';
+        const billingLabel = { monthly: '/mo', annual: '/yr', 'one-time': ' one-time' }[plan.billingCycle] || '';
+        const statusColors = {
+            active: { bg: '#e8f5e9', color: '#2e7d32' },
+            inactive: { bg: '#f5f5f5', color: '#616161' },
+            'under-review': { bg: '#fff8e1', color: '#f57f17' }
+        };
+        const sc = statusColors[plan.status] || statusColors.active;
+        const statusLabel = { active: 'Active', inactive: 'Inactive', 'under-review': 'Under Review' }[plan.status] || plan.status;
+        return `<div class="it-tool-card">
+            <div class="it-tool-card-header">
+                <div class="it-tool-name">${escapeHtml(plan.planName)}</div>
+                <div class="it-tool-badges">
+                    <span class="it-dept-badge" style="background:${tc.bg};color:${tc.color};border-color:${tc.border}">${escapeHtml(plan.type || 'Other')}</span>
+                    <span class="it-status-badge" style="background:${sc.bg};color:${sc.color}">${statusLabel}</span>
+                </div>
+            </div>
+            ${plan.provider ? `<div class="it-tool-vendor">${escapeHtml(plan.provider)}</div>` : ''}
+            ${plan.company || plan.country ? `<div class="it-tool-vendor" style="color:var(--brand-text)">${[plan.company, plan.country].filter(Boolean).map(escapeHtml).join(' · ')}</div>` : ''}
+            ${plan.description ? `<div class="it-tool-desc">${escapeHtml(plan.description)}</div>` : ''}
+            <div class="it-tool-footer">
+                <div class="it-tool-cost">
+                    <span class="it-cost-value">${costStr}</span>${plan.cost !== null && plan.cost !== undefined ? `<span class="it-cost-cycle">${billingLabel}</span>` : ''}
+                </div>
+                <div class="it-tool-meta">${escapeHtml(plan.country || '—')}</div>
+            </div>
+            <div class="it-tool-actions">
+                <button class="btn-link" data-plan-id="${plan.id}" onclick="openEditInsuranceModal(this.dataset.planId)">Edit</button>
+                <button class="btn-link btn-link-danger" data-plan-id="${plan.id}" onclick="deleteInsurance(this.dataset.planId)">Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderInsuranceDashboard() {
+    const active = allInsurances.filter(p => p.status === 'active');
+
+    function monthlyEquiv(plan) {
+        if (plan.cost === null || plan.cost === undefined) return 0;
+        if (plan.billingCycle === 'monthly') return plan.cost;
+        if (plan.billingCycle === 'annual') return plan.cost / 12;
+        return 0;
+    }
+    function annualEquiv(plan) {
+        if (plan.cost === null || plan.cost === undefined) return 0;
+        if (plan.billingCycle === 'monthly') return plan.cost * 12;
+        if (plan.billingCycle === 'annual') return plan.cost;
+        return 0;
+    }
+
+    const totalMonthly = active.reduce((s, p) => s + monthlyEquiv(p), 0);
+    const totalAnnual = active.reduce((s, p) => s + annualEquiv(p), 0);
+
+    const kpiEl = document.getElementById('ins-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">${allInsurances.length}</div><div class="kpi-label">Total Plans</div></div>
+            <div class="kpi-card"><div class="kpi-value">${active.length}</div><div class="kpi-label">Active Plans</div></div>
+            <div class="kpi-card"><div class="kpi-value">€${totalMonthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Est. Monthly Cost</div></div>
+            <div class="kpi-card"><div class="kpi-value">€${totalAnnual.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Est. Annual Cost</div></div>
+        `;
+    }
+
+    // By country
+    const countryEl = document.getElementById('ins-by-country');
+    if (countryEl) {
+        const byCountry = {};
+        active.forEach(p => {
+            const key = p.country || '(No Country)';
+            if (!byCountry[key]) byCountry[key] = { count: 0, monthly: 0 };
+            byCountry[key].count++;
+            byCountry[key].monthly += monthlyEquiv(p);
+        });
+        const entries = Object.entries(byCountry).sort((a, b) => b[1].monthly - a[1].monthly);
+        if (entries.length === 0) {
+            countryEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No active plans yet.</p>';
+        } else {
+            countryEl.innerHTML = entries.map(([country, data]) => `<div class="ls-dept-row">
+                <span class="ins-country-badge">${escapeHtml(country)}</span>
+                <span class="ls-dept-count">${data.count} plan${data.count !== 1 ? 's' : ''}</span>
+                <span class="ls-dept-cost">€${data.monthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}/mo</span>
+            </div>`).join('');
+        }
+    }
+
+    // By type
+    const typeEl = document.getElementById('ins-by-type');
+    if (typeEl) {
+        const byType = {};
+        active.forEach(p => {
+            const key = p.type || 'Other';
+            if (!byType[key]) byType[key] = { count: 0, monthly: 0 };
+            byType[key].count++;
+            byType[key].monthly += monthlyEquiv(p);
+        });
+        const entries = Object.entries(byType).sort((a, b) => b[1].monthly - a[1].monthly);
+        if (entries.length === 0) {
+            typeEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No active plans yet.</p>';
+        } else {
+            typeEl.innerHTML = entries.map(([type, data]) => {
+                const tc = INSURANCE_TYPE_COLORS[type] || INSURANCE_TYPE_COLORS.Other;
+                return `<div class="ls-dept-row">
+                    <span class="it-dept-badge" style="background:${tc.bg};color:${tc.color};border-color:${tc.border}">${escapeHtml(type)}</span>
+                    <span class="ls-dept-count">${data.count} plan${data.count !== 1 ? 's' : ''}</span>
+                    <span class="ls-dept-cost">€${data.monthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}/mo</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Recent plans
+    const recentEl = document.getElementById('ins-recent');
+    if (recentEl) {
+        const recent = [...allInsurances].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
+        if (recent.length === 0) {
+            recentEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No plans added yet.</p>';
+        } else {
+            recentEl.innerHTML = recent.map(p => {
+                const tc = INSURANCE_TYPE_COLORS[p.type] || INSURANCE_TYPE_COLORS.Other;
+                const costStr = p.cost !== null && p.cost !== undefined ? `${Number(p.cost).toLocaleString()} ${p.currency}` : '—';
+                return `<div class="ls-overview-row">
+                    <span class="it-dept-badge" style="background:${tc.bg};color:${tc.color};border-color:${tc.border};flex-shrink:0">${escapeHtml(p.type || 'Other')}</span>
+                    <span class="ls-overview-name">${escapeHtml(p.planName)}</span>
+                    <span class="ls-overview-cost">${costStr}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function openInsuranceModal() {
+    const modal = document.getElementById('insurance-modal');
+    const form = document.getElementById('insurance-form');
+    form.reset();
+    document.getElementById('ins-id').value = '';
+    document.getElementById('insurance-modal-title').textContent = 'Add Insurance Plan';
+    document.getElementById('ins-submit-btn').textContent = 'Add Plan';
+    document.getElementById('ins-success').classList.add('hidden');
+    document.getElementById('ins-error').classList.add('hidden');
+    modal.classList.remove('hidden');
+}
+
+function openEditInsuranceModal(id) {
+    const plan = allInsurances.find(p => p.id === id);
+    if (!plan) return;
+    document.getElementById('insurance-modal-title').textContent = 'Edit Insurance Plan';
+    document.getElementById('ins-submit-btn').textContent = 'Save Changes';
+    document.getElementById('ins-id').value = plan.id;
+    document.getElementById('ins-plan-name').value = plan.planName || '';
+    document.getElementById('ins-provider').value = plan.provider || '';
+    document.getElementById('ins-type').value = plan.type || 'Other';
+    document.getElementById('ins-status').value = plan.status || 'active';
+    document.getElementById('ins-company').value = plan.company || '';
+    document.getElementById('ins-country').value = plan.country || '';
+    document.getElementById('ins-description').value = plan.description || '';
+    document.getElementById('ins-cost').value = plan.cost !== null && plan.cost !== undefined ? plan.cost : '';
+    document.getElementById('ins-currency').value = plan.currency || 'EUR';
+    document.getElementById('ins-billing').value = plan.billingCycle || 'annual';
+    document.getElementById('ins-contract-start').value = plan.contractStart || '';
+    document.getElementById('ins-contract-end').value = plan.contractEnd || '';
+    document.getElementById('ins-notes').value = plan.notes || '';
+    document.getElementById('ins-success').classList.add('hidden');
+    document.getElementById('ins-error').classList.add('hidden');
+    document.getElementById('insurance-modal').classList.remove('hidden');
+}
+
+function closeInsuranceModal() {
+    document.getElementById('insurance-modal').classList.add('hidden');
+}
+
+function closeInsuranceModalOnBg(e) {
+    if (e.target === document.getElementById('insurance-modal')) closeInsuranceModal();
+}
+
+async function submitInsurance(event) {
+    event.preventDefault();
+    const id = document.getElementById('ins-id').value;
+    const successEl = document.getElementById('ins-success');
+    const errorEl = document.getElementById('ins-error');
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    const payload = {
+        planName: document.getElementById('ins-plan-name').value.trim(),
+        provider: document.getElementById('ins-provider').value.trim(),
+        type: document.getElementById('ins-type').value,
+        status: document.getElementById('ins-status').value,
+        company: document.getElementById('ins-company').value.trim(),
+        country: document.getElementById('ins-country').value.trim(),
+        description: document.getElementById('ins-description').value.trim(),
+        cost: document.getElementById('ins-cost').value !== '' ? parseFloat(document.getElementById('ins-cost').value) : null,
+        currency: document.getElementById('ins-currency').value,
+        billingCycle: document.getElementById('ins-billing').value,
+        contractStart: document.getElementById('ins-contract-start').value || null,
+        contractEnd: document.getElementById('ins-contract-end').value || null,
+        notes: document.getElementById('ins-notes').value.trim()
+    };
+
+    try {
+        const url = id ? `${API_URL}/insurances/${id}` : `${API_URL}/insurances`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            errorEl.textContent = data.error || 'Error saving insurance plan';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        successEl.textContent = id ? 'Plan updated successfully!' : 'Plan added successfully!';
+        successEl.classList.remove('hidden');
+        if (id) {
+            const idx = allInsurances.findIndex(p => p.id === id);
+            if (idx !== -1) allInsurances[idx] = data;
+        } else {
+            allInsurances.push(data);
+        }
+        populateInsuranceCountryFilter();
+        renderInsurancePlans();
+        renderInsuranceDashboard();
+        setTimeout(() => closeInsuranceModal(), 1200);
+    } catch (err) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function deleteInsurance(id) {
+    if (!confirm('Are you sure you want to delete this insurance plan?')) return;
+    try {
+        const res = await fetch(`${API_URL}/insurances/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Error deleting insurance plan'); return; }
+        allInsurances = allInsurances.filter(p => p.id !== id);
+        populateInsuranceCountryFilter();
+        renderInsurancePlans();
+        renderInsuranceDashboard();
+    } catch (err) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ─── Company Costs ────────────────────────────────────────────────────────────
+
+async function loadCompanyCosts() {
+    try {
+        const [toolsRes, insRes] = await Promise.all([
+            fetch(`${API_URL}/it-landscape`),
+            fetch(`${API_URL}/insurances`)
+        ]);
+        if (toolsRes.ok) allITTools = await toolsRes.json();
+        if (insRes.ok) allInsurances = await insRes.json();
+        populateCompanyCostsCountryFilter();
+        renderCompanyCosts();
+    } catch (err) {
+        console.error('Failed to load company costs', err);
+    }
+}
+
+function populateCompanyCostsCountryFilter() {
+    const countries = [...new Set(allInsurances.map(p => p.country).filter(Boolean))].sort();
+    const sel = document.getElementById('cc-filter-country');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All Countries</option>' +
+        countries.map(c => `<option value="${escapeHtml(c)}"${c === current ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+}
+
+function renderCompanyCosts() {
+    const filterCountry = document.getElementById('cc-filter-country')?.value || '';
+
+    function monthlyEquivTool(tool) {
+        if (tool.cost === null || tool.cost === undefined) return 0;
+        if (tool.billingCycle === 'monthly') return tool.cost;
+        if (tool.billingCycle === 'annual') return tool.cost / 12;
+        return 0;
+    }
+    function annualEquivTool(tool) {
+        if (tool.cost === null || tool.cost === undefined) return 0;
+        if (tool.billingCycle === 'monthly') return tool.cost * 12;
+        if (tool.billingCycle === 'annual') return tool.cost;
+        return 0;
+    }
+    function monthlyEquivIns(plan) {
+        if (plan.cost === null || plan.cost === undefined) return 0;
+        if (plan.billingCycle === 'monthly') return plan.cost;
+        if (plan.billingCycle === 'annual') return plan.cost / 12;
+        return 0;
+    }
+    function annualEquivIns(plan) {
+        if (plan.cost === null || plan.cost === undefined) return 0;
+        if (plan.billingCycle === 'monthly') return plan.cost * 12;
+        if (plan.billingCycle === 'annual') return plan.cost;
+        return 0;
+    }
+
+    const activeTools = allITTools.filter(t => t.status === 'active');
+    const activeIns = allInsurances.filter(p => p.status === 'active');
+
+    const totalITMonthly = activeTools.reduce((s, t) => s + monthlyEquivTool(t), 0);
+    const totalITAnnual = activeTools.reduce((s, t) => s + annualEquivTool(t), 0);
+    const totalInsMonthly = activeIns.reduce((s, p) => s + monthlyEquivIns(p), 0);
+    const totalInsAnnual = activeIns.reduce((s, p) => s + annualEquivIns(p), 0);
+
+    const kpiEl = document.getElementById('cc-kpi-cards');
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <div class="kpi-card"><div class="kpi-value">€${totalITMonthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">IT Monthly Cost</div></div>
+            <div class="kpi-card"><div class="kpi-value">€${totalInsMonthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Insurance Monthly Cost</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:var(--brand-red)">€${(totalITMonthly + totalInsMonthly).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Total Monthly Cost</div></div>
+            <div class="kpi-card"><div class="kpi-value" style="color:var(--brand-red)">€${(totalITAnnual + totalInsAnnual).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div><div class="kpi-label">Total Annual Cost</div></div>
+        `;
+    }
+
+    // IT by department
+    const itCountryEl = document.getElementById('cc-it-by-country');
+    if (itCountryEl) {
+        const byDept = {};
+        activeTools.forEach(t => {
+            const key = t.department || 'Other';
+            if (!byDept[key]) byDept[key] = { count: 0, monthly: 0 };
+            byDept[key].count++;
+            byDept[key].monthly += monthlyEquivTool(t);
+        });
+        const entries = Object.entries(byDept).sort((a, b) => b[1].monthly - a[1].monthly);
+        if (entries.length === 0) {
+            itCountryEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No active IT tools yet.</p>';
+        } else {
+            itCountryEl.innerHTML = entries.map(([dept, data]) => {
+                const dc = IT_DEPT_COLORS[dept] || IT_DEPT_COLORS.Other;
+                return `<div class="ls-dept-row">
+                    <span class="it-dept-badge" style="background:${dc.bg};color:${dc.color};border-color:${dc.border}">${escapeHtml(dept)}</span>
+                    <span class="ls-dept-count">${data.count} tool${data.count !== 1 ? 's' : ''}</span>
+                    <span class="ls-dept-cost">€${data.monthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}/mo</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Insurance by country
+    const insCountryEl = document.getElementById('cc-ins-by-country');
+    if (insCountryEl) {
+        const filteredIns = filterCountry ? activeIns.filter(p => p.country === filterCountry) : activeIns;
+        const byCountry = {};
+        filteredIns.forEach(p => {
+            const key = p.country || '(No Country)';
+            if (!byCountry[key]) byCountry[key] = { count: 0, monthly: 0 };
+            byCountry[key].count++;
+            byCountry[key].monthly += monthlyEquivIns(p);
+        });
+        const entries = Object.entries(byCountry).sort((a, b) => b[1].monthly - a[1].monthly);
+        if (entries.length === 0) {
+            insCountryEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No active insurance plans yet.</p>';
+        } else {
+            insCountryEl.innerHTML = entries.map(([country, data]) => `<div class="ls-dept-row">
+                <span class="ins-country-badge">${escapeHtml(country)}</span>
+                <span class="ls-dept-count">${data.count} plan${data.count !== 1 ? 's' : ''}</span>
+                <span class="ls-dept-cost">€${data.monthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}/mo</span>
+            </div>`).join('');
+        }
+    }
+
+    // Total by country
+    const totalEl = document.getElementById('cc-total-by-country');
+    if (totalEl) {
+        const filteredIns = filterCountry ? activeIns.filter(p => p.country === filterCountry) : activeIns;
+        const byCountry = {};
+        filteredIns.forEach(p => {
+            const key = p.country || '(No Country)';
+            if (!byCountry[key]) byCountry[key] = { insMonthly: 0, insAnnual: 0 };
+            byCountry[key].insMonthly += monthlyEquivIns(p);
+            byCountry[key].insAnnual += annualEquivIns(p);
+        });
+        const entries = Object.entries(byCountry).sort((a, b) => b[1].insMonthly - a[1].insMonthly);
+        if (entries.length === 0) {
+            totalEl.innerHTML = '<p class="empty-state" style="font-size:0.9em;color:var(--brand-muted)">No country data available yet.</p>';
+        } else {
+            totalEl.innerHTML = entries.map(([country, data]) => `<div class="ls-dept-row">
+                <span class="ins-country-badge">${escapeHtml(country)}</span>
+                <span class="ls-dept-count" style="font-size:var(--fs-xs);color:var(--brand-muted)">Insurance</span>
+                <span class="ls-dept-cost" style="color:var(--brand-red);font-weight:700">€${data.insMonthly.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}/mo</span>
+            </div>`).join('');
+        }
+    }
+}
+
 // ─── IT Asset Inventory ───────────────────────────────────────────────────────
 
 const ASSET_TYPE_ICONS = {
-    Laptop: '💻', Desktop: '🖥️', Monitor: '🖵', Phone: '📱', Tablet: '📲',
     Printer: '🖨️', Server: '🗄️', 'Network Equipment': '🔌', Peripheral: '🖱️', Other: '📦'
 };
 
