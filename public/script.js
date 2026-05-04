@@ -3124,6 +3124,7 @@ function renderCompanyCosts() {
 // ─── IT Asset Inventory ───────────────────────────────────────────────────────
 
 const ASSET_TYPE_ICONS = {
+    Laptop: '💻', Desktop: '🖥️', Monitor: '🖵', Phone: '📱', Tablet: '📲',
     Printer: '🖨️', Server: '🗄️', 'Network Equipment': '🔌', Peripheral: '🖱️', Other: '📦'
 };
 
